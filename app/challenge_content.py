@@ -1,9 +1,13 @@
 """Content for the Challenges tab.
 
 A challenge is different from a Problem: a Problem teaches one knob with a
-known optimum. This challenge hands you a fixed design and a fixed evaluator and
+known optimum. A challenge hands you a fixed design and a fixed evaluator and
 lets you optimize by ANY open-source means, then ranks the legal entries on a
 composite cost. There is no revealed optimum; you see your percentile.
+
+The first entry is Competition 01, which is the Challenges tab itself. Every
+other entry has its own page at /challenges/<slug>, rendered by the template
+it names; all of them share challenge_layout.html.
 
 The flow is whatever the entrant wants (open tools only). An entry is a git
 repository holding that flow; the official run builds every entry on the reference
@@ -23,6 +27,9 @@ CHALLENGES = [
             "on clock speed, area and power."
         ),
         "status": "open",
+        "template": "challenge.html",
+        # the smaller challenge its page points to, just above the steps
+        "warmup": "ibex",
         "design": {
             "name": "Gemmini, from the University of California, Berkeley",
             "summary": (
@@ -256,6 +263,245 @@ CHALLENGES = [
              "note": "the logic-equivalence prover the gate uses, through Yosys"},
             {"label": "KLayout", "url": "https://www.klayout.de",
              "note": "layout viewing and DRC"},
+        ],
+    },
+    {
+        # the warmup: a small flat core, the same kind of harness and score as
+        # Competition 01, and a 1 hour budget. Its harness is not built yet, so
+        # status is "soon": the page says so, the harness buttons are inactive,
+        # and every number the reference run sets is left to be published with it
+        "slug": "ibex",
+        "title": "Chipbase Warmup: Ibex RISC-V Core",
+        "template": "challenge_ibex.html",
+        "tagline": (
+            "Harden Ibex, a small 32-bit RISC-V (Reduced Instruction Set Computer, "
+            "fifth generation) processor core, on ASAP7 (Arizona State University's "
+            "7 nm predictive process) with any open tools. It is the warmup for "
+            "Competition 01: a full run fits in one hour, and entries are scored on "
+            "clock speed, area and power."
+        ),
+        "status": "soon",
+        "status_note": (
+            "The harness, the reference layout and its numbers are published when "
+            "the reference run is finished. Until then, the rules and scoring below "
+            "are a draft and may change."
+        ),
+        # how Competition 01's page introduces it
+        "callout_title": "Warm up on Ibex",
+        "callout": (
+            "New to the open flow? Start with the warmup, a smaller challenge on Ibex, "
+            "a 32-bit RISC-V (Reduced Instruction Set Computer, fifth generation) "
+            "processor core. It works the same way, with a harness, an evaluator and "
+            "a leaderboard of its own, but a full run fits in a 1 hour budget, so you "
+            "can try several ideas in an evening."
+        ),
+        "callout_link": "Go to the Ibex warmup",
+        "design": {
+            "name": "Ibex, from lowRISC",
+            "summary": (
+                "A 32-bit RISC-V processor core with a two-stage pipeline: the first "
+                "stage fetches instructions and the second decodes and executes them. "
+                "It runs the base integer instructions plus the multiply and divide "
+                "and the compressed instruction extensions, and keeps its registers "
+                "in flip-flops. There are no memory macros, so the whole core is "
+                "standard cells. This is the configuration OpenROAD-flow-scripts "
+                "ships, from Ibex commit 77d8010."
+            ),
+        },
+        "allowed": [
+            "Any open-source tools, stock or patched.",
+            "Your own tooling: write custom placers, routers, scripts, or anything else, as long as it is open source and in your repository.",
+            "Enter alone or as a team.",
+            "Submit again when you improve: your best score counts.",
+            "Any optimization: floorplan, die shape, pins, sizing, buffering, useful skew, manual placement.",
+        ],
+        "notallowed": [
+            "Commercial or proprietary tools, libraries, or IP (Intellectual Property).",
+            "Changing the design's function or interface (checked by equivalence against the pinned synthesis of the golden RTL).",
+            "Changing synthesis in any way: the evaluator re-synthesizes the core with the pinned settings, and your netlist must be equivalent to it. Retiming, scan insertion, and adding, removing, duplicating, or merging registers are therefore out.",
+            "Hardened blocks: the core is built flat, as one layout.",
+            "Anything fetched from outside: your build must run offline, from your repository and the fixed inputs only.",
+        ],
+        "constraints_free": [
+            "Clock period: a faster clock scores better",
+            "Die size, aspect ratio, and utilization",
+            "I/O (Input/Output) pin placement",
+            "Clock tree targets and useful skew",
+            "Cell choices, including the threshold-voltage mix",
+            "Power grid design (straps, pitch, layers), as long as it meets the IR (current times resistance) drop limit",
+            "Any other knob in the flow: tool settings, scripts, effort levels, anything not in the fixed list",
+        ],
+        "constraints_fixed": [
+            "One clock, on the clock port clk_i: you choose its period and nothing else about it",
+            "Input and output paths: input to register and register to output within 80 percent of your period, input to output within 60 percent",
+            "Every path is timed: there are no false or multicycle paths",
+            "No clock uncertainty, input drive, or output load: the same ideal conditions for every entry",
+            "Operating corners: setup at the slow corner, hold at the fast, power at the typical",
+            "Wire resistance and capacitance per layer, pinned for M2 through M9",
+            "Switching activity for power: one pinned file for everyone",
+            "IR drop limit: 110 mV worst-case static drop",
+        ],
+        "howitworks": [
+            "Clone the harness, start the pinned container, and run `./setup.sh` inside it:",
+            "Optional: `./run_baseline.sh` reproduces the reference, then `./evaluate.sh baseline/` should score 1.000, confirming your machine matches it.",
+            "Make the flow your own: edit or replace the reference flow in `flow/`. `run_baseline.sh` runs it, both here and in the official run, where `reproduce/run.sh` copies its result to `/result`.",
+            "Build and score your flow inside the container:",
+            "Once you are ready to submit, push your source, without build outputs, and open an issue on the harness repository with your repository, the commit, and your `eval_work/mine/evaluation.json`.",
+        ],
+        # files to start from are linked once the harness is published
+        "start_points": [],
+        # speed leads here: there are no blocks or memories to pack, so the die
+        # is the cells synthesis fixes, and the clock period is where physical
+        # design shows most on a processor pipeline; keep in step with the
+        # harness's scoring.yaml once it exists
+        "weights": {"T": 0.50, "A": 0.30, "P": 0.20},
+        "cost_why": (
+            "The factors multiply rather than add, so a gain on any axis moves "
+            "your score and no single term drowns the others. The weights are "
+            "fixed before the warmup opens and do not change once entries arrive: "
+            "speed 0.50, area 0.30, power 0.20. Speed counts most because on a "
+            "processor core the clock period is where physical design shows: "
+            "placement, sizing, buffering and the clock tree all move the critical "
+            "path through the pipeline. Area counts less: synthesis fixes the "
+            "cells, so the die comes down mostly to how densely you place them. "
+            "Power moves least: most of it is drawn by logic the pinned synthesis "
+            "fixes."
+        ),
+        "evaluator": (
+            "The evaluator is what scores you. It is fixed, it uses the tools pinned "
+            "in versions.lock, and it computes every number from your layout "
+            "itself; anything your own flow reports is ignored. It runs the same "
+            "way on your machine (./evaluate.sh baseline/) and in the official "
+            "run. Steps marked GATE decide pass or fail: miss any gate and the "
+            "entry is not ranked. The other steps produce the numbers the score is "
+            "built from."
+        ),
+        "eval_steps": [
+            {"title": "Build your entry", "gate": False,
+             "body": "The official runner clones your repository at the commit you submit, builds its container, and runs your flow with no network, 8 threads, and 16 GB of memory. Your flow writes result/: the DEF (Design Exchange Format) layout, the netlist, and period.txt. Only these files are read: any parasitics, timing models, or reports your flow writes are ignored. Locally, judge/run_entry.sh runs every step here; ./evaluate.sh baseline/ runs every step from Timing on, on the result you built."},
+            {"title": "Compute budget", "gate": True,
+             "body": "The official runner measures how long your build takes on its machine, from the start of reproduce/run.sh to its end, and it must be 1 hour or less. judge/run_entry.sh reports the same measurement locally, in judge.json, but only the official run's time counts."},
+            {"title": "Timing, legality, routing, area", "gate": True,
+             "body": "Reads your layout, extracts its parasitics with the pinned rules, and times it with OpenSTA at your declared period with propagated clocks: setup at the slow corner (0.63 V, 100 °C), hold at the fast corner. Checks that no cell overlaps another, that everything is on the placement grid, and that no net is unrouted. The die area comes from the layout's outline."},
+            {"title": "Power", "gate": False,
+             "body": "Total power at the typical corner with a fixed 1,000 ps reference clock, from the pinned switching activity: a short program run on the golden RTL, published with the harness. Activity is applied per flip-flop by register name and propagated through the rest. A slower clock does not lower your power score."},
+            {"title": "Power integrity", "gate": True,
+             "body": "Static IR drop analysis of your power grid with OpenROAD, using that power; the worst drop must be at most 110 mV."},
+            {"title": "Design rules", "gate": True,
+             "body": "The layout is checked with the detailed router's own rule checker against the technology's routing and via rules. Any short, or any via spacing, enclosure, or off-grid violation, fails the entry. The checker's other findings (end-of-line keep-out and spacing, corner and metal spacing, minimum width) are reported as counts but do not fail the entry, as in Competition 01. The open ASAP7 KLayout deck is available for information, but it is not a gate."},
+            {"title": "Logic equivalence", "gate": True,
+             "body": "The evaluator runs the pinned synthesis itself: the golden RTL through the pinned Yosys with the pinned settings. Your final netlist must be equivalent to the result. The proof cuts every register, pairs each flip-flop with the synthesized register of the same name, and has ABC prove the logic between them. If the prover cannot finish, the netlist is checked with 2,000,000 random vectors instead: it passes, and the report says it was checked, not proven. Keep synthesis as pinned: the gate is what you did after it."},
+            {"title": "Layout matches netlist", "gate": True,
+             "body": "The pin-level connectivity of the layout is compared with that of the netlist that passed equivalence, net by net. ASAP7 has no open transistor-level LVS (Layout Versus Schematic) deck, so this compares the connectivity the layout declares; opens and shorts in the metal are caught by routing and the design-rule check."},
+            {"title": "Score", "gate": False,
+             "body": "The figure of merit from your clock period, die area, and power against the reference values, which are published with the harness. The report lists every gate's result and details, every metric, and the score, and evaluation.json holds the same as JSON (JavaScript Object Notation) for the leaderboard."},
+        ],
+        "eval_note": (
+            "The evaluator is deterministic: the same result always gets the "
+            "same numbers. Its own runtime does not count toward your budget."
+        ),
+        "eval_open_runtime": "",
+        "submission": (
+            "A git repository of source that builds your layout from the pinned "
+            "RTL, with nothing prebuilt. The official run builds the result from "
+            "it, so the layout is never committed. The harness has the full "
+            "submission spec."
+        ),
+        "honesty": [
+            ("No shipped answers.",
+             "Your repository may carry scripts, tools, and floorplan constraints: die size, pin placement, and placement regions. It may not carry a finished placement, routing, or gate netlist, and your flow must synthesize from the pinned RTL, the same RTL everyone downloads. The official run mounts that RTL at /design and builds with no network, a person reads the flow of every leading entry before it is certified, and the tool logs are kept, so a run too fast to be real is examined."),
+            ("Every layer is charged for its wires.",
+             "M2 through M7 have calibrated resistance and capacitance in the flow. M8 and M9 have no calibrated values in stock OpenROAD-flow-scripts, so the evaluator uses our pinned values for them, derived from the ASAP7 layer geometry. You may route on M8 and M9, and those wires are charged at the pinned values, never at zero."),
+            ("The evaluator is the same one you run.",
+             "The evaluator is public, and everyone can run it locally as often as they like. If you find a gap in it, report it on the harness repository."),
+        ],
+        "requirements": [
+            "A Linux machine on x86-64.",
+            "8 threads and 16 GB of memory: the same limits the official run builds under.",
+            "Free disk for the container image and a few runs; the exact figure is published with the harness.",
+            "Docker, or any OCI (Open Container Initiative) container runtime.",
+            "Git and Python 3 on your machine itself, outside the container, and a repository for your entry.",
+        ],
+        "stack": [
+            {"mark": "RV32", "name": "Ibex",
+             "role": "the processor core",
+             "url": "https://github.com/lowRISC/ibex"},
+            {"mark": "7nm", "name": "ASAP7",
+             "role": "the 7 nm process kit",
+             "url": "https://github.com/The-OpenROAD-Project/asap7"},
+            {"img": "logo_yosys.png", "name": "Yosys",
+             "role": "logic synthesis",
+             "url": "https://github.com/YosysHQ/yosys"},
+            {"img": "logo_openroad.png", "name": "OpenROAD",
+             "role": "place and route",
+             "url": "https://github.com/The-OpenROAD-Project/OpenROAD"},
+            {"img": "logo_klayout.png", "name": "KLayout",
+             "role": "layout and design rules",
+             "url": "https://www.klayout.de"},
+        ],
+        "pins": [
+            {"what": "OpenROAD-flow-scripts",
+             "detail": "the flow and the ASAP7 platform files, the same commit as Competition 01",
+             "ref": "bde10c7",
+             "url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/bde10c79a2389ffe9c5d73445f177f81262059f9"},
+            {"what": "Ibex RTL",
+             "detail": "as OpenROAD-flow-scripts ships it, in its default configuration",
+             "ref": "77d8010",
+             "url": "https://github.com/lowRISC/ibex/tree/77d801001554cce8fe69e742e96539eecbe74425"},
+            {"what": "ASAP7 PDK (Process Design Kit)",
+             "detail": "inside the flow, pinned by the commit above",
+             "ref": "flow/platforms/asap7",
+             "url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/bde10c79a2389ffe9c5d73445f177f81262059f9/flow/platforms/asap7"},
+        ],
+        # not published yet: the page shows the harness buttons as inactive
+        "repo_url": None,
+        "quickstart_code": (
+            "git clone https://github.com/Samcooper01/ibex-warmup-harness\n"
+            "cd ibex-warmup-harness\n"
+            "\n"
+            "# the pinned image: OpenROAD-flow-scripts at the challenge commit\n"
+            "DIGEST=sha256:6bc088ee563c76374f7ef5d0a3244d607a6162c8979f1815f92eef683c1169a4\n"
+            "docker run --rm -it \\\n"
+            "  -v \"$PWD\":/work -w /work \\\n"
+            "  openroad/orfs@$DIGEST bash\n"
+            "\n"
+            "# inside the container:\n"
+            "./setup.sh                # links the container's tools and checks them"
+        ),
+        "iterate_code": (
+            "./run_baseline.sh          # runs your flow, as reproduce/run.sh does,\n"
+            "                           # into baseline/\n"
+            "./evaluate.sh baseline/    # checks every gate and scores it"
+        ),
+        "presubmit_text": "Before you submit, test it once the way the official run will: commit, then run the official runner in a terminal on your own machine, outside the container (for an entry that is not a fork of the harness, add its path and commit):",
+        "selftest_code": (
+            "git add -A && git commit -m \"my entry\"\n"
+            "# builds your commit's container and runs it with no network under the\n"
+            "# 1 hour budget, then scores it, writing eval_work/mine/evaluation.json\n"
+            "judge/run_entry.sh"
+        ),
+        "submit_how": (
+            "To send it in, open an issue on the harness repository with your "
+            "repository, the commit to build, and the evaluation.json from your "
+            "test with the official runner (eval_work/mine/evaluation.json). The official run builds your repository at that "
+            "commit and scores what it builds; your own numbers are checked "
+            "against its run."
+        ),
+        "links": [
+            {"label": "OpenROAD-flow-scripts @ bde10c7", "url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/bde10c79a2389ffe9c5d73445f177f81262059f9",
+             "note": "the exact flow and PDK the harness pins"},
+            {"label": "ASAP7 PDK", "url": "https://github.com/The-OpenROAD-Project/asap7",
+             "note": "the process design kit"},
+            {"label": "OpenROAD", "url": "https://github.com/The-OpenROAD-Project/OpenROAD",
+             "note": "place and route, timing, extraction, and design-rule checks"},
+            {"label": "Yosys", "url": "https://github.com/YosysHQ/yosys",
+             "note": "synthesis"},
+            {"label": "OpenSTA", "url": "https://github.com/The-OpenROAD-Project/OpenSTA",
+             "note": "the static timing engine the timing gate uses"},
+            {"label": "ABC", "url": "https://github.com/berkeley-abc/abc",
+             "note": "the logic-equivalence prover the gate uses, through Yosys"},
+            {"label": "KLayout", "url": "https://www.klayout.de",
+             "note": "layout viewing and design-rule checks"},
         ],
     },
 ]

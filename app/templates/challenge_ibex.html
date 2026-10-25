@@ -1,0 +1,214 @@
+{% extends "challenge_layout.html" %}
+{# the Ibex warmup: the parts of the page only it has; everything else is
+   challenge_layout.html. It has no reference layout section until the
+   reference run is published, so that section and its menu entry are left out #}
+{% block og_description %}Take Ibex, a small open-source RISC-V processor core, from RTL to a complete layout in the ASAP7 predictive process with open-source tools, within a 1 hour budget. The warmup for Chipbase Competition 01.{% endblock %}
+{% block spec_strip %}
+    <dl class="spec-strip">
+      <div><dt>Core</dt><dd>32-bit RISC-V, 2-stage pipeline</dd></div>
+      <div><dt>Process</dt><dd>ASAP7</dd></div>
+      <div><dt>Runtime budget</dt><dd>1 h, 8 threads, 16 GB of memory</dd></div>
+    </dl>
+{% endblock %}
+{% block design %}
+    {% set t_iport = "The core's port to instruction memory: it sends an address and gets back 32 bits of instructions. The memory itself sits outside the core and is not part of this challenge." %}
+    {% set t_dport = "The core's port to data memory, for loads and stores, 32 bits wide. The memory itself sits outside the core and is not part of this challenge." %}
+    {% set t_pref = "Prefetch buffer: fetches instructions ahead of time and holds them in a small first-in, first-out queue, so the pipeline does not wait on every fetch." %}
+    {% set t_cdec = "Compressed decoder: expands 16-bit compressed instructions into their 32-bit equivalents, so the rest of the core sees only full-size instructions." %}
+    {% set t_preg = "Pipeline register: holds the fetched instruction for one clock between the two stages." %}
+    {% set t_clk = "One clock: a single clock, on the clk_i port, drives every flip-flop in the core, including the register file." %}
+    {% set t_dec = "Decoder: works out what each instruction does, which registers it reads and writes, and which unit runs it." %}
+    {% set t_ctl = "Controller: the core's control state machine. It handles branches and jumps, stalls, exceptions, interrupts and debug requests." %}
+    {% set t_rf = "Register file: the 32 general-purpose registers, 32 bits each, built from flip-flops; register zero always reads as zero. Two reads and one write every clock." %}
+    {% set t_csr = "Control and status registers: the core's settings and counters, such as the cycle counter and the state of interrupts and exceptions." %}
+    {% set t_alu = "Arithmetic logic unit: adds, subtracts, compares, shifts and does bitwise logic, and decides whether a branch is taken." %}
+    {% set t_md = "Multiplier and divider: run the multiply and divide instructions, each taking more than one clock." %}
+    {% set t_lsu = "Load-store unit: sends load and store requests to the data memory and lines up the data that comes back." %}
+    <p><b>{{ ch.design.name }}.</b> {{ ch.design.summary }}</p>
+    <div class="block-diagram">
+      <svg viewBox="0 0 720 412" role="img" aria-label="Ibex processor core block diagram: a fetch stage and a decode and execute stage, between the instruction and data memory ports" style="font-family:'Inter',system-ui,sans-serif">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#5f6470"/>
+          </marker>
+        </defs>
+
+        <!-- the two memory ports, outside the core -->
+        <rect class="bd-tip" data-tip="{{ t_iport }}" tabindex="0" x="40" y="10" width="270" height="26" rx="6" fill="#16241b"/>
+        <text class="bd-tip" data-tip="{{ t_iport }}" x="175" y="27" text-anchor="middle" fill="#f4f3ee" font-size="12" font-family="ui-monospace,monospace">Instruction memory port  (32 b)</text>
+        <rect class="bd-tip" data-tip="{{ t_dport }}" tabindex="0" x="410" y="10" width="270" height="26" rx="6" fill="#16241b"/>
+        <text class="bd-tip" data-tip="{{ t_dport }}" x="545" y="27" text-anchor="middle" fill="#f4f3ee" font-size="12" font-family="ui-monospace,monospace">Data memory port  (32 b)</text>
+
+        <!-- stage 1: fetch -->
+        <rect x="30" y="56" width="290" height="290" rx="8" fill="#f7f6f2" stroke="#cdd0c8" stroke-dasharray="5 3"/>
+        <text x="42" y="72" fill="#5f6470" font-size="9.5" font-weight="700" letter-spacing="0.06em">STAGE 1  &#183;  FETCH</text>
+        <line x1="175" y1="36" x2="175" y2="86" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <rect class="bd-tip" data-tip="{{ t_pref }}" tabindex="0" x="50" y="88" width="250" height="50" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
+        <text class="bd-tip" data-tip="{{ t_pref }}" x="175" y="109" text-anchor="middle" fill="#16241b" font-size="12" font-weight="700">Prefetch buffer</text>
+        <text x="175" y="126" text-anchor="middle" fill="#5f6470" font-size="10.5">fetches ahead into a small queue</text>
+        <line x1="175" y1="138" x2="175" y2="156" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <rect class="bd-tip" data-tip="{{ t_cdec }}" tabindex="0" x="50" y="158" width="250" height="50" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
+        <text class="bd-tip" data-tip="{{ t_cdec }}" x="175" y="179" text-anchor="middle" fill="#16241b" font-size="12" font-weight="700">Compressed decoder</text>
+        <text x="175" y="196" text-anchor="middle" fill="#5f6470" font-size="10.5">16-bit instructions &#8594; 32-bit</text>
+        <line x1="175" y1="208" x2="175" y2="226" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <rect class="bd-tip" data-tip="{{ t_preg }}" tabindex="0" x="50" y="228" width="250" height="30" rx="5" fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3"/>
+        <text class="bd-tip" data-tip="{{ t_preg }}" x="175" y="247" text-anchor="middle" fill="#b45309" font-size="11.5" font-weight="700">Pipeline register</text>
+
+        <!-- the clock -->
+        <rect class="bd-tip" data-tip="{{ t_clk }}" tabindex="0" x="50" y="276" width="250" height="54" rx="6" fill="#ffffff" stroke="#16241b" stroke-dasharray="4 3"/>
+        <circle cx="68" cy="294" r="7" fill="none" stroke="#16241b" stroke-width="1.2"/>
+        <line x1="68" y1="294" x2="68" y2="289" stroke="#16241b" stroke-width="1.2"/>
+        <line x1="68" y1="294" x2="72" y2="296" stroke="#16241b" stroke-width="1.2"/>
+        <text class="bd-tip" data-tip="{{ t_clk }}" x="84" y="298" fill="#16241b" font-size="12" font-weight="700">One clock</text>
+        <text x="62" y="318" fill="#16241b" font-size="11">drives every flip-flop in the core</text>
+
+        <!-- the fetched instruction into stage 2 -->
+        <polyline points="300,243 330,243 330,111 354,111" fill="none" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+
+        <!-- stage 2: decode and execute -->
+        <rect x="340" y="56" width="362" height="290" rx="8" fill="#f7f6f2" stroke="#cdd0c8" stroke-dasharray="5 3"/>
+        <text x="352" y="72" fill="#5f6470" font-size="9.5" font-weight="700" letter-spacing="0.06em">STAGE 2  &#183;  DECODE AND EXECUTE</text>
+        <g fill="#ffffff" stroke="#cdd0c8">
+          <rect class="bd-tip" data-tip="{{ t_dec }}" tabindex="0" x="356" y="88" width="160" height="46" rx="5"/>
+          <rect class="bd-tip" data-tip="{{ t_ctl }}" tabindex="0" x="528" y="88" width="160" height="46" rx="5"/>
+          <rect class="bd-tip" data-tip="{{ t_csr }}" tabindex="0" x="528" y="150" width="160" height="70" rx="5"/>
+        </g>
+        <g fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3">
+          <rect class="bd-tip" data-tip="{{ t_rf }}" tabindex="0" x="356" y="150" width="160" height="70" rx="5"/>
+          <rect class="bd-tip" data-tip="{{ t_alu }}" tabindex="0" x="356" y="240" width="100" height="52" rx="5"/>
+          <rect class="bd-tip" data-tip="{{ t_md }}" tabindex="0" x="466" y="240" width="110" height="52" rx="5"/>
+          <rect class="bd-tip" data-tip="{{ t_lsu }}" tabindex="0" x="586" y="240" width="102" height="52" rx="5"/>
+        </g>
+        <g font-size="12" font-weight="700" text-anchor="middle">
+          <text class="bd-tip" data-tip="{{ t_dec }}" x="436" y="108" fill="#16241b">Decoder</text>
+          <text class="bd-tip" data-tip="{{ t_ctl }}" x="608" y="108" fill="#16241b">Controller</text>
+          <text class="bd-tip" data-tip="{{ t_csr }}" x="608" y="172" fill="#16241b">Control and status</text>
+          <text class="bd-tip" data-tip="{{ t_csr }}" x="608" y="187" fill="#16241b">registers</text>
+          <text class="bd-tip" data-tip="{{ t_rf }}" x="436" y="172" fill="#b45309">Register file</text>
+          <text class="bd-tip" data-tip="{{ t_alu }}" x="406" y="262" fill="#b45309">Arithmetic</text>
+          <text class="bd-tip" data-tip="{{ t_alu }}" x="406" y="277" fill="#b45309">logic unit</text>
+          <text class="bd-tip" data-tip="{{ t_md }}" x="521" y="262" fill="#b45309">Multiplier</text>
+          <text class="bd-tip" data-tip="{{ t_md }}" x="521" y="277" fill="#b45309">and divider</text>
+          <text class="bd-tip" data-tip="{{ t_lsu }}" x="637" y="262" fill="#b45309">Load-store</text>
+          <text class="bd-tip" data-tip="{{ t_lsu }}" x="637" y="277" fill="#b45309">unit</text>
+        </g>
+        <g font-size="10.5" fill="#5f6470" text-anchor="middle">
+          <text x="436" y="124">reads the instruction</text>
+          <text x="608" y="124">branches, stalls, exceptions</text>
+          <text x="608" y="205">settings and counters</text>
+          <text x="436" y="189">32 registers &#215; 32 bits</text>
+          <text x="436" y="205">in flip-flops</text>
+        </g>
+        <!-- decode reads the registers; the registers feed the execute units; the controller owns the status registers -->
+        <line x1="436" y1="134" x2="436" y2="148" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <line x1="406" y1="220" x2="406" y2="238" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <line x1="490" y1="220" x2="490" y2="238" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <line x1="608" y1="134" x2="608" y2="148" stroke="#5f6470" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ah)"/>
+        <!-- loads and stores, out to the data memory port and back -->
+        <polyline points="690,266 710,266 710,23 683,23" fill="none" stroke="#5f6470" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+
+        <!-- legend -->
+        <rect x="120" y="364" width="12" height="12" rx="2" fill="#d97706" fill-opacity="0.14" stroke="#d97706"/>
+        <text x="138" y="374" fill="#5f6470" font-size="11.5">datapath: registers and arithmetic</text>
+        <rect x="400" y="364" width="12" height="12" rx="2" fill="#ffffff" stroke="#cdd0c8"/>
+        <text x="418" y="374" fill="#5f6470" font-size="11.5">fetch, decode and control</text>
+        <text x="360" y="400" text-anchor="middle" fill="#5f6470" font-size="11.5">Every block is standard cells: the core has no memory macros.</text>
+      </svg>
+    </div>
+    <p class="bd-hint">Hover over or tap any block to see what it does.</p>
+{% endblock %}
+{% block fom_why %}
+    <p class="fom-why">Speed weighs most because on a processor core the clock period is where placement,
+      sizing and the clock tree show. <a href="#weights">How the weights were chosen</a>.</p>
+{% endblock %}
+{% block fom_note %}
+        <p class="fom-note">Slide each value against the reference and watch your score. The reference numbers
+          are published with the harness.</p>
+{% endblock %}
+{% block steps_need %}
+    <p class="steps-need"><b>Basic requirements:</b> a Linux machine with Docker, 8 threads and 16 GB of
+      memory. <a href="#requirements">Full requirements</a>.</p>
+{% endblock %}
+{% block harness_tree %}
+    <p class="qs-cap">What's in the harness:</p>
+    <pre class="puzzle-code qs-code qs-tree">ibex-warmup-harness/
+  design/          <span class="c-cm"># the fixed inputs: the Ibex RTL (Register-Transfer</span>
+                   <span class="c-cm"># Level) and the activity file</span>
+  flow/            <span class="c-cm"># the reference flow (flow/ibex/) and the evaluator</span>
+  reproduce/       <span class="c-cm"># the reference packaged as an entry</span>
+  judge/           <span class="c-cm"># the official runner (step 4)</span>
+  setup.sh         <span class="c-cm"># step 1</span>
+  run_baseline.sh  <span class="c-cm"># steps 2 and 4: runs the flow</span>
+  evaluate.sh      <span class="c-cm"># step 4: scores a result</span>
+
+<span class="c-cm"># made as you go, never committed:</span>
+  work/            <span class="c-cm"># the flow's working files</span>
+  baseline/        <span class="c-cm"># the flow's result</span>
+  judge_work/      <span class="c-cm"># your entry, built as the official run builds it</span>
+  eval_work/       <span class="c-cm"># the evaluator's work and evaluation.json</span></pre>
+{% endblock %}
+{% block brief_items %}
+        <li>Open-source tools, or your own: write your own placer, router, or scripts if you like, as long as it is open source and in your repository.</li>
+        <li>Physical design changes only: floorplan, placement, clock tree, routing, sizing, and buffering are yours. Synthesis is pinned, and the evaluator proves your final netlist against its own run of it.</li>
+        <li>The core is built flat, as one layout, and has no memory macros.</li>
+        <li>Your repository must build the layout from the RTL within the 1 hour budget, on 8 threads and 16 GB of memory.</li>
+        <li>The evaluator takes every measurement itself from your layout, so every entry is scored the same way.</li>
+{% endblock %}
+{% block submit_tree %}
+    <pre class="puzzle-code"><span class="c-cm"># what you submit: a git repository of source, nothing built</span>
+your-entry/
+  reproduce/
+    Dockerfile    <span class="c-cm"># the container your flow runs in: open tools, pinned</span>
+    run.sh        <span class="c-cm"># builds the result from the pinned RTL, within the budget</span>
+  flow/           <span class="c-cm"># your scripts, settings, and any tools you add</span>
+  floorplan/      <span class="c-cm"># optional: die size, pins, placement regions</span>
+  .gitignore      <span class="c-cm"># keeps result/ and the flow's work directories out of git</span>
+
+<span class="c-cm"># not committed: run.sh writes top.def, top.v and period.txt</span>
+<span class="c-cm"># into /result in the official run</span></pre>
+{% endblock %}
+{% block helpful %}
+  <section class="puzzle-sec" id="helpful">
+    <h2>Helpful information</h2>
+    <h3 class="rules-sub">The challenge and its tools</h3>
+    <ul class="pz-help">
+      {% for l in ch.links %}
+      <li><a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.label }}</a>: {{ l.note[0] | upper }}{{ l.note[1:] }}.</li>
+      {% endfor %}
+    </ul>
+    <h3 class="rules-sub">Understand the design</h3>
+    <ul class="pz-help">
+      <li><a href="https://ibex-core.readthedocs.io/en/latest/" target="_blank" rel="noopener">Ibex's documentation</a>: How the core works, from lowRISC, who maintain it.</li>
+      <li><a href="https://github.com/lowRISC/ibex" target="_blank" rel="noopener">Ibex on GitHub</a>: The source, and the configurations beyond the one pinned here.</li>
+    </ul>
+    <h3 class="rules-sub">Learn the steps you will change</h3>
+    <ul class="pz-help">
+      <li><a href="/education/floorplanning">Floorplanning</a>: Die size, shape and pin placement, which set how far signals travel.</li>
+      <li><a href="/education/placement">Placement</a>: Where the cells go, which sets the length of the critical path.</li>
+      <li><a href="/education/clock-tree-synthesis">Clock tree synthesis</a>: One clock to every flip-flop, with useful skew if you want it.</li>
+      <li><a href="/education/routing">Routing</a>: Connecting it all on nine metal layers.</li>
+      <li><a href="/education/static-timing-analysis">Static timing analysis</a>: How the evaluator decides your clock period is real.</li>
+      <li><a href="/explore/algorithms">Methods and algorithms</a>: The algorithms behind each stage, if you want to write your own tools.</li>
+    </ul>
+    <h3 class="rules-sub">Know the process</h3>
+    <ul class="pz-help">
+      <li><a href="/explore/processes/asap7-predictive-pdk">ASAP7, the predictive 7 nm process kit</a>: The process the warmup is built on.</li>
+      <li><a href="/explore/processes/metal-stack-design-rules">The metal stack and design rules</a>: The layers you route on and the rules the design-rule check enforces.</li>
+      <li><a href="/explore/processes/pvt-corners">PVT (Process, Voltage, Temperature) corners</a>: Why setup is checked at the slow corner and hold at the fast.</li>
+    </ul>
+    <h3 class="rules-sub">Practice first</h3>
+    <ul class="pz-help">
+      <li><a href="/explore/designs/riscv32i">Harden riscv32i in your browser</a>: Take a simpler processor through the flow in seconds, and see what the clock and utilization do.</li>
+      <li><a href="/problems">Graded problems</a>: Small physical design tasks, some graded by a real OpenROAD run.</li>
+    </ul>
+    <h3 class="rules-sub">Ready for more</h3>
+    <ul class="pz-help">
+      <li><a href="/challenges">Chipbase Competition 01</a>: A 16 by 16 systolic-array AI accelerator, with memory macros, partitioning and a 12 hour budget.</li>
+    </ul>
+    <h3 class="rules-sub">Tool documentation</h3>
+    <ul class="pz-help">
+      <li><a href="https://openroad.readthedocs.io" target="_blank" rel="noopener">OpenROAD</a>: The place-and-route tool the reference flow uses.</li>
+      <li><a href="https://openroad-flow-scripts.readthedocs.io" target="_blank" rel="noopener">OpenROAD-flow-scripts</a>: The flow the harness pins, and its settings.</li>
+    </ul>
+  </section>
+{% endblock %}

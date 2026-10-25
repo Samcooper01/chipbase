@@ -470,12 +470,12 @@ def algorithms_redirect(rest: str):
 
 @app.get("/challenges", response_class=HTMLResponse)
 def challenges_page(request: Request):
-    # a single challenge for now: the Challenges tab is the challenge itself
+    # the Challenges tab is Competition 01 itself; its warmup is linked from it
     ch = challenge_content.all_challenges()[0]
     return templates.TemplateResponse(
         request,
-        "challenge.html",
-        {"ch": ch},
+        ch["template"],
+        {"ch": ch, "warmup": challenge_content.get(ch.get("warmup"))},
     )
 
 
@@ -487,7 +487,12 @@ def challenge_workload_page(request: Request):
 
 @app.get("/challenges/{slug}", response_class=HTMLResponse)
 def challenge_page(request: Request, slug: str):
-    return RedirectResponse("/challenges")
+    # every other challenge has its own page; Competition 01's old address, and
+    # any unknown one, goes to the tab
+    ch = challenge_content.get(slug)
+    if ch is None or ch is challenge_content.all_challenges()[0]:
+        return RedirectResponse("/challenges")
+    return templates.TemplateResponse(request, ch["template"], {"ch": ch})
 
 
 from starlette.exceptions import HTTPException as _HTTPException  # noqa: E402

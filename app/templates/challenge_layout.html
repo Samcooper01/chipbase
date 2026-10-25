@@ -1,0 +1,575 @@
+{% extends "base.html" %}
+{# the page every challenge shares, filled from its entry in challenge_content.py;
+   each challenge's own template extends this one and fills the blocks below
+   that hold what only it has: its spec strip, design, reference layout,
+   harness contents and helpful links #}
+{% block title %}{{ ch.title }}{% endblock %}
+{% block og_title %}{{ ch.title }}{% endblock %}
+{% block main_class %}page puzzle-page{% endblock %}
+{% block head %}
+<style>
+  /* the section list: fixed in the margin left of the 720px column, only where
+     the margin can hold it */
+  .puzzle-sec { scroll-margin-top: 76px; }
+  .pz-toc { display: none; }
+  @media (min-width: 1220px) {
+    .pz-toc { display: block; position: fixed; top: 96px; left: calc(50% - 360px - 250px); width: 220px;
+      opacity: 0; visibility: hidden; transition: opacity 0.2s, visibility 0.2s; }
+    .pz-toc.is-on { opacity: 1; visibility: visible; }
+  }
+  .pz-toc { counter-reset: toc; }
+  .pz-toc ol { list-style: none; margin: 0 0 10px; padding: 0; border-left: 1px solid #e6e3da; }
+  .pz-toc-group { font: 700 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #9aa0a8; margin: 0 0 4px 12px; }
+  .pz-toc li { counter-increment: toc; }
+  .pz-toc a { display: flex; gap: 10px; padding: 5px 12px; margin-left: -1px; border-left: 2px solid transparent;
+    font-size: 13px; line-height: 1.35; color: var(--muted); text-decoration: none; }
+  .pz-toc a::before { content: counter(toc, decimal-leading-zero); font: 700 11px 'JetBrains Mono', monospace; color: #c2c7cf; padding-top: 1px; }
+  .pz-toc a:hover { color: var(--text); }
+  .pz-toc a.is-here { color: var(--green-deep); border-left-color: var(--green); font-weight: 700; }
+  .pz-toc a.is-here::before { color: var(--green); }
+  /* section headings: larger and darker, the section number in green before each */
+  .puzzle .puzzle-sec { margin-top: 56px; }
+  .puzzle .puzzle-sec h2 { font: 800 26px 'Inter', system-ui, sans-serif; text-transform: none; letter-spacing: -0.015em;
+    color: var(--text); border-bottom: 2px solid #e6e3da; padding-bottom: 10px; margin-bottom: 18px; }
+  .puzzle .puzzle-sec h2::before { font: 800 15px 'JetBrains Mono', monospace; color: var(--green); vertical-align: 4px; margin-right: 12px; }
+  /* helpful information: tight bullets, link then one sentence */
+  .pz-help { margin: 0 0 4px; padding-left: 20px; }
+  .pz-help li { padding: 2px 0; font-size: 14.5px; line-height: 1.5; color: var(--muted); }
+  .pz-help a { font-weight: 600; }
+  /* the reference layout: one stage at a time */
+  .sv-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .sv-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 6px;
+    border: 1.5px solid var(--border); border-radius: 8px; background: #fff; cursor: pointer;
+    font: 700 13.5px 'Inter', system-ui, sans-serif; color: var(--text); transition: border-color 0.15s, background 0.15s; }
+  .sv-tabs button span { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%;
+    background: #eceae2; font: 800 11px 'JetBrains Mono', monospace; }
+  .sv-tabs button:hover { border-color: var(--green); }
+  .sv-tabs button[aria-selected="true"] { border-color: var(--green); background: var(--green); color: #fff; }
+  .sv-tabs button[aria-selected="true"] span { background: #fff; color: var(--green-deep); }
+  .sv-pane { margin: 0; }
+  .sv-img { display: block; background: #0b0d10; border-radius: 12px; overflow: hidden; line-height: 0; }
+  .sv-img img { display: block; width: 100%; height: auto; aspect-ratio: 1800 / 1677; object-fit: contain; }
+  .sv-pane figcaption { margin-top: 10px; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+  /* the full-size image, as a button under each caption so it is easy to find and to tap */
+  .sv-full { display: block; margin: 12px 0 0; padding: 11px 16px; border-radius: 8px; background: var(--green);
+    color: #fff; font-size: 15px; font-weight: 700; text-align: center; text-decoration: none; }
+  .sv-full:hover { background: var(--green-deep); color: #fff; text-decoration: none; }
+  /* the design diagram: hover (or focus) any block for what it does */
+  #design .block-diagram { position: relative; }
+  #design .bd-tip { cursor: help; }
+  #design rect.bd-tip:hover, #design rect.bd-tip:focus { stroke-width: 2.2; outline: none; }
+  .bd-pop { position: absolute; z-index: 5; max-width: 260px; padding: 8px 10px; border-radius: 8px; background: #16241b; color: #f4f3ee;
+    font-size: 12.5px; line-height: 1.45; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); pointer-events: none; }
+  /* the design: space between the block diagram and the line under it */
+  #design .block-diagram + .bd-hint { margin: 8px 0 16px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  /* start in five steps: the rules in brief */
+  .pz-brief { margin: 18px 0 16px; border: 1px solid #e6e3da; border-left: 3px solid var(--green); border-radius: 8px;
+    background: #faf9f5; padding: 12px 16px; }
+  .pz-brief-h { font: 700 11px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--green-deep); }
+  .pz-brief ul { margin: 8px 0 8px; padding-left: 18px; }
+  .pz-brief li { font-size: 14px; line-height: 1.55; margin-bottom: 3px; }
+  .pz-brief a { font-weight: 700; font-size: 13.5px; }
+  /* the actions under the intro */
+  .pz-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+  .pz-actions .cc-btn { padding: 10px 22px; font-size: 14.5px; }
+  /* the spec strip: three cells, each value on one line */
+  .puzzle-head .spec-strip { grid-template-columns: 1fr 0.7fr 1.3fr; max-width: 720px; margin-left: auto; margin-right: auto; }
+  .puzzle-head .spec-strip dd { white-space: nowrap; }
+  @media (max-width: 620px) { .puzzle-head .spec-strip { grid-template-columns: 1fr; } .puzzle-head .spec-strip dd { white-space: normal; } }
+  /* the open stack, smaller: all five cards in one row */
+  .puzzle-head .head-stack { margin-top: 18px; }
+  .puzzle-head .stack-grid { max-width: 720px; gap: 10px; }
+  .puzzle-head .stack-card { flex: 0 1 132px; padding: 12px 8px; gap: 6px; }
+  .puzzle-head .stack-logo { width: 44px; height: 44px; border-radius: 10px; }
+  .puzzle-head .stack-logo img { max-width: 30px; max-height: 30px; }
+  .puzzle-head .stack-mark { font-size: 13px; }
+  .puzzle-head .stack-name { font-size: 13px; }
+  .puzzle-head .stack-role { font-size: 11px; line-height: 1.35; }
+  /* the leaderboard: in the header's right margin where there is room, the
+     mirror of the section list on the left */
+  .pz-board { max-width: 300px; margin: 22px auto 0; text-align: left; border: 1.5px solid var(--navy); border-radius: 12px;
+    background: #fff; box-shadow: 4px 4px 0 var(--shadow-hard); padding: 12px 14px 10px; }
+  @media (min-width: 1220px) {
+    .puzzle-head > .pz-board { position: absolute; top: 44px; left: calc(50% + 360px + 28px); width: 250px; margin: 0; }
+  }
+  .pz-board-head { font: 700 10.5px 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 4px; }
+  .pz-board-row { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; padding: 6px 0;
+    border-top: 1px solid #eceae2; font-size: 13px; }
+  .pz-board-row.is-open .pz-board-name { color: var(--muted); font-style: italic; }
+  .pz-board-row.is-base { border-top: 1px dashed #cfcbc0; font-size: 12px; color: var(--muted); }
+  .pz-board-row.is-base .pz-board-name { grid-column: 1 / 3; white-space: nowrap; }  /* the full width, on one line */
+  .pz-board-fom { font: 700 13px 'JetBrains Mono', monospace; color: var(--text); }
+  .puzzle-head .pz-board-note { margin: 6px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--muted); text-align: left; }
+  /* medals: a disc with a ribbon notch above it, as on the front page */
+  .pz-medal { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+    margin-top: 6px; border-radius: 50%; font: 800 11px 'JetBrains Mono', monospace; color: #1c1a14;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), inset 0 0 0 4px rgba(0, 0, 0, 0.12); }
+  .pz-medal::before { content: ""; position: absolute; top: -7px; left: 50%; width: 12px; height: 8px; transform: translateX(-50%);
+    clip-path: polygon(0 0, 100% 0, 78% 100%, 50% 62%, 22% 100%); background: #2f6fed; }
+  .pz-medal-1 { background: radial-gradient(circle at 35% 30%, #fff3b0, #f2c230 55%, #b8860b); }
+  .pz-medal-2 { background: radial-gradient(circle at 35% 30%, #ffffff, #c9ced6 55%, #8a929e); }
+  .pz-medal-3 { background: radial-gradient(circle at 35% 30%, #ffd9b3, #cd8a4b 55%, #8a5325); }
+  .pz-medal-1::before { background: #dc2626; }
+  .pz-medal-3::before { background: #16a34a; }
+  /* the rules section: labelled groups inside each card, and the inputs under both */
+  /* each card's title: the largest text in the card, with a rule under it */
+  #rules .rule-card-h { font: 800 19px 'Inter', system-ui, sans-serif; letter-spacing: -0.01em; text-transform: none;
+    display: flex; align-items: center; gap: 10px; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 2px solid currentColor; }
+  #rules .rc-icon { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%;
+    color: #fff; font-size: 15px; }
+  #rules .rule-ok .rc-icon { background: #5aae78; }
+  #rules .rule-no .rc-icon { background: #d27069; }
+  #rules .rule-ok .rule-card-h { color: #3f8f5c; border-bottom-color: #9fd0b0; }
+  #rules .rule-no .rule-card-h { color: #b85a53; border-bottom-color: #e3aaa5; }
+  /* the group labels inside each card: clear subheadings, with a rule between groups */
+  .rule-group { font: 700 14px 'Inter', system-ui, sans-serif; letter-spacing: 0; text-transform: none;
+    margin: 16px 0 6px; padding-top: 12px; border-top: 1px solid rgba(0, 0, 0, 0.1); }
+  .rule-ok .rule-group { color: var(--green-deep); }
+  .rule-no .rule-group { color: #a1312a; }
+  .rule-card .rule-card-h + .rule-group { margin-top: 12px; padding-top: 0; border-top: 0; }
+  /* the score: the method behind the weights, folded away */
+  /* the score explorer */
+  /* the score equation, light: dark ink on a pale panel */
+  #score .puzzle-eq { background: #eaf6ee; border-color: #bfe3cb; }
+  #score .puzzle-eq .math { color: #16241b; }
+  #score .puzzle-eq .math sub { color: #6b7280; }
+  #score .puzzle-eq .math sup { color: var(--green-deep); }
+  #score .puzzle-eq .mop { color: #6b7280; }
+  #score .puzzle-eq .mden { border-top-color: var(--green); }
+  .fom-key { margin: 8px 0 0; font-size: 13.5px; color: var(--muted); text-align: center; }
+  .fom-key b { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+  /* starting places linked under step 3 of Start in five steps */
+  .flow-links { margin: 8px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.55; }
+  .flow-links li { margin: 0 0 4px; }
+  /* the quick-start commands wrap, so the long image line is visible; copying keeps it whole */
+  /* the quick-start commands: no line wraps (none is longer than the clone line); on a phone the block scrolls */
+  .qs-code { margin: 8px 0 2px; font-size: 12px; }
+  #how-to-start .qs-cap { margin: 0; }
+  #how-to-start .qs-tree { margin: 8px 0 22px; }
+  #how-to-start .qs-then { margin: 12px 0 0; }
+  #how-to-start .flow-txt { min-width: 0; }
+  #how-to-start .steps-need { margin: 0 0 16px; }
+  #how-to-start .puzzle-actions { margin: 0 0 22px; }   /* Get the harness, above the harness contents */
+  #how-to-start .flow-txt code { font-family: var(--mono); font-size: 13px; background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }   /* lets the code block scroll inside the step, not widen it */
+  /* the weights table under the score equation */
+  #score .fom-lede { margin: 0 0 12px; }
+  #score .fom-why { margin: 2px 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+  #score .fom-weights { margin: 14px 0 6px; }
+  #score .fom-weights td { padding: 8px 12px; }
+  #score .fom-weights th:not(:first-child), #score .fom-weights td.fw-num { text-align: center; }
+  #score .fom-weights td.fw-num { font-family: 'JetBrains Mono', monospace; }
+  #score .fom-weights td.fw-lead { font-weight: 700; color: var(--green-deep); }
+  @media (max-width: 480px) { #score .puzzle-eq { padding: 14px 8px; } #score .puzzle-eq .math { font-size: 14px; flex-wrap: nowrap; } #score .puzzle-eq .mop { margin: 0 5px; } #score .fom-weights td, #score .fom-weights th { padding: 8px 6px; } }
+  .fom-lab { margin: 14px 0 6px; border: 1px solid #e6e3da; border-radius: 12px; background: #fff; padding: 12px 14px; }
+  .fom-top { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
+  .fom-read { flex: none; display: flex; flex-direction: column; align-items: flex-start; min-width: 120px; }
+  .fom-read span { font: 700 10px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .fom-read b { font: 800 30px 'JetBrains Mono', monospace; line-height: 1.1; color: var(--green-deep); }
+  .fom-read em { font-style: normal; font-size: 12px; color: var(--muted); }
+  .fom-read.is-low b { color: #c23c32; }
+  .fom-lab .fom-note { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  /* three columns: each variable's slider over its small graph */
+  .fom-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .fom-var { border: 1px solid #eceae2; border-radius: 10px; padding: 8px 10px 4px; background: #faf9f5; }
+  .fom-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 13px; }
+  .fom-head output { font: 700 11px 'JetBrains Mono', monospace; color: var(--green-deep); text-align: right; }
+  .fom-var input { width: 100%; margin: 6px 0 2px; accent-color: var(--green); }
+  .fom-var svg { display: block; width: 100%; height: auto; }
+  .fom-var svg text { font: 13px 'JetBrains Mono', monospace; fill: #8a8f98; }
+  @media (max-width: 700px) { .fom-grid { grid-template-columns: 1fr; } .fom-top { flex-direction: column; align-items: flex-start; } }
+  /* a challenge whose harness is not out yet: the note under the intro, and the harness buttons, inactive */
+  .puzzle-head .pz-soon { max-width: 640px; margin: 14px auto 0; padding: 9px 14px; border: 1px dashed #cfcbc0; border-radius: 8px;
+    background: #faf9f5; font-size: 14px; line-height: 1.5; color: var(--muted); }
+  .puzzle-head .pz-soon b { color: var(--text); }
+  .btn.btn-off { display: inline-block; opacity: 0.55; cursor: default; }
+  .btn.btn-off:hover { background: var(--panel); }
+  /* the warmup: a pointer to the smaller challenge, in the same quiet box as the rules in brief */
+  .pz-warm { border: 1px solid #e6e3da; border-left: 3px solid var(--green); border-radius: 8px; background: #faf9f5; padding: 12px 16px; }
+  .pz-warm p { margin: 0 0 8px; font-size: 15px; line-height: 1.6; }
+  .pz-warm a { font-weight: 700; font-size: 14.5px; }
+</style>
+{% endblock %}
+{% block content %}
+<article class="puzzle">
+
+  <header class="puzzle-head">
+   <div class="puzzle-head-inner">
+    <h1 class="puzzle-title">{% set _t = ch.title.rsplit(': ', 1) %}{% if _t|length > 1 %}{{ _t[0] }}: <span class="title-mark">{{ _t[1] }}</span>{% else %}{{ ch.title }}{% endif %}</h1>
+    {% block spec_strip %}{% endblock %}
+    <p class="puzzle-lede">{{ ch.tagline }}</p>
+    {% if ch.status == "soon" %}<p class="pz-soon"><b>Coming soon.</b> {{ ch.status_note }}</p>{% endif %}
+    {# where to go first: how to start (which leads to the harness), then the rules #}
+    <div class="pz-actions">
+      <a class="cc-btn cc-btn-primary" href="#how-to-start">See how to start</a>
+      <a class="cc-btn cc-btn-ghost" href="#rules">Read the rules</a>
+    </div>
+    <div class="head-stack">
+      <span class="ft-label">The open stack</span>
+      <div class="stack-grid">
+        {% for t in ch.stack %}
+        <a class="stack-card" href="{{ t.url }}" target="_blank" rel="noopener">
+          <span class="stack-logo">{% if t.img %}<img src="/static/img/{{ t.img }}?v={{ asset_v }}" alt="{{ t.name }} logo" loading="lazy">{% else %}<span class="stack-mark">{{ t.mark }}</span>{% endif %}</span>
+          <span class="stack-name">{{ t.name }}</span>
+          <span class="stack-role">{{ t.role }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+   </div>
+   {# the leaderboard, beside the title in the header's right margin; on
+      narrower screens it follows the intro #}
+   <aside class="pz-board" id="leaderboard" aria-label="Leaderboard">
+     <div class="pz-board-head">Leaderboard</div>
+     {% for n in [1, 2, 3] %}
+     <div class="pz-board-row is-open">
+       <span class="pz-medal pz-medal-{{ n }}" aria-label="place {{ n }}">{{ n }}</span>
+       <span class="pz-board-name">{% if n == 1 %}{% if ch.status == "soon" %}Opens with the harness{% else %}Open: be the first entry{% endif %}{% else %}Open{% endif %}</span>
+       <span class="pz-board-fom">&nbsp;</span>
+     </div>
+     {% endfor %}
+     <div class="pz-board-row is-base">
+       <span class="pz-board-name">Reference: the score to beat</span><span class="pz-board-fom">1.000</span>
+     </div>
+   </aside>
+  </header>
+
+  {# the page's sections, kept in view beside the column on wide screens; the
+     script at the end marks the one being read #}
+  <nav class="pz-toc" aria-label="Sections of this page">
+    <div class="pz-toc-group">Start</div>
+    <ol>
+      <li><a href="#design">The design</a></li>
+      {% if self.reference_layout()|trim %}<li><a href="#reference-layout">The reference layout</a></li>{% endif %}
+      <li><a href="#score">How you win</a></li>
+      {% if warmup %}<li><a href="#warmup">{{ warmup.callout_title }}</a></li>{% endif %}
+      <li><a href="#how-to-start">Start in five steps</a></li>
+    </ol>
+    <div class="pz-toc-group">Details</div>
+    <ol>
+      <li><a href="#rules">The rules</a></li>
+      <li><a href="#submit">Submit an entry</a></li>
+      <li><a href="#requirements">Requirements</a></li>
+      <li><a href="#evaluator">How entries are scored</a></li>
+      <li><a href="#helpful">Helpful information</a></li>
+    </ol>
+  </nav>
+
+  <section class="puzzle-sec" id="design">
+    <h2>The design</h2>
+    {% block design %}{% endblock %}
+  </section>
+
+  {% block reference_layout %}{% endblock %}
+
+  <section class="puzzle-sec" id="score">
+    <h2>How you win</h2>
+    <p class="fom-lede">Pass every <a href="#evaluator">gate</a> to be ranked, then score highest; the reference scores 1.000.</p>
+    <div class="puzzle-eq">
+      <span class="math">
+        <i>Score</i><span class="mop">=</span>
+        <span class="mpow"><span class="mfrac"><span class="mnum"><i>T</i><sub>base</sub></span><span class="mden"><i>T</i><sub>you</sub></span></span><sup>{{ "%.2f"|format(ch.weights.T) }}</sup></span>
+        <span class="mop">&middot;</span>
+        <span class="mpow"><span class="mfrac"><span class="mnum"><i>A</i><sub>base</sub></span><span class="mden"><i>A</i><sub>you</sub></span></span><sup>{{ "%.2f"|format(ch.weights.A) }}</sup></span>
+        <span class="mop">&middot;</span>
+        <span class="mpow"><span class="mfrac"><span class="mnum"><i>P</i><sub>base</sub></span><span class="mden"><i>P</i><sub>you</sub></span></span><sup>{{ "%.2f"|format(ch.weights.P) }}</sup></span>
+      </span>
+    </div>
+    <p class="fom-key"><b>T</b> the clock period you declare and pass timing at &#183; <b>A</b> die area &#183; <b>P</b> power at a fixed 1,000 ps clock with the pinned activity, so a slower clock does not lower it</p>
+    {# the weights, stated outright: what each is, and what a 10% gain on that axis is worth #}
+    {% set wmax = ch.weights.values()|max %}
+    <table class="puzzle-table fom-weights">
+      <thead><tr><th></th><th>Speed (clock period)</th><th>Area (die)</th><th>Power</th></tr></thead>
+      <tbody>
+        <tr><td>Weight</td>{% for k in ["T", "A", "P"] %}<td class="fw-num{% if ch.weights[k] == wmax %} fw-lead{% endif %}">{{ "%.2f"|format(ch.weights[k]) }}</td>{% endfor %}</tr>
+        <tr><td>10% smaller adds</td>{% for k in ["T", "A", "P"] %}<td class="fw-num{% if ch.weights[k] == wmax %} fw-lead{% endif %}">+{{ "%.1f"|format((0.9 ** (0 - ch.weights[k]) - 1) * 100) }}%</td>{% endfor %}</tr>
+      </tbody>
+    </table>
+    {% block fom_why %}{% endblock %}
+    {# try the formula: slide each of your values against the reference and see
+       the score move; the script at the end draws one graph per variable #}
+    <div class="fom-lab" id="fom-lab">
+      <div class="fom-top">
+        <div class="fom-read"><span>Your score</span><b id="fom-val">1.000</b><em id="fom-vs">the same as the reference</em></div>
+        {% block fom_note %}{% endblock %}
+      </div>
+      <div class="fom-grid">
+        <div class="fom-var" data-k="T"><div class="fom-head"><b>Clock period</b><output></output></div>
+          <input type="range" min="-40" max="40" step="1" value="0" aria-label="Your clock period against the reference, in percent"><svg viewBox="0 0 400 130" aria-hidden="true"></svg></div>
+        <div class="fom-var" data-k="A"><div class="fom-head"><b>Area</b><output></output></div>
+          <input type="range" min="-40" max="40" step="1" value="0" aria-label="Your area against the reference, in percent"><svg viewBox="0 0 400 130" aria-hidden="true"></svg></div>
+        <div class="fom-var" data-k="P"><div class="fom-head"><b>Power</b><output></output></div>
+          <input type="range" min="-40" max="40" step="1" value="0" aria-label="Your power against the reference, in percent"><svg viewBox="0 0 400 130" aria-hidden="true"></svg></div>
+      </div>
+    </div>
+  </section>
+
+  {% if warmup %}
+  {# a smaller challenge to start on, with its own page, harness and leaderboard #}
+  <section class="puzzle-sec" id="warmup">
+    <h2>{{ warmup.callout_title }}</h2>
+    <div class="pz-warm">
+      <p>{{ warmup.callout }}</p>
+      <a href="/challenges/{{ warmup.slug }}">{{ warmup.callout_link }} &rarr;</a>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="puzzle-sec" id="how-to-start">
+    <h2>Start in five steps</h2>
+    {# text in backticks is shown as inline code: commands, files, folders #}
+    {# a command block with its comments (from "#" to the end of a line) in the comment color #}
+    {% macro cmtcode(text) %}{% for line in text.split("\n") %}{% set k = line.find("#") %}{% if k >= 0 %}{{ line[:k] }}<span class="c-cm">{{ line[k:] }}</span>{% else %}{{ line }}{% endif %}{% if not loop.last %}
+{% endif %}{% endfor %}{% endmacro %}
+    {% macro codeify(text) %}{% for part in text.split("`") %}{% if loop.index is even %}<code>{{ part }}</code>{% else %}{{ part }}{% endif %}{% endfor %}{% endmacro %}
+    {% block steps_need %}{% endblock %}
+    {# the harness first, so the way to get it is in view before its contents #}
+    <div class="puzzle-actions">
+      {% if ch.repo_url %}<a class="btn" href="{{ ch.repo_url }}" target="_blank" rel="noopener">Get the harness &rarr;</a>{% else %}<span class="btn btn-off" aria-disabled="true">Harness coming soon</span>{% endif %}
+    </div>
+    {# the harness's layout, for reference while working through the steps #}
+    {% block harness_tree %}{% endblock %}
+    <ol class="flow-steps">
+      {% for step in ch.howitworks %}<li class="flow-step"><span class="flow-num">{{ loop.index }}</span><div class="flow-txt">{{ codeify(step) }}{% if loop.index == 1 %}
+        <pre class="puzzle-code qs-code">{{ cmtcode(ch.quickstart_code) }}</pre>{% endif %}{% if loop.index == 3 %}
+        {% if ch.start_points %}<ul class="flow-links">{% for p in ch.start_points %}<li><a href="{{ ch.repo_url }}/{{ p.kind }}/main/{{ p.path }}" target="_blank" rel="noopener">{{ p.label }}</a>: {{ codeify(p.note[0] | upper ~ p.note[1:]) }}.</li>{% endfor %}</ul>{% endif %}{% endif %}{% if loop.index == 4 %}
+        <pre class="puzzle-code qs-code">{{ cmtcode(ch.iterate_code) }}</pre>
+        <p class="qs-then">{{ codeify(ch.presubmit_text) }}</p>
+        <pre class="puzzle-code qs-code">{{ cmtcode(ch.selftest_code) }}</pre>{% endif %}</div></li>{% endfor %}
+    </ol>
+    <div class="pz-brief">
+      <div class="pz-brief-h">The rules, in brief</div>
+      <ul>
+        {% block brief_items %}{% endblock %}
+      </ul>
+      <a href="#rules">The full rules, below &darr;</a>
+    </div>
+  </section>
+
+  <section class="puzzle-sec" id="rules">
+    <h2>The rules</h2>
+    {# one section for what you decide and what is fixed: the rules and the
+       constraints; the pinned inputs are listed under Requirements #}
+    <div class="rule-cards">
+      <div class="rule-card rule-ok">
+        <div class="rule-card-h"><span class="rc-icon">&check;</span> Yours to decide</div>
+        <div class="rule-group">Allowed</div>
+        <ul>{% for r in ch.allowed %}<li>{{ r }}</li>{% endfor %}</ul>
+        <div class="rule-group">You set</div>
+        <ul>{% for r in ch.constraints_free %}<li>{{ r }}</li>{% endfor %}</ul>
+      </div>
+      <div class="rule-card rule-no">
+        <div class="rule-card-h"><span class="rc-icon">&times;</span> Fixed for everyone</div>
+        <div class="rule-group">Not allowed</div>
+        <ul>{% for r in ch.notallowed %}<li>{{ r }}</li>{% endfor %}</ul>
+        <div class="rule-group">Fixed constraints</div>
+        <ul>{% for r in ch.constraints_fixed %}<li>{{ r }}</li>{% endfor %}</ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="puzzle-sec" id="submit">
+    <h2>Submit an entry</h2>
+    <p>{{ ch.submission }}</p>
+    {% block submit_tree %}{% endblock %}
+    <p class="puzzle-note">{{ ch.submit_how }}</p>
+    <div class="puzzle-actions">
+      {% if ch.repo_url %}<a class="btn" href="{{ ch.repo_url }}" target="_blank" rel="noopener">Harness repo</a>{% else %}<span class="btn btn-off" aria-disabled="true">Harness coming soon</span>{% endif %}
+    </div>
+  </section>
+
+  <section class="puzzle-sec" id="requirements">
+    <h2>Requirements</h2>
+    <ul class="puzzle-list">
+      {% for r in ch.requirements %}<li>{{ r }}</li>{% endfor %}
+    </ul>
+    <div class="pin-block">
+      <div class="pin-h">Pinned versions</div>
+      <ul class="pin-list">
+        {% for p in ch.pins %}
+        <li>
+          <a class="pin-ref" href="{{ p.url }}" target="_blank" rel="noopener">{{ p.what }} @ {{ p.ref }} &rarr;</a>
+          <span class="pin-detail">{{ p.detail }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+
+  <section class="puzzle-sec" id="evaluator">
+    <h2>How entries are scored</h2>
+    <p>{{ ch.evaluator }}</p>
+    {% set gn = namespace(n=0) %}
+    <ol class="eval-steps">
+      {% for st in ch.eval_steps %}
+      <li class="eval-step">
+        <div class="eval-head">
+          <span class="eval-title">{{ st.title }}</span>
+          {% if st.gate %}{% set gn.n = gn.n + 1 %}<span class="gate-badge">GATE {{ '%02d' % gn.n }}</span>{% endif %}
+        </div>
+        <div class="eval-body">{{ st.body }}</div>
+        {% if st.open %}<div class="eval-open"><span class="open-tag">Open</span> {{ st.open }}</div>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    <p class="puzzle-note">{{ ch.eval_note }}{% if ch.eval_open_runtime %} <span class="open-tag">Open</span> {{ ch.eval_open_runtime }}{% endif %}</p>
+    <h3 class="rules-sub" id="honest">Closing the loopholes</h3>
+    <ul class="honest-list">
+      {% for title, body in ch.honesty %}<li><b>{{ title }}</b> {{ body }}</li>{% endfor %}
+    </ul>
+    <h3 class="rules-sub" id="weights">How the score weights are set</h3>
+    <p>{{ ch.cost_why }} The weights sum to 1 and are pinned in scoring.yaml.</p>
+  </section>
+
+  {% block helpful %}{% endblock %}
+</article>
+{% endblock %}
+{% block scripts %}
+<script>
+  /* the reference layout's stage viewer: the buttons, or the left and right
+     arrow keys while a button has focus, show one stage */
+  (function () {
+    var box = document.getElementById("stage-viewer");
+    if (!box) return;
+    var tabs = [].slice.call(box.querySelectorAll(".sv-tabs button")), panes = [].slice.call(box.querySelectorAll(".sv-pane"));
+    function show(n) {
+      tabs.forEach(function (t, i) { t.setAttribute("aria-selected", i === n ? "true" : "false"); });
+      panes.forEach(function (p, i) { p.hidden = i !== n; });
+    }
+    tabs.forEach(function (t, i) {
+      t.addEventListener("click", function () { show(i); });
+      t.addEventListener("keydown", function (ev) {
+        var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+        if (!d) return;
+        var n = (i + d + tabs.length) % tabs.length;
+        show(n); tabs[n].focus(); ev.preventDefault();
+      });
+    });
+  })();
+  /* the design diagram's descriptions: shown beside the pointer, under a
+     block reached with the keyboard, or at a tap (a phone cannot hover); a
+     second tap on the same block, or a tap outside the diagram, closes it */
+  (function () {
+    var fig = document.querySelector("#design .block-diagram");
+    if (!fig) return;
+    var pop = document.createElement("div");
+    pop.className = "bd-pop"; pop.hidden = true; fig.appendChild(pop);
+    function show(el, x, y) {
+      pop.textContent = el.getAttribute("data-tip"); pop.hidden = false;
+      var box = fig.getBoundingClientRect(), w = pop.offsetWidth;
+      pop.style.left = Math.max(4, Math.min(box.width - w - 4, x - box.left + 14)) + "px";
+      pop.style.top = (y - box.top + 16) + "px";
+    }
+    var tapped = null;
+    fig.addEventListener("mousemove", function (ev) {
+      var el = ev.target.closest && ev.target.closest(".bd-tip");
+      if (el) show(el, ev.clientX, ev.clientY); else { pop.hidden = true; tapped = null; }
+    });
+    /* on each block itself, not the figure: iOS Safari sends a tap's click only
+       to an element that listens for it */
+    fig.querySelectorAll(".bd-tip").forEach(function (el) {
+      el.addEventListener("click", function (ev) {
+        var tip = el.getAttribute("data-tip");
+        if (tapped === tip) { pop.hidden = true; tapped = null; return; }
+        show(el, ev.clientX, ev.clientY); tapped = tip;
+      });
+    });
+    document.addEventListener("click", function (ev) {
+      if (!fig.contains(ev.target)) { pop.hidden = true; tapped = null; }
+    });
+    fig.addEventListener("mouseleave", function () { pop.hidden = true; tapped = null; });
+    fig.addEventListener("focusin", function (ev) {
+      var el = ev.target.closest && ev.target.closest(".bd-tip");
+      if (!el) return;
+      var r = el.getBoundingClientRect();
+      show(el, r.left, r.bottom - 12);
+    });
+    fig.addEventListener("focusout", function () { pop.hidden = true; });
+  })();
+  /* the score explorer: FOM = (T_base/T)^a (A_base/A)^b (P_base/P)^g, with each
+     of your values given as a percent above or below the reference. The
+     weights come from ch.weights, kept in step with scoring.yaml */
+  (function () {
+    var lab = document.getElementById("fom-lab");
+    if (!lab) return;
+    var W = { T: {{ ch.weights.T }}, A: {{ ch.weights.A }}, P: {{ ch.weights.P }} }, v = { T: 0, A: 0, P: 0 };
+    var X0 = -40, X1 = 40, Y0 = 0.7, Y1 = 1.7;             /* fixed axes, so the curves can be compared */
+    var L = 38, R = 394, TOP = 8, BOT = 108;               /* the plot box inside the 400 by 130 view */
+    function x(p) { return L + (p - X0) / (X1 - X0) * (R - L); }
+    function y(f) { return BOT - (f - Y0) / (Y1 - Y0) * (BOT - TOP); }
+    function fom(t, a, p) {
+      return Math.pow(1 / (1 + t / 100), W.T) * Math.pow(1 / (1 + a / 100), W.A) * Math.pow(1 / (1 + p / 100), W.P);
+    }
+    function words(k, p) {
+      if (!p) return "the reference";
+      var more = p > 0, n = Math.abs(p) + "% ";
+      if (k === "T") return n + (more ? "longer, slower" : "shorter, faster");
+      return n + (more ? "larger" : "smaller");
+    }
+    function at(k, p) { var o = { T: v.T, A: v.A, P: v.P }; o[k] = p; return fom(o.T, o.A, o.P); }
+    function draw(box) {
+      var k = box.getAttribute("data-k"), svg = box.querySelector("svg"), g = [];
+      [0.8, 1.0, 1.2, 1.4, 1.6].forEach(function (f) {          /* grid, with the reference's 1.000 dashed */
+        var ref = f === 1.0;
+        g.push('<line x1="' + L + '" x2="' + R + '" y1="' + y(f) + '" y2="' + y(f) + '" stroke="' + (ref ? "#9aa0a8" : "#ebe9e2") +
+               '"' + (ref ? ' stroke-dasharray="4 3"' : "") + "/>");
+        g.push('<text x="' + (L - 5) + '" y="' + (y(f) + 3.5) + '" text-anchor="end">' + f.toFixed(1) + "</text>");
+      });
+      g.push('<line x1="' + x(0) + '" x2="' + x(0) + '" y1="' + TOP + '" y2="' + BOT + '" stroke="#ebe9e2"/>');
+      [[-40, "-40%"], [0, "ref"], [40, "+40%"]].forEach(function (t) {
+        g.push('<text x="' + x(t[0]) + '" y="' + (BOT + 14) + '" text-anchor="' + (t[0] < 0 ? "start" : t[0] > 0 ? "end" : "middle") + '">' + t[1] + "</text>");
+      });
+      var pts = [];
+      for (var p = X0; p <= X1; p += 2) pts.push(x(p).toFixed(1) + "," + y(at(k, p)).toFixed(1));
+      g.push('<polyline points="' + pts.join(" ") + '" fill="none" stroke="#16a34a" stroke-width="2.2"/>');
+      var f = at(k, v[k]);
+      g.push('<circle cx="' + x(v[k]) + '" cy="' + y(f) + '" r="5" fill="#fff" stroke="#15803d" stroke-width="2.5"/>');
+      g.push('<text x="' + (R - 2) + '" y="' + (TOP + 10) + '" text-anchor="end">weight ' + W[k].toFixed(2) + "</text>");
+      svg.innerHTML = g.join("");
+      box.querySelector("output").textContent = words(k, v[k]);
+    }
+    var boxes = [].slice.call(lab.querySelectorAll(".fom-var"));
+    function update() {
+      boxes.forEach(draw);
+      /* three decimals, as scores are shown everywhere; the difference to one decimal of a percent */
+      var f = fom(v.T, v.A, v.P), d = Math.round((f - 1) * 1000) / 10;
+      document.getElementById("fom-val").textContent = f.toFixed(3);
+      document.getElementById("fom-vs").textContent = !d ? "the same as the reference"
+        : Math.abs(d).toFixed(1) + "% " + (d > 0 ? "better" : "worse") + " than the reference";
+      lab.querySelector(".fom-read").classList.toggle("is-low", f < 0.9995);
+    }
+    boxes.forEach(function (box) {
+      box.querySelector("input").addEventListener("input", function (ev) { v[box.getAttribute("data-k")] = +ev.target.value; update(); });
+    });
+    update();
+  })();
+  /* the section list: marks the last section whose heading has passed the
+     top of the window */
+  (function () {
+    var toc = document.querySelector(".pz-toc");
+    if (!toc) return;
+    var links = [].slice.call(toc.querySelectorAll("a"));
+    var secs = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
+    var head = document.querySelector(".puzzle-head");
+    function update() {
+      /* it starts just below the header banner and rides up with the page
+         until it reaches the top, where it stays */
+      if (head) toc.style.top = Math.max(96, head.getBoundingClientRect().bottom + 28) + "px";
+      /* shown from page load, and hidden before it would sit over the footer */
+      var foot = document.querySelector(".footer");
+      var clear = !foot || foot.getBoundingClientRect().top > toc.getBoundingClientRect().top + toc.offsetHeight + 24;
+      toc.classList.toggle("is-on", clear);
+      var here = 0;
+      secs.forEach(function (sec, i) { if (sec && sec.getBoundingClientRect().top < 140) here = i; });
+      /* at the very bottom the last sections may never reach the top: mark the last */
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) here = secs.length - 1;
+      links.forEach(function (a, i) { a.classList.toggle("is-here", i === here); });
+    }
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    update();
+  })();
+</script>
+{% endblock %}
