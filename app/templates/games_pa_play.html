@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} - {{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="fc-page pa-page">
+  <div class="crumb"><a href="/games">Games</a> / <a href="/games/spot-the-pathology">{{ game.title }}</a> / {{ section.title }}</div>
+  <h1 class="lab-title">{{ section.title }}</h1>
+  <p class="fc-intro">
+    Read the map, then answer. Some questions give you four readings to choose
+    between, some show two maps and ask which is healthy, and some ask you to
+    click the region itself. Keys <b>1</b> to <b>4</b> choose an option,
+    <b>a</b> and <b>b</b> choose a map, and <b>Enter</b> moves on. Every answer
+    is followed by a description of what the map shows and the numbers behind
+    it. Progress is stored in this browser.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}</span></div>
+  <div id="pa-root"></div>
+  <div id="fg-root"></div>
+
+  <details class="fc-deck">
+    <summary>All {{ play["items"] | length }} maps {% if mixed %}in this drill{% else %}in this family{% endif %}, described</summary>
+    <ul class="fc-list">
+      {% for i in play["items"] %}
+      <li>
+        <div class="fc-list-cmd">{{ i.question }}</div>
+        <div class="fc-list-ans">{{ i.caption }}</div>
+        <p class="fc-list-exp">{{ i.describe }}</p>
+        <p class="fc-list-exp">{{ i.explain_html | safe }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+</article>
+{% endblock %}
+{% block scripts %}
+<script src="/static/games/flag.js?v={{ asset_v }}"></script>
+<script src="/static/games/pathology.js?v={{ asset_v }}"></script>
+<script id="pa-data" type="application/json">{{ data_json | safe }}</script>
+<script>
+  (function () {
+    var data = JSON.parse(document.getElementById("pa-data").textContent);
+    Pathology.mount(document.getElementById("pa-root"), data, {
+      keyTarget: document, confirm: function (m) { return window.confirm(m); }
+    });
+  })();
+</script>
+<script>Flag.mount(document.getElementById("fg-root"), "spot-the-pathology");</script>
+{% endblock %}

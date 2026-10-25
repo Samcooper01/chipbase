@@ -1,0 +1,62 @@
+% report_checks -path_delay min
+Startpoint: dpath.b_reg.out[4]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: dpath.b_reg.out[4]$_DFFE_PP_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: min
+
+  Delay    Time   Description
+---------------------------------------------------------
+   0.00    0.00   clock core_clock (rise edge)
+   0.07    0.07   clock network delay (propagated)
+   0.00    0.07 ^ dpath.b_reg.out[4]$_DFFE_PP_/CK (DFF_X1)
+   0.09    0.16 v dpath.b_reg.out[4]$_DFFE_PP_/Q (DFF_X1)
+   0.02    0.18 ^ _825_/ZN (INV_X1)
+   0.01    0.19 v _826_/ZN (OAI21_X2)
+   0.00    0.19 v dpath.b_reg.out[4]$_DFFE_PP_/D (DFF_X1)
+           0.19   data arrival time
+
+   0.00    0.00   clock core_clock (rise edge)
+   0.07    0.07   clock network delay (propagated)
+   0.15    0.22   clock uncertainty
+   0.00    0.22   clock reconvergence pessimism
+           0.22 ^ dpath.b_reg.out[4]$_DFFE_PP_/CK (DFF_X1)
+   0.00    0.22   library hold time
+           0.22   data required time
+---------------------------------------------------------
+           0.22   data required time
+          -0.19   data arrival time
+---------------------------------------------------------
+          -0.04   slack (VIOLATED)
+
+
+Startpoint: dpath.b_reg.out[0]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: resp_msg[0] (output port clocked by vclk_core_clock)
+Path Group: vclk_core_clock
+Path Type: min
+
+  Delay    Time   Description
+---------------------------------------------------------
+   0.00    0.00   clock core_clock (rise edge)
+   0.07    0.07   clock network delay (propagated)
+   0.00    0.07 ^ dpath.b_reg.out[0]$_DFFE_PP_/CK (DFF_X1)
+   0.08    0.15 ^ dpath.b_reg.out[0]$_DFFE_PP_/QN (DFF_X1)
+   0.02    0.17 v _563_/ZN (XNOR2_X1)
+   0.02    0.20 v output37/Z (BUF_X1)
+   0.00    0.20 v resp_msg[0] (out)
+           0.20   data arrival time
+
+   0.00    0.00   clock vclk_core_clock (rise edge)
+   0.07    0.07   clock network delay (ideal)
+   0.00    0.07   clock reconvergence pessimism
+  -0.09   -0.02   output external delay
+          -0.02   data required time
+---------------------------------------------------------
+          -0.02   data required time
+          -0.20   data arrival time
+---------------------------------------------------------
+           0.22   slack (MET)
+
+

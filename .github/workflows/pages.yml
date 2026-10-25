@@ -1,0 +1,68 @@
+# Publishes Chipbase to GitHub Pages on every push to main, and checks every
+# pull request the same way without publishing it.
+#
+# The site is frozen from the repository by the app itself
+# (python -m app.freeze), after the content rules are checked and the browser
+# grader is checked against the recorded scorecards. Any step failing stops
+# the publish, so broken content, a broken grader or a broken link never
+# reaches the live site.
+#
+# One-time setup: in the repository's Settings > Pages, set Source to
+# "GitHub Actions".
+
+name: Publish site
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  # a pull request's runs replace each other; publishing runs queue on their own
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'pages' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install the site's requirements
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+      - name: Check the content rules
+        run: .venv/bin/python tests/games/validate_content.py
+      - name: Check the browser grader against the recorded scorecards
+        run: node tests/grader/check_grader.mjs
+      - name: Freeze the site
+        run: .venv/bin/python -m app.freeze
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

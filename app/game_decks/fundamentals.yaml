@@ -1,0 +1,1412 @@
+# Physical design fundamentals flash-card deck.
+#
+# Concepts rather than commands: the ideas a physical designer reasons with,
+# and that interviews ask about. Each card names the open command that shows
+# the effect where one exists, so the idea stays connected to something you can
+# run. See fundamentals_scope.md.
+
+deck: fundamentals
+title: PD fundamentals
+reference: https://github.com/parallaxsw/OpenSTA/blob/master/doc/Commands.md
+basis:
+  tool: the open flow
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD
+  tag: concepts, tied to the open tools
+  doc_title: the OpenSTA command reference
+  note: >-
+    These cards cover the reasoning behind physical design rather than any
+    tool's interface: how a timing check is formed, what skew and variation do
+    to it, and what the physical effects cost. Where an idea can be observed in
+    the open flow, the explanation names the command that shows it, and the
+    answer links to its documentation.
+
+sections:
+  - id: timing
+    title: Timing basics
+    blurb: How a check is formed, and what slack actually measures.
+    commands: [setup, hold, slack, arrival, required, critical-path, launch, capture]
+  - id: clocking
+    title: Clocking
+    blurb: Latency, skew, jitter, and what they do to the two checks.
+    commands: [latency, skew, jitter, uncertainty, useful-skew, clock-gating, CDC]
+  - id: variation
+    title: Variation and corners
+    blurb: Why one analysis is never enough, and how pessimism is managed.
+    commands: [corners, OCV, derating, CRPR, MCMM, aging]
+  - id: si
+    title: Signal integrity
+    blurb: What neighbouring wires do to a net's delay and its logic value.
+    commands: [crosstalk, delta-delay, noise, shielding, NDR, coupling]
+  - id: power
+    title: Power and current
+    blurb: Where the power goes, and what the current does to the supply.
+    commands: [dynamic-power, leakage, IR-drop, electromigration, decap, clock-gating]
+  - id: physical
+    title: Physical effects
+    blurb: Wires, loads, and the quantities that make a layout hard.
+    commands: [wire-delay, fanout, utilization, congestion, buffering, floorplan]
+  - id: test
+    title: Test concepts
+    blurb: Why a chip needs test logic, and what it costs the physical design.
+    commands: [scan, controllability, observability, ATPG, stuck-at, at-speed, scan-reorder]
+  - id: interfaces
+    title: Interfaces and budgeting
+    blurb: Timing at a block's edge, and what a block's model hides from the level above.
+    commands: [input-delay, output-delay, source-synchronous, budget, ILM, feedthrough]
+  - id: flow
+    title: Flow reasoning
+    blurb: Why the flow has the shape it does, and what each stage can still change.
+    commands: [flat-vs-hierarchical, abstract, ECO, closure, timing-model]
+
+cards:
+
+  # ---------------------------------------------------------------- Timing basics
+
+  - id: fun-setup-equation
+    section: timing
+    command: the setup check
+    hint: "Write the inequality: data arrival against the next capture edge."
+    answer: Data must arrive before the capture edge, less the setup time.
+    wrong:
+      - Data must arrive after the capture edge, plus the setup time.
+      - Data must arrive within one clock period of the launch edge.
+      - Data must arrive before the launch edge of the following cycle.
+    explain: >-
+      Uncertainty comes off as well. Arrival is the launch edge plus the
+      launch clock's latency, the
+      register's clock-to-output delay, and the logic delay. Required is the
+      capture edge plus the capture clock's latency, minus the setup time and
+      the uncertainty. Setup slack is required minus arrival, which is what
+      `report_checks` prints at the bottom.
+    source: report_checks
+
+  - id: fun-hold-equation
+    section: timing
+    command: the hold check
+    hint: "The two edges involved are usually the same one, not a cycle apart."
+    answer: Data must not arrive too early after the same edge that launched it.
+    wrong:
+      - Data must not arrive too early before the next capture edge.
+      - Data must be held stable for one full clock period after launch.
+      - Data must arrive after the capture edge of the following cycle.
+    explain: >-
+      Hold compares the fastest path against the same capture edge, so the
+      period cancels out. That is why hold failures do not improve when the
+      clock is slowed, and why they are fixed by adding delay to the data
+      path rather than by relaxing the clock.
+    source: report_checks
+
+  - id: fun-slack
+    section: timing
+    command: slack
+    hint: "One number, formed from two. Ask which is subtracted from which."
+    answer: "Required time minus arrival time: positive means the check passes."
+    wrong:
+      - "Arrival time minus required time: positive means the check passes."
+      - The margin left in the clock period after the logic delay.
+      - The difference between the worst and the second-worst path.
+    explain: >-
+      The same definition covers both checks because required time means
+      different things in each: the latest allowed arrival for setup and the
+      earliest for hold, where the subtraction reverses. Slack is the
+      universal currency of timing closure.
+    source: report_checks
+
+  - id: fun-critical-path
+    section: timing
+    command: the critical path
+    hint: "Ask whether it is about delay alone, or about delay against a requirement."
+    answer: The path with the least slack, which need not be the slowest one.
+    wrong:
+      - The path with the largest delay anywhere in the design.
+      - The path with the most logic stages between two registers.
+      - The path that fails by the largest amount, if any fails.
+    explain: >-
+      A long path with a relaxed requirement, such as a multicycle path, can
+      have more slack than a short path on a fast clock. Optimization works on
+      slack, so the critical path is defined by slack, and it moves as the
+      design is fixed.
+    source: report_checks
+
+  - id: fun-launch-capture
+    section: timing
+    command: launch and capture
+    hint: "Two registers, two clock edges. Ask which edge belongs to which register."
+    answer: The launching register's edge starts the path, the capturing register's ends it.
+    wrong:
+      - The launch edge starts the path and the capture edge is one cycle later on the same register.
+      - The launch edge is the clock's rise and the capture edge its fall.
+      - The launch edge is at the clock source and the capture edge at the register.
+    explain: >-
+      Both edges come from the clock, but they arrive at different registers
+      after different clock-tree paths, which is where skew enters. Writing a
+      check as launch-side against capture-side is what makes the effect of
+      skew, latency, and uncertainty easy to see.
+    source: report_checks
+
+  - id: fun-mcp-reasoning
+    section: timing
+    command: why a multicycle path is safe
+    hint: "Ask what the designer knows that the timer does not."
+    answer: The design guarantees the data is not used for several cycles.
+    wrong:
+      - The path is slow, so the tool is told to allow it more time.
+      - The path is rarely exercised, so its failure is unlikely.
+      - The receiving register is not clocked every cycle by the design.
+    explain: >-
+      An exception is a promise about behaviour: an enable holds the capture
+      register, or the protocol waits. If the promise is wrong the chip fails
+      in a way no timing report will show, which is why exceptions are
+      reviewed as carefully as they are written.
+    source: set_multicycle_path
+
+  # ---------------------------------------------------------------- Clocking
+
+  - id: fun-latency-vs-skew
+    section: clocking
+    command: latency against skew
+    hint: "One is an absolute delay, the other a difference. Ask which hurts a check."
+    answer: Latency is the delay to a register; skew is the difference between two.
+    wrong:
+      - Latency is the difference between two registers; skew is the delay to one.
+      - Latency is the clock's delay and skew its variation over time.
+      - Latency applies to the source and skew to the network.
+    explain: >-
+      Equal latency at both ends cancels in a same-clock check, so a deep
+      clock tree is not itself a timing problem. The difference between the
+      two ends does not cancel, which is why the tree is balanced rather than
+      merely made short. `report_clock_skew` shows the difference.
+    source: report_clock_skew
+
+  - id: fun-skew-effect
+    section: clocking
+    command: skew that delays the capture clock
+    hint: "Work through both checks: the late capture edge helps one and hurts the other."
+    answer: It helps setup, by giving the data more time, and hurts hold.
+    wrong:
+      - It hurts setup, since the data must arrive earlier, and helps hold.
+      - It hurts both checks, since any skew reduces the available margin.
+      - It helps both checks, since the whole path shifts together.
+    explain: >-
+      A late capture edge extends the setup window and shortens the hold
+      window by the same amount. This is why fixing hold by adding buffers can
+      be cheaper than rebalancing a tree, and why useful skew is deliberately
+      unbalanced rather than skew being minimized everywhere.
+    source: report_clock_skew
+
+  - id: fun-jitter
+    section: clocking
+    command: jitter against skew
+    hint: "One varies between places, the other between cycles."
+    answer: Skew is a difference between registers; jitter is a variation over time.
+    wrong:
+      - Skew is a variation over time; jitter is a difference between registers.
+      - Skew is measured after routing and jitter before it.
+      - Skew comes from the clock tree and jitter from the power supply only.
+    explain: >-
+      Jitter comes from the clock generator and from supply noise, so it
+      cannot be designed out of the tree. It enters analysis as part of
+      `set_clock_uncertainty`, along with a margin for skew before the tree
+      exists.
+    source: set_clock_uncertainty
+
+  - id: fun-useful-skew
+    section: clocking
+    command: useful skew
+    hint: "Ask what deliberately unbalancing the tree can buy."
+    answer: Deliberate skew that moves slack from a path with margin to one without.
+    wrong:
+      - The skew that remains after the clock tree has been balanced.
+      - Skew that happens to help setup on the critical path by chance.
+      - The amount of skew a design can tolerate before it fails.
+    explain: >-
+      Delaying a register's clock gives the path into it more time and the
+      path out of it less. Where the outgoing path has margin, that is free
+      speed. It costs hold margin and makes the design more sensitive to
+      variation, so it is used deliberately and sparingly.
+    source: report_clock_skew
+
+  - id: fun-cdc
+    section: clocking
+    command: a clock domain crossing
+    hint: "Ask why timing analysis cannot close such a path, however much margin it has."
+    answer: The two clocks have no fixed phase, so no margin guarantees it.
+    wrong:
+      - The path is too long to close between two different clocks.
+      - The tool cannot compute the delay between two clock trees.
+      - The two clocks have different periods, so the check is ambiguous.
+    explain: >-
+      No margin closes it. With no fixed relationship, an edge can land
+      arbitrarily close to the
+      data change, and the receiving register can go metastable. The fix is a
+      synchronizer, and timing declares the crossing false with
+      `set_clock_groups -asynchronous`. Verifying the synchronizers is a
+      separate check.
+    source: set_clock_groups
+
+  - id: fun-clock-gating-check
+    section: clocking
+    command: why a clock gate needs its own check
+    hint: "Ask what a late enable would do to the shape of the gated clock."
+    answer: A late enable can cut a clock pulse short, producing a runt edge.
+    wrong:
+      - A late enable can delay the clock, adding skew to the gated branch.
+      - A late enable can gate the wrong cycle, losing data for one cycle.
+      - A late enable can glitch the enable net, which the check detects.
+    explain: >-
+      The check constrains the enable against the clock so the gate only ever
+      produces whole pulses. The integrated cell latches the enable to make
+      that possible, and `set_clock_gating_check` sets the margins.
+    source: set_clock_gating_check
+
+  # ---------------------------------------------------------------- Variation and corners
+
+  - id: fun-corners
+    section: variation
+    command: why several corners are analysed
+    hint: "Ask which check is worst when everything is slow."
+    answer: Different checks fail at different conditions, so no single corner covers both.
+    wrong:
+      - The slow corner is worst for both checks, but the others confirm it.
+      - Each corner covers a different part of the design's area.
+      - The corners bracket the range of clock frequencies the part supports.
+    explain: >-
+      Setup is worst when cells are slow, hot, and at low voltage; hold is
+      worst when they are fast. A part sold across a voltage and temperature
+      range must pass at every corner it is guaranteed at, which is why
+      sign-off runs them all.
+    source: set_operating_conditions
+
+  - id: fun-ocv
+    section: variation
+    command: on-chip variation
+    hint: "Ask why one corner for the whole die is still optimistic."
+    answer: Cells on one die differ from each other, not just die from die.
+    wrong:
+      - The die's conditions vary over time, so a static corner is not enough.
+      - Different dies from the same wafer vary, which the corners capture.
+      - The die's temperature varies, which the corner's value averages.
+    explain: >-
+      One corner for the whole die is therefore still optimistic. Doping,
+      lithography, and local temperature all vary across a die, so two
+      cells at the same corner are not identical. Analysis therefore derates
+      the launch and capture paths in opposite directions, which
+      `set_timing_derate` controls.
+    source: set_timing_derate
+
+  - id: fun-crpr
+    section: variation
+    command: clock reconvergence pessimism removal
+    hint: "Part of the clock path is shared. Ask whether it can be fast and slow at once."
+    answer: It credits back derating applied twice on the shared clock path.
+    wrong:
+      - It removes the pessimism of analysing several corners at once.
+      - It removes the uncertainty added twice on both clock paths.
+      - It credits back the skew already counted in the uncertainty.
+    explain: >-
+      The shared path cannot be both fast and slow. Derating makes the launch
+      clock late and the capture clock early, but
+      the part of the tree they share cannot be both. CRPR (Clock
+      Reconvergence Pessimism Removal) gives that difference back, and the
+      line appears in every `report_checks` path.
+    source: report_checks
+
+  - id: fun-derate-direction
+    section: variation
+    command: set_timing_derate -early 0.95 -late 1.05
+    hint: "Ask which path of a setup check is made slow, and which fast."
+    answer: Data is derated late and the capture clock early, for setup.
+    wrong:
+      - Every path is derated late, so all delays grow by five percent.
+      - Data is derated early and the clock late, making checks optimistic.
+      - The two values are averaged, so the analysis stays at nominal.
+    explain: >-
+      Each check then sees its own worst case. For setup the data path takes
+      the late factor and the capture clock the
+      early one; for hold the assignment reverses. The pair is what makes the
+      analysis pessimistic in both directions at once, and CRPR (Clock Reconvergence Pessimism Removal) then removes
+      the part that cannot physically happen.
+    source: set_timing_derate
+
+  - id: fun-mcmm
+    section: variation
+    command: multi-corner multi-mode
+    hint: "Two independent axes. Ask what each one varies."
+    answer: Several operating conditions crossed with several modes.
+    wrong:
+      - Several operating conditions, analysed one after another.
+      - Several clock frequencies, each analysed at its own corner.
+      - Several modes of the design, each with its own layout.
+    explain: >-
+      Modes bring their own constraints: a chip has functional, test, and
+      low-power modes, each with its own
+      constraints, and each must hold at every corner. The combinations are
+      what sign-off covers, and what makes it expensive. OpenSTA calls one
+      combination a scene.
+    source: define_scene
+
+  - id: fun-aging
+    section: variation
+    command: why a margin is kept for aging
+    hint: "Ask what happens to a transistor after years of use."
+    answer: Transistors slow as they age, so a part must start with margin to last.
+    wrong:
+      - Wires thin as they age, so the design must start with wider metal.
+      - The supply voltage falls over the years as the package degrades.
+      - Aging is modelled in the corners, so no separate margin is needed.
+    explain: >-
+      Mechanisms such as bias temperature instability and hot-carrier injection
+      shift a transistor's threshold over its lifetime, and electromigration
+      thins conductors. Designs therefore sign off with margin, or at a corner
+      characterized for end of life.
+    source: set_timing_derate
+
+  # ---------------------------------------------------------------- Signal integrity
+
+  - id: fun-crosstalk-delay
+    section: si
+    command: crosstalk delta delay
+    hint: "Two nets switch together. Ask when it helps and when it hurts."
+    answer: A neighbour switching the other way slows the victim down.
+    wrong:
+      - A neighbour switching always slows the victim, whichever way it goes.
+      - A neighbour switching the same way slows the victim by coupling.
+      - A neighbour changes the victim's delay only if it switches first.
+    explain: >-
+      Switching the same way speeds it up instead. The coupling capacitance
+      sees a doubled voltage swing when the two nets
+      move oppositely, which is the Miller effect, so it charges more slowly.
+      Setup analysis takes the slowing case and hold the speeding one, from
+      aggressors whose switching windows overlap the victim's.
+    source: report_checks
+
+  - id: fun-crosstalk-noise
+    section: si
+    command: crosstalk noise, as opposed to delta delay
+    hint: "Ask what happens to a net that is not switching at all."
+    answer: A quiet net is pulled by its neighbour, and may glitch its receiver.
+    wrong:
+      - A switching net is delayed by its neighbour's coupling.
+      - A quiet net picks up a permanent offset from its neighbour.
+      - A net's transition becomes slower and its delay unpredictable.
+    explain: >-
+      Delta delay is about a switching victim; noise is about a static one. A
+      large enough glitch can be latched or can propagate through combinational
+      logic. The defences are the same: spacing, shielding, and shorter
+      parallel runs.
+    source: report_checks
+
+  - id: fun-si-defences
+    section: si
+    command: how a sensitive net is protected
+    hint: "Three ways, all geometric rather than electrical."
+    answer: More spacing, a shield net alongside, or a shorter parallel run.
+    wrong:
+      - A stronger driver, a smaller load, and a shorter net.
+      - A higher metal layer, a wider wire, and more vias.
+      - A buffer at each end, a spare track, and a slower transition.
+    explain: >-
+      Coupling grows with the length two wires run alongside and falls with
+      their separation, so the fixes are geometric. A non-default rule that
+      widens and spaces a net is the usual mechanism, and a grounded shield
+      wire is the strongest form.
+    source: create_ndr
+
+  - id: fun-slew-matters
+    section: si
+    command: why a slow transition is a problem
+    hint: "Name three separate costs, not just the delay."
+    answer: It adds delay, burns current, and invites noise at the input.
+    wrong:
+      - It adds delay, raises leakage, and increases the cell's area.
+      - It adds delay and makes the cell's timing tables inaccurate only.
+      - It only matters when the receiving cell is a flip-flop.
+    explain: >-
+      Three costs, not one. While an input sits between the rails, both
+      transistor stacks conduct,
+      so current flows straight from supply to ground. A slow edge also
+      lengthens the window where noise can flip the receiver, and it makes the
+      next stage's delay worse. This is why maximum transition is a rule.
+    source: repair_design
+
+  # ---------------------------------------------------------------- Power and current
+
+  - id: fun-power-split
+    section: power
+    command: where the power goes
+    hint: "Three components. Ask which one exists even when nothing switches."
+    answer: Switching the load, the cell's internal switching cost, and static leakage.
+    wrong:
+      - Switching the load, the clock tree, and the power grid's losses.
+      - Dynamic power, short-circuit power, and the current lost to IR drop.
+      - Logic power, memory power, and the power lost as heat.
+    explain: >-
+      Switching power is the load capacitance times the supply squared times
+      the activity; internal power is the cell's own cost per transition, from
+      its library; leakage flows whether or not anything switches. Clock
+      networks dominate the first two because they switch every cycle.
+    source: report_power
+
+  - id: fun-clock-power
+    section: power
+    command: why the clock network dominates dynamic power
+    hint: "Ask how often a clock switches compared with a data net."
+    answer: It switches every cycle and reaches every register, unlike data.
+    wrong:
+      - It is routed on thick upper layers, which carry more capacitance.
+      - Its buffers are larger than the logic cells they drive.
+      - It is never gated, so it draws power even when the logic is idle.
+    explain: >-
+      A data net switches on a fraction of cycles; the clock switches twice
+      per cycle everywhere. This is why clock gating, multi-bit flops, and
+      fewer clock buffers all matter so much, and why clock power is reported
+      as its own group.
+    source: report_power
+
+  - id: fun-ir-drop
+    section: power
+    command: why IR drop slows a design
+    hint: "Ask at what voltage the library was characterized, and what the cell actually gets."
+    answer: A cell at a lower supply than characterized is slower than the analysis assumed.
+    wrong:
+      - A cell at a lower supply draws more current, which slows its neighbours.
+      - The drop adds a delay of its own to every path through the region.
+      - The drop lowers the noise margin, which the timer models as delay.
+    explain: >-
+      Timing is computed at the library's voltage, so a local droop makes real
+      silicon slower than the report. Designs either keep drop under a budget
+      (a few percent of the supply) or analyse timing at the reduced voltage.
+      `analyze_power_grid` finds the drop.
+    source: analyze_power_grid
+
+  - id: fun-em
+    section: power
+    command: electromigration, and why it is not about heat
+    hint: "Ask what physically moves, and over what timescale."
+    answer: Current gradually displaces the metal's atoms, thinning the wire over years.
+    wrong:
+      - Current heats the wire until its resistance rises permanently.
+      - Current induces a field that migrates charge into the dielectric.
+      - Current erodes the via barriers, which fail before the metal does.
+    explain: >-
+      Momentum from the electron flow moves atoms along the wire, opening it
+      eventually. The limit is a current density, not a current, which is why
+      widening a strap fixes it. It is a wear-out mechanism: the part works
+      when new and fails in the field.
+    source: analyze_power_grid
+
+  - id: fun-decap-purpose
+    section: power
+    command: what a decoupling capacitor actually does
+    hint: "Ask what the grid cannot deliver quickly enough on its own."
+    answer: It holds charge locally for the spike the grid cannot supply.
+    wrong:
+      - It filters noise coupled into the supply from the switching logic.
+      - It raises the local supply voltage where IR drop is worst.
+      - It stores charge so the design can ride out a power-down.
+    explain: >-
+      The charge is held beside the cells that need it. The grid has
+      inductance and resistance, so a sudden demand outruns it.
+      A capacitor beside the switching cells supplies that moment and
+      recharges between. It costs leakage and area, so decaps are placed where
+      switching is heaviest.
+    source: pdn
+
+  # ---------------------------------------------------------------- Physical effects
+
+  - id: fun-wire-delay
+    section: physical
+    command: why wire delay grows faster than length
+    hint: "Both resistance and capacitance grow with length. Ask what their product does."
+    answer: Resistance and capacitance both grow with length, so delay grows with its square.
+    wrong:
+      - Resistance grows with length and capacitance with area, so delay grows linearly.
+      - Delay grows with the square because the driver must charge more load.
+      - Delay grows with the square only above a critical length.
+    explain: >-
+      A wire is a distributed network whose delay goes with resistance times
+      capacitance, and each is proportional to length. Splitting a long wire
+      with buffers turns one quadratic term into several small ones, which is
+      why `repair_design -max_wire_length` exists.
+    source: repair_design
+
+  - id: fun-fanout
+    section: physical
+    command: why high fanout is a problem
+    hint: "Two separate costs: one at the driver, one in the layout."
+    answer: Each load adds capacitance, and reaching them all adds wire.
+    wrong:
+      - Each load adds capacitance, and the extra loads add leakage.
+      - Each load slows the driver, and the router may not reach them all.
+      - Each load adds delay of its own, which accumulates along the net.
+    explain: >-
+      A high-fanout net is slow both because of the pin capacitance and
+      because the wire has to travel to every load. The fix is a buffer tree,
+      which trades cell delay for shorter wires, and it is what repair builds
+      when a net exceeds the fanout limit.
+    source: repair_design
+
+  - id: fun-utilization
+    section: physical
+    command: why utilization is not pushed to the limit
+    hint: "Ask what else needs the space besides the cells that are already there."
+    answer: Later steps add cells, and routing needs space between them.
+    wrong:
+      - The placer cannot converge above a certain density, whatever the design.
+      - High utilization raises power density beyond what the package allows.
+      - The rows must stay partly empty for the fillers that are added later.
+    explain: >-
+      Buffering, clock tree synthesis, and timing repair all add cells after
+      placement, and routing needs tracks that cells do not block. A design
+      packed at 90% may place and then fail to route or to close timing, which
+      is why the target is set by what the flow still has to do.
+    source: global_placement
+
+  - id: fun-congestion
+    section: physical
+    command: routing congestion
+    hint: "Ask what is being compared with what, in a small region."
+    answer: More nets want to cross a region than it has tracks for.
+    wrong:
+      - More cells are placed in a region than its rows can hold.
+      - The router takes too long because too many nets are in one area.
+      - The nets in a region are longer than their timing allows.
+    explain: >-
+      Capacity comes from the tracks in a region; demand from the nets routed
+      through it. Congestion is fixed by spreading the cells that cause it,
+      which is why the placer has a routability mode and why padding and
+      density are the usual controls. `global_route` reports it per layer.
+    source: global_route
+
+  - id: fun-buffer-tradeoff
+    section: physical
+    command: what inserting a buffer costs
+    hint: "It shortens the wire, but the buffer is not free."
+    answer: Its own delay, area, and power, in exchange for breaking the wire up.
+    wrong:
+      - Only area and power; a buffer's delay is negligible by design.
+      - Only delay; buffers are placed in gaps that would be filled anyway.
+      - Its delay and the extra load it presents to the net it drives.
+    explain: >-
+      Buffering wins when the quadratic wire delay saved exceeds the buffer's
+      own delay, which is why there is an optimal spacing rather than "more is
+      better". Each buffer also needs a site, power, and a place in the
+      clock or data path that repair must keep legal.
+    source: repair_design
+
+  - id: fun-floorplan-matters
+    section: physical
+    command: why the floorplan decides the outcome
+    hint: "Ask which later stage can undo a bad macro placement."
+    answer: Later stages can move cells and wires, but not the shape the floorplan imposed.
+    wrong:
+      - Later stages cannot change anything, since the floorplan is fixed.
+      - The floorplan decides utilization, which sets the achievable frequency.
+      - The floorplan is the only stage that can be checked against the die size.
+    explain: >-
+      Macros in the wrong place force long wires and pinch routing channels,
+      and no amount of placement or routing effort recovers that. This is why
+      a floorplan is reviewed before the flow is allowed to continue, and why
+      macro placement is treated as a decision rather than an optimization.
+    source: rtl_macro_placer
+
+  # ---------------------------------------------------------------- Flow reasoning
+
+  - id: fun-flat-vs-hier
+    section: flow
+    command: flat against hierarchical implementation
+    hint: "Ask what each one buys, given the same design and the same tools."
+    answer: Flat gives better results; hierarchical makes a large design tractable.
+    wrong:
+      - Hierarchical gives better results; flat is only for small designs.
+      - Flat is faster to run; hierarchical gives better timing closure.
+      - Flat keeps the module names; hierarchical flattens them away.
+    explain: >-
+      Optimizing across block boundaries is strictly better, but runtime and
+      memory grow faster than linearly, and a team cannot work on one flat
+      database at once. Hierarchy buys parallel work and repeatability at the
+      cost of the boundaries it freezes.
+    source: rtl_macro_placer
+
+  - id: fun-abstract
+    section: flow
+    command: why a block is abstracted
+    hint: "Ask what the top level needs to know about a finished block, and what it does not."
+    answer: The top level needs its outline, pins, and timing, not its contents.
+    wrong:
+      - The top level needs its contents, but reads them in a compressed form.
+      - The abstract is for other designers to reuse the block elsewhere.
+      - The abstract protects the block's internals from being changed.
+    explain: >-
+      A block's insides are millions of objects the top level would only slow
+      down on. An abstract LEF (Library Exchange Format) gives the shape and
+      pins and `write_timing_model` the timing, so the top level treats it as
+      a macro.
+    source: write_abstract_lef
+
+  - id: fun-eco
+    section: flow
+    command: why a late fix is made as an ECO
+    hint: "Ask what re-running the flow would cost, besides time."
+    answer: A small local edit keeps everything else exactly as it was verified.
+    wrong:
+      - A small edit is faster to run than repeating the whole flow.
+      - An edit avoids re-running the checks, which a new run would need.
+      - An edit is the only way to change a design after routing.
+    explain: >-
+      Re-running from synthesis produces a different netlist and a different
+      layout, so every check and every verification result starts again. An
+      ECO (Engineering Change Order) touches a few cells and keeps the rest of
+      the sign-off evidence valid, which is why closure ends in small edits.
+    source: repair_timing
+
+  - id: fun-closure
+    section: flow
+    command: why timing closure is iterative
+    hint: "Ask what a fix in one place does elsewhere."
+    answer: Each fix moves cells and wires, which changes the timing of other paths.
+    wrong:
+      - Each fix is approximate, so several passes are needed to converge.
+      - The tool can only repair one violation per pass by design.
+      - Timing must be recomputed because the tool caches its results.
+    explain: >-
+      Adding a buffer displaces neighbours, changes parasitics, and can create
+      a new critical path. The flow therefore alternates repair and analysis
+      rather than fixing everything at once, and a stage's result is only
+      trusted after its own analysis has run.
+    source: repair_timing
+
+  - id: fun-estimates
+    section: flow
+    command: why early timing is optimistic
+    hint: "Ask what each stage knows that the one before it did not."
+    answer: Each stage's estimate of the wires is closer to the truth than the last.
+    wrong:
+      - Early stages ignore timing, so their numbers mean little.
+      - Early stages use the typical corner and later ones the slow one.
+      - Early stages report before repair has run, later ones after it.
+    explain: >-
+      Before placement there are no distances, after placement only straight
+      lines, after global routing the regions, and only after detailed routing
+      the real wires. Each step reveals cost the last one could not see, which
+      is why margins are kept early and released late.
+    source: estimate_parasitics
+
+  # ---------------------------------------------------------------- Timing additions
+
+  - id: fun-register-params
+    section: timing
+    command: clock-to-output, setup time, hold time
+    hint: "Ask which of the three is a delay and which two are requirements."
+    answer: One is the register's own delay; the other two are requirements on its data.
+    wrong:
+      - All three are delays of the register, measured from its clock edge.
+      - All three are requirements the surrounding logic must meet.
+      - Two are delays of the register and one a requirement on the clock.
+    explain: >-
+      Clock-to-output is how long after the edge the register drives its new
+      value, so it is part of the path delay. Setup and hold say how long the
+      data must be stable before and after the edge, so they are subtracted
+      from the budget. All three come from the library and vary with slew.
+    source: report_checks
+
+  - id: fun-metastability
+    section: timing
+    command: why a synchronizer is a probability argument
+    hint: "Ask whether adding flops makes failure impossible or merely unlikely."
+    answer: It makes failure unlikely enough to ignore, not impossible.
+    wrong:
+      - It makes failure impossible, since the second flop always resolves it.
+      - It makes failure impossible if the clocks are slower than a limit.
+      - It detects the failure and retries, rather than preventing it.
+    explain: >-
+      A register that samples a changing input can sit between states, and it
+      resolves after an unpredictable time. A second register gives it a full
+      cycle to settle, which cuts the failure rate by orders of magnitude. The
+      result is a mean time between failures, quoted in years, not a guarantee.
+    source: set_clock_groups
+
+  - id: fun-fmax
+    section: timing
+    command: the fastest this design could run
+    hint: "Slack is the margin at the current period. Ask how the two combine."
+    answer: One over the period minus the worst slack.
+    wrong:
+      - One over the delay of the critical path, which sets the limit.
+      - One over the period, scaled by the fraction of slack remaining.
+      - One over the period minus the setup time of the worst register.
+    explain: >-
+      Slack already accounts for the setup time, the clock skew, and the
+      uncertainty, so shrinking the period by the slack is what the design can
+      take. Note that skew and uncertainty do not shrink with the period, so
+      the estimate is optimistic if the clock is scaled a long way.
+      `report_clock_min_period` computes it.
+    source: report_clock_min_period
+
+  - id: fun-half-cycle
+    section: timing
+    command: a path from a rising-edge register to a falling-edge one
+    hint: "Draw the two edges. Ask how far apart they are."
+    answer: Half a period, since the capture edge is the falling one.
+    wrong:
+      - A full period, since both registers use the same clock.
+      - A full period, unless a multicycle exception says otherwise.
+      - Half a period for setup and a full period for hold.
+    explain: >-
+      The timer pairs each launch edge with the nearest following capture
+      edge, so mixing edges halves the budget. Between clocks of different
+      periods it does the same over their common multiple, which can produce
+      a much tighter requirement than either period alone.
+    source: report_checks
+
+  - id: fun-false-vs-mcp
+    section: timing
+    command: a false path against a multicycle path
+    hint: "Both relax a check. Ask which one is still checked at all."
+    answer: A false path is not timed at all; a multicycle path is timed with more cycles.
+    wrong:
+      - A false path is timed with infinite slack; a multicycle path with more cycles.
+      - A false path applies to whole clocks; a multicycle path to single paths.
+      - A false path removes setup only; a multicycle path moves both checks.
+    explain: >-
+      A false path claims the timing never matters, so nothing is reported and
+      nothing is optimized. A multicycle path claims it matters later, so it
+      is still checked, against a different edge. Using a false path where a
+      multicycle would do hides real failures.
+    source: set_false_path
+
+  - id: fun-time-borrowing
+    section: timing
+    command: time borrowing through a latch
+    hint: "A latch is open for a while. Ask what late data can do in that window."
+    answer: Late data passes straight through, borrowing time from the next stage.
+    wrong:
+      - The latch holds the late data until the next edge, hiding the delay.
+      - The latch stretches its transparent window to accept the late data.
+      - The next stage starts early, lending time to the late stage.
+    explain: >-
+      Because a latch is transparent rather than edge-triggered, data arriving
+      after it opens flows on immediately, so the overrun is passed to the
+      following stage rather than failing. It is paid back there, which is why
+      the total across stages still has to fit and why
+      `set_max_time_borrow` caps it.
+    source: set_max_time_borrow
+
+  # ---------------------------------------------------------------- Clocking additions
+
+  - id: fun-tree-structures
+    section: clocking
+    command: an H-tree, a mesh, and a spine
+    hint: "Order them by how much metal and power they spend on skew."
+    answer: Increasingly expensive ways to buy lower skew, from tree to grid.
+    wrong:
+      - Three shapes of clock tree with the same cost and different skew.
+      - Three stages of one clock tree, from the root to the leaves.
+      - Three names for the same structure, used by different tools.
+    explain: >-
+      An H-tree balances by construction and is cheap, but its skew depends on
+      the loads matching. A mesh shorts the leaves together, so skew is very
+      low and the power very high. A spine is the middle: a strong backbone
+      with trees hanging off it. The choice follows the skew budget.
+    source: clock_tree_synthesis
+
+  - id: fun-insertion-delay
+    section: clocking
+    command: why a shallower clock tree is not automatically better
+    hint: "Ask what a deep tree costs, and what shallowness costs in return."
+    answer: A shallow tree needs bigger buffers and matches loads less easily.
+    wrong:
+      - A shallow tree has more skew, since fewer levels means less balance.
+      - A shallow tree costs more power, since each level drives more load.
+      - A shallow tree cannot reach every register in a large block.
+    explain: >-
+      Latency itself cancels within a clock, so depth is not the enemy; what
+      matters is skew, power, and how sensitive the tree is to variation. Deep
+      trees accumulate variation, and shallow ones need strong drivers and
+      long wires. Insertion delay also matters at a block's boundary, where it
+      does not cancel.
+    source: report_clock_latency
+
+  - id: fun-clock-gating-savings
+    section: clocking
+    command: what clock gating actually saves
+    hint: "Ask how far down the tree the saving reaches."
+    answer: The switching power of the clock branch below the gate.
+    wrong:
+      - The leakage of the registers below the gate while they are idle.
+      - The switching power of the whole clock network, including the root.
+      - The power of the logic fed by those registers, which stops switching.
+    explain: >-
+      Everything below a disabled gate stops toggling, including the register
+      clock pins, which is where most clock power sits. The costs are the
+      gate's own area, a timing check on its enable, and a tree that is harder
+      to balance because branches switch independently.
+    source: set_clock_gating_check
+
+  - id: fun-duty-cycle
+    section: clocking
+    command: duty cycle distortion along a clock path
+    hint: "Ask what happens if a buffer's rise delay differs from its fall delay."
+    answer: Each unbalanced stage shifts one edge relative to the other, shrinking a pulse.
+    wrong:
+      - Each stage delays both edges equally, so the duty cycle is preserved.
+      - The clock's frequency drifts, since one edge arrives before the other.
+      - The distortion cancels along the chain, since buffers alternate.
+    explain: >-
+      A pulse that starts at half the period can arrive much narrower, and a
+      register needs a minimum high and low time to work. This is why clock
+      cells are drawn with matched edges and why `set_min_pulse_width` is
+      checked at the leaves.
+    source: set_min_pulse_width
+
+  - id: fun-rdc
+    section: clocking
+    command: a reset domain crossing
+    hint: "The clock domains can be the same. Ask what differs instead."
+    answer: A register reset by one reset feeds one reset by another.
+    wrong:
+      - A reset signal crosses between two clock domains without a synchronizer.
+      - A register is reset while its clock domain is still switched off.
+      - Two resets assert at different times, leaving the design in a mixed state.
+    explain: >-
+      If one register is released from reset while its neighbour is still
+      held, the released one can capture a value that the other is about to
+      change, which is the same hazard as a clock crossing. Reset domain
+      crossing checks are a separate verification step, distinct from clock
+      domain crossing.
+    source: set_false_path
+
+  # ---------------------------------------------------------------- Variation additions
+
+  - id: fun-corner-names
+    section: variation
+    command: slow-slow and worst-capacitance
+    hint: "Two names from two different files. Ask what each one varies."
+    answer: One names the transistors' corner, the other the wires' parasitics.
+    wrong:
+      - One names the slow corner and the other its worst-case capacitance.
+      - Both name library corners, one for cells and one for macros.
+      - One names a process corner and the other a temperature corner.
+    explain: >-
+      Library corners such as slow-slow, typical-typical, and fast-fast come
+      from the transistors' process, voltage, and temperature. Parasitic
+      corners come from the metal's own variation and are chosen separately,
+      which is why sign-off pairs them: a slow library with worst capacitance
+      for setup, a fast one with best for hold.
+    source: define_scene
+
+  - id: fun-temp-inversion
+    section: variation
+    command: temperature inversion
+    hint: "The old rule is hot equals slow. Ask when that stops being true."
+    answer: At low supply voltage, cold silicon can be slower than hot.
+    wrong:
+      - At high supply voltage, cold silicon becomes slower than hot.
+      - At low temperature, leakage rises and slows the transistors.
+      - At high temperature, mobility rises and speeds the transistors.
+    explain: >-
+      Two effects compete: carrier mobility falls with heat, which slows a
+      cell, and the threshold voltage falls with heat, which speeds it. At low
+      supply the threshold effect wins, so the worst case moves to cold. This
+      is why a modern flow signs off at both temperature extremes rather than
+      assuming hot is worst.
+    source: set_operating_conditions
+
+  - id: fun-statistical-ocv
+    section: variation
+    command: advanced and parametric on-chip variation
+    hint: "Ask what a single derate factor ignores about a path."
+    answer: They vary the derate with path depth and location instead of using one factor.
+    wrong:
+      - They apply the derate statistically, as a distribution over corners.
+      - They replace derating with a Monte Carlo simulation of each path.
+      - They derate each cell by its own measured variation instead of a factor.
+    explain: >-
+      A long path averages out random variation, so a flat derate over-margins
+      it, while a short path needs more. Advanced on-chip variation uses
+      depth-dependent factors, parametric methods carry a distribution per
+      cell, and Liberty variation data supplies the per-cell numbers.
+    source: set_timing_derate
+
+  # ---------------------------------------------------------------- Signal integrity additions
+
+  - id: fun-noise-margin
+    section: si
+    command: the noise margin of a gate
+    hint: "Ask against what a glitch's size is judged."
+    answer: The gap between the level a driver guarantees and the level a receiver accepts.
+    wrong:
+      - The largest glitch a net may carry before the rule checker flags it.
+      - The difference between the supply voltage and the switching threshold.
+      - The margin added to a net's delay to account for coupling noise.
+    explain: >-
+      A gate accepts anything below its low threshold as a zero and above its
+      high threshold as a one; the unclaimed middle is the margin a glitch has
+      to cross to matter. Margins shrink with the supply voltage, which is why
+      noise became a first-class concern as voltages fell.
+    source: report_checks
+
+  - id: fun-switching-windows
+    section: si
+    command: why an aggressor's switching window matters
+    hint: "Ask what has to be true at the same time for coupling to hurt."
+    answer: Coupling only affects the victim if the aggressor switches while it does.
+    wrong:
+      - Coupling only affects the victim if the aggressor switches more often.
+      - The window decides how much charge the aggressor can inject in total.
+      - The window decides whether the coupling is delay or noise.
+    explain: >-
+      Each net has a range of times in which it can switch. If the windows
+      cannot overlap, the aggressor cannot change the victim's delay, and a
+      tool that ignored this would report impossible worst cases. Windows
+      depend on timing, so the analysis iterates: timing changes windows,
+      which changes delays.
+    source: report_checks
+
+  - id: fun-glitch-propagation
+    section: si
+    command: a glitch that reaches a register against one that does not
+    hint: "Ask what makes a glitch harmful rather than merely present."
+    answer: A glitch matters when it is captured or propagated onward.
+    wrong:
+      - A glitch matters only when it exceeds the supply voltage.
+      - A glitch matters only when it lands on a clock or reset net.
+      - Every glitch matters, since each one costs switching power.
+    explain: >-
+      Combinational logic can pass a glitch along, and a register can latch
+      one if it lands in the sampling window. On a clock or asynchronous pin
+      it is worse, since those need no window at all. Glitches that harm
+      nothing still cost power, which is a separate concern.
+    source: report_checks
+
+  # ---------------------------------------------------------------- Power additions
+
+  - id: fun-power-gating
+    section: power
+    command: power gating a block
+    hint: "Ask what has to happen to the block's outputs and its state."
+    answer: The supply is switched off, so outputs need isolating and state needs retaining.
+    wrong:
+      - The clock is switched off, so the block keeps its state and stops switching.
+      - The voltage is lowered, so the block runs slower and leaks less.
+      - The block is disconnected logically, but its supply stays on.
+    explain: >-
+      Gating the clock stops switching power; gating the supply also stops
+      leakage, which dominates when a block is idle for long. The price is
+      isolation cells on the outputs, retention flops for the state worth
+      keeping, and a wake-up sequence that costs time and a current surge.
+    source: set_isolation
+
+  - id: fun-activity-factor
+    section: power
+    command: the activity factor in a power calculation
+    hint: "Ask where a tool gets it when no simulation has been run."
+    answer: How often a net switches, taken from simulation or assumed by default.
+    wrong:
+      - How many nets switch in a cycle, averaged over the design.
+      - How often the clock switches, which sets the rate for all nets.
+      - The fraction of cells that are active in a given mode.
+    explain: >-
+      Switching power is proportional to it, so the number matters as much as
+      the capacitance. Simulation gives real activity through a value-change
+      dump or a switching-activity file; without one, a default is assumed at
+      the inputs and propagated, which is an estimate only.
+    source: report_power
+
+  - id: fun-glitch-power
+    section: power
+    command: glitch power
+    hint: "Ask what a net does when its inputs arrive at different times."
+    answer: Power spent on transitions that settle to the same value they started at.
+    wrong:
+      - Power spent on the short-circuit current during each transition.
+      - Power spent by a net that toggles faster than the clock.
+      - Power spent on the glitches that noise analysis reports.
+    explain: >-
+      An unbalanced logic cone makes a gate switch several times before
+      settling, and each transition costs a full charge and discharge. It can
+      be a noticeable fraction of dynamic power in arithmetic logic, and it
+      does not appear in a report that uses a single activity factor per net.
+    source: report_power
+
+  - id: fun-thermal-feedback
+    section: power
+    command: the leakage and temperature loop
+    hint: "Leakage rises with temperature. Ask what dissipating it does next."
+    answer: Leakage heats the die, and a hotter die leaks more.
+    wrong:
+      - Leakage cools as the die heats, since mobility falls with temperature.
+      - Switching power heats the die, while leakage stays constant.
+      - The loop settles immediately, since leakage is a small fraction.
+    explain: >-
+      The feedback is real and, if the package cannot remove the heat, it runs
+      away. It is one reason sign-off includes a hot corner and why leakage is
+      controlled with threshold-voltage choice and power gating rather than
+      treated as a fixed cost.
+    source: report_power
+
+  # ---------------------------------------------------------------- Physical additions
+
+  - id: fun-pin-access
+    section: physical
+    command: a placement that is legal but will not route
+    hint: "Ask what the router needs at each pin that legalization never checks."
+    answer: "The pins cannot be entered: their access points are blocked."
+    wrong:
+      - The cells overlap slightly, which legalization tolerated.
+      - The nets are too long for the router's iteration limit.
+      - The rows are too full for the router to add vias.
+    explain: >-
+      A pin is reachable only from certain directions and through certain
+      vias, and two cells side by side can block each other's access. This is
+      why placement padding exists, why some cells are excluded from use, and
+      why `pin_access` runs before detailed routing.
+    source: pin_access
+
+  - id: fun-metal-stack
+    section: physical
+    command: why the upper metal layers are thicker
+    hint: "Ask what each part of the stack is for, given the same process."
+    answer: Thick upper layers carry power and long wires with less resistance.
+    wrong:
+      - Thick upper layers are easier to manufacture, so they are made last.
+      - Thick upper layers carry more current because they are wider only.
+      - Thick upper layers shield the lower ones from external noise.
+    explain: >-
+      Resistance falls with thickness, so long nets and the power grid go up
+      the stack, while dense local routing stays on the thin, fine-pitch lower
+      layers. This is the reason clocks are routed high, why the grid takes
+      the top layers, and why layer assignment matters for delay.
+    source: set_routing_layers
+
+  - id: fun-via-resistance
+    section: physical
+    command: why a via count matters on a long net
+    hint: "Ask what a layer change costs, besides the wire on each side."
+    answer: Each via adds resistance, so many layer changes slow a net.
+    wrong:
+      - Each via adds capacitance, which the driver must charge.
+      - Each via risks a manufacturing defect, but adds no delay.
+      - Vias add delay only when they connect non-adjacent layers.
+    explain: >-
+      A via is a small plug of high-resistance metal, and a route that zigzags
+      up and down the stack accumulates them. This is why routers prefer to
+      stay on a layer, why via arrays are used on wide nets, and why via
+      resistance appears in the extraction rules.
+    source: extract_parasitics
+
+  - id: fun-macro-orientation
+    section: physical
+    command: turning a macro so its pins face the logic
+    hint: "The macro's pins are usually on one edge. Ask what that implies for placement."
+    answer: Wires shorten when the pin edge faces what it connects to.
+    wrong:
+      - Wires shorten because a rotated macro occupies less routing area.
+      - Orientation matters only for the power rails to line up with rows.
+      - Orientation affects the macro's own internal timing, so it is chosen carefully.
+    explain: >-
+      A pin edge facing away means every net wraps around the block, spending
+      wire and congesting the channel behind it. The related choice is whether
+      macros abut or leave a channel: abutted saves area, a channel leaves
+      room for routing and buffers.
+    source: place_macro
+
+  - id: fun-advanced-node
+    section: physical
+    command: fin quantization and multiple patterning
+    hint: "Two constraints from the same source: what the process can actually print."
+    answer: Drive strength comes in steps, and shapes are colored onto masks.
+    wrong:
+      - Cells come in discrete heights, and each layer needs its own mask.
+      - Transistors have fixed width, and every layer is printed twice.
+      - Drive strength is continuous, but spacing must alternate by color.
+    explain: >-
+      The width of a FinFET (Fin Field-Effect Transistor) is a whole number of fins, so sizing moves in steps
+      rather than smoothly. Below the wavelength limit a layer is printed with
+      several masks, and shapes too close together must go on different ones,
+      which the rules enforce as a coloring problem the router must respect.
+    source: detailed_route
+
+  # ---------------------------------------------------------------- Flow additions
+
+  - id: fun-ppa
+    section: flow
+    command: the PPA (Power, Performance, Area) trade
+    hint: "Ask what happens to the other two when one is pushed."
+    answer: Pushing any one of the three costs the other two, so a target is a choice.
+    wrong:
+      - The three improve together as the implementation gets better.
+      - Power and area trade against each other; performance is independent.
+      - Performance is set by the process, so only power and area trade.
+    explain: >-
+      A faster design uses bigger cells at lower threshold voltage, spending
+      area and leakage; a smaller one is slower. The quality of a run is
+      reported as worst and total negative slack, area, power, and the
+      violation counts, and a team weighs them against the product's needs.
+    source: report_design_area
+
+  - id: fun-eco-kinds
+    section: flow
+    command: a metal-only ECO against an all-layer ECO
+    hint: "Ask which masks each one changes, and what that costs."
+    answer: A metal-only change reuses the base masks by rewiring spare cells.
+    wrong:
+      - A metal-only change alters only the top metal, leaving the rest fixed.
+      - A metal-only change is made before tapeout and an all-layer one after.
+      - A metal-only change fixes timing and an all-layer one fixes function.
+    explain: >-
+      The transistor masks are the expensive ones, so designs scatter spare
+      cells through the layout in advance; a late fix connects them with metal
+      changes alone. An all-layer change can add real cells but needs the full
+      mask set again. This is why spare cells are placed before anyone knows
+      what will break.
+    source: repair_timing
+
+  - id: fun-correlation
+    section: flow
+    command: why the implementation timer and the sign-off timer disagree
+    hint: "Ask what each tool is optimized for, given the same design."
+    answer: They use different delay calculation and parasitics, so their slacks differ.
+    wrong:
+      - They use different constraints, since sign-off applies extra margin.
+      - They analyse different corners, so their results cannot be compared.
+      - The implementation timer is approximate because it runs incrementally.
+    explain: >-
+      An implementation tool times millions of paths thousands of times, so it
+      trades accuracy for speed; a sign-off timer does the opposite. Teams
+      measure the gap and carry margin for it, which is exactly what
+      `SETUP_SLACK_MARGIN` and its equivalents are for.
+    source: repair_timing
+
+  - id: fun-budgeting
+    section: flow
+    command: budgeting a block's interface timing
+    hint: "The block is designed alone but must fit a whole. Ask what it is given."
+    answer: A share of the period at each port, as input and output delays.
+    wrong:
+      - A share of the die area, which sets the block's aspect ratio.
+      - The full period, since the block is timed independently of the top.
+      - A list of paths that must close, taken from the top-level analysis.
+    explain: >-
+      Someone has to decide how much of a cycle belongs inside the block and
+      how much to the logic around it. That split becomes the block's
+      constraints, and the top level assumes the block meets them. Budgets
+      that do not add up are discovered late, at integration.
+    source: set_input_delay
+
+  - id: fun-closure-order
+    section: flow
+    command: why setup is fixed before hold
+    hint: "Ask what each fix does to the other check."
+    answer: Hold fixes add delay, which can break setup, so setup is settled first.
+    wrong:
+      - Setup failures are more common, so they are worth fixing first.
+      - Hold fixes need the final routing, so they must come last anyway.
+      - Setup fixes are cheaper, so they are made before the expensive ones.
+    explain: >-
+      Adding buffers for hold slows the path, and if setup were already tight
+      it fails again. Repair therefore runs setup first, and hold repair
+      refuses to insert a buffer that would break setup unless told otherwise.
+      Hold is also fixed late, when the clock tree and routing are real.
+    source: repair_timing
+
+  # ---------------------------------------------------------------- Test concepts
+
+  - id: fun-scan-purpose
+    section: test
+    command: why a chip needs scan
+    hint: "Ask how you would set a register deep inside a chip from outside it."
+    answer: It makes every register directly settable and readable from the pins.
+    wrong:
+      - It lets the chip test itself at speed after every power-up.
+      - It gives the tester a way to run the design's normal function.
+      - It detects design bugs before the chip is manufactured.
+    explain: >-
+      Controllability and observability are the problem: a fault deep in the
+      logic cannot be excited or seen from the pins in normal operation.
+      Chaining the registers into a shift register solves both, at the cost of
+      a larger flop, the chain's wiring, and the test pins.
+    source: dft
+
+  - id: fun-atpg-coverage
+    section: test
+    command: stuck-at coverage of 98%
+    hint: "Ask what model that number counts against."
+    answer: 98% of the modelled faults are excited and observed.
+    wrong:
+      - 98% of manufactured chips will be caught if they are faulty.
+      - 98% of the design's logic is exercised by the test patterns.
+      - 98% of the registers are reachable through the scan chains.
+    explain: >-
+      A fault model is a simplification: stuck-at assumes a node is welded to
+      a value. Coverage counts modelled faults, not real defects, so a high
+      number with a weak model still lets parts escape. Untestable logic, such
+      as redundant gates, is why 100% is rare.
+    source: dft
+
+  - id: fun-at-speed-test
+    section: test
+    command: at-speed test against a stuck-at test
+    hint: "One kind of defect only shows up when the chip runs fast."
+    answer: At-speed test catches defects that slow a path rather than break it.
+    wrong:
+      - At-speed test runs the same patterns faster, to save tester time.
+      - At-speed test checks the clock tree rather than the logic.
+      - At-speed test replaces stuck-at test on modern processes.
+    explain: >-
+      A resistive via or a weak transistor still passes a slow test but fails
+      at frequency. Transition-fault patterns launch and capture in
+      consecutive fast cycles, which is why the scan chains and the clocking
+      must work at speed and why the test mode has its own timing constraints.
+    source: dft
+
+  - id: fun-scan-pd-impact
+    section: test
+    command: what scan costs the physical design
+    hint: "Ask what a chain of hundreds of registers does to the layout."
+    answer: Larger flops, and a long chain competing for routing.
+    wrong:
+      - Larger flops only, since the chain is routed on spare tracks.
+      - Extra clock buffers, since the chain has its own clock tree.
+      - Extra area only, since the chain is routed after everything else.
+    explain: >-
+      A chain stitched in netlist order wanders across the block, which is why
+      `scan_opt` reorders it after placement to follow physical proximity. The
+      scan enable is also a high-fanout net, usually treated as an ideal
+      network until it is buffered.
+    source: dft
+
+  - id: fun-test-mode-constraints
+    section: test
+    command: why test mode has its own constraints
+    hint: "Ask what the clock and the enables are doing during a shift."
+    answer: Shifting uses a slower clock and different paths.
+    wrong:
+      - Test mode uses the same constraints with a relaxed clock period.
+      - Test mode needs no constraints, since it is not a functional mode.
+      - Test mode is constrained only for the at-speed capture cycles.
+    explain: >-
+      During shift the data path is register to register through the scan
+      inputs, usually at a slower clock, while functional paths are
+      irrelevant. Capture cycles are at speed. Each mode is a separate set of
+      constraints, which is what multi-mode analysis exists for.
+    source: set_mode
+
+  # ---------------------------------------------------------------- Interfaces and budgeting
+
+  - id: fun-io-budget
+    section: interfaces
+    command: splitting a period across a block boundary
+    hint: "Two blocks share one cycle. Ask what stops them each assuming the whole of it."
+    answer: One side's output delay plus the other's input delay fills the period.
+    wrong:
+      - Each block is given the whole period, since they are timed separately.
+      - The boundary registers absorb the difference, so no split is needed.
+      - The split is decided after both blocks have been implemented.
+    explain: >-
+      A path from a register in one block to a register in another crosses the
+      boundary, and each side sees only its half. The budgets are the promise
+      each side makes to the other, expressed as `set_output_delay` on one and
+      `set_input_delay` on the other.
+    source: set_output_delay
+
+  - id: fun-source-synchronous
+    section: interfaces
+    command: source-synchronous against system-synchronous
+    hint: "Ask where the clock that captures the data comes from."
+    answer: The sender ships a clock with the data, rather than both using a common one.
+    wrong:
+      - The sender and receiver share a clock, rather than each having its own.
+      - The data is sampled on both clock edges rather than one.
+      - The clock is recovered from the data rather than sent separately.
+    explain: >-
+      Sending a clock alongside the data means the two travel the same path
+      and see the same delay, so the interface survives a flight time far
+      longer than a cycle. It is how fast off-chip interfaces work, and it is
+      constrained against a virtual clock rather than the core's.
+    source: create_clock
+
+  - id: fun-timing-model-hides
+    section: interfaces
+    command: what a block's timing model hides
+    hint: "Ask what the top level can no longer see once a block is a model."
+    answer: The internal paths, so an error inside the model is invisible above.
+    wrong:
+      - The block's area and pin positions, which come from the abstract.
+      - The block's power, which must be reported separately.
+      - The block's internal clock tree, which the top level rebuilds.
+    explain: >-
+      A model states the block's arrival and required times at its pins.
+      If it was extracted with the wrong constraints or a different corner,
+      the top level times against a fiction and closes on it. This is why
+      models are regenerated whenever the block changes and are checked
+      against the block's own analysis.
+    source: write_timing_model
+
+  - id: fun-feedthrough
+    section: interfaces
+    command: a feedthrough path across a block
+    hint: "Ask what a top-level net does when a block sits in its way."
+    answer: A signal that enters a block and leaves it, using it only as a route.
+    wrong:
+      - A signal that passes through a block and is registered inside it.
+      - A signal that is routed over a block on an upper metal layer.
+      - A signal that connects two blocks without passing through either.
+    explain: >-
+      If a block occupies the space between two others, a connection either
+      routes around it, which costs wire, or through it, which costs pins and
+      a committed channel inside the block. Feedthroughs have to be planned
+      when the block is built, since adding one later means rebuilding it.
+    source: set_max_delay
+
+  # ---------------------------------------------------------------- Put in order
+
+  - id: fun-order-flow
+    section: flow
+    style: order
+    question: Put these stages in the order a flow runs them.
+    hint: "Each stage needs something the stage before it produced."
+    items:
+      - floorplan and power grid
+      - placement
+      - clock tree synthesis
+      - routing
+      - parasitic extraction and sign-off timing
+    explain: >-
+      Nothing can be placed before there are rows and a grid, the clock tree
+      needs the registers placed, routing needs the tree, and only a routed
+      design has parasitics worth extracting. Each stage also re-times, which
+      is why an early mistake is expensive.
+    source: repair_timing
+
+  - id: fun-order-signoff
+    section: flow
+    style: order
+    question: Put these in the order a sign-off run needs them.
+    hint: "One of these changes the capacitance the others measure."
+    items:
+      - detailed routing
+      - metal fill
+      - parasitic extraction
+      - static timing analysis
+    explain: >-
+      Fill is added after routing, and it adds capacitance to the nets beside
+      it. Extracting before the fill exists gives numbers that are too
+      optimistic, so the order matters: route, fill, extract, then time.
+    source: extract_parasitics
+
+  - id: fun-order-estimates
+    section: physical
+    style: order
+    question: Put these estimates of a net's delay in order, from earliest to most trustworthy.
+    hint: "Each one knows something the one before it could only guess."
+    items:
+      - a wire load model, from fanout alone
+      - a placement-based estimate, from the distance between cells
+      - a global route estimate, from the layers and the congestion
+      - extracted parasitics from the detailed route
+    explain: >-
+      Each rung knows more about where the wire actually goes. This is why
+      timing moves at every stage, why early numbers are optimistic, and why a
+      design that closes only just at placement rarely closes after routing.
+    source: extract_parasitics

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Open data{% endblock %}
+{% block head %}
+<style>
+  /* Open data: page-local styles, built from the same parts as the games
+     pages (panel fill, 2px ink border, hard offset shadow). */
+  .dt-head { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel);
+    box-shadow: 5px 5px 0 var(--shadow-hard); padding: 22px 26px 20px; margin-bottom: 22px; }
+  .dt-kicker, .dt-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px;
+    text-transform: uppercase; color: var(--muted); }
+  .dt-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 7px 0 10px; }
+  .dt-lede { font-size: 15px; line-height: 1.55; margin: 0; max-width: 760px; }
+  .dt-counts { display: flex; flex-wrap: wrap; gap: 30px; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .dt-count b { display: block; font-family: var(--mono); font-size: 19px; font-weight: 700; color: var(--green-deep); line-height: 1.2; }
+  .dt-count span { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .dt-get { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .dt-get .btn { text-decoration: none; }
+  .dt-notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 0 0 26px; }
+  .dt-note { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 12px 14px; font-size: 13.5px; line-height: 1.5; }
+  .dt-note b { display: block; margin-bottom: 3px; }
+  .dt-filter { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .dt-filter button { font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid var(--navy); background: var(--panel); color: var(--text); }
+  .dt-filter button.is-on { background: var(--navy); color: #fff; }
+  .dt-wrap { overflow-x: auto; border: 2px solid var(--navy); border-radius: 12px; background: var(--panel); }
+  .dt-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .dt-table th { text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--border); padding: 8px 9px; white-space: nowrap; background: var(--panel-2); }
+  .dt-table td { padding: 7px 9px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .dt-table td.n { font-family: var(--mono); text-align: right; white-space: nowrap; }
+  .dt-table tr.is-base td { background: rgba(22, 163, 74, 0.06); }
+  .dt-run { font-family: var(--mono); font-weight: 700; white-space: nowrap; }
+  .dt-sub { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+  .dt-chg { display: inline-block; font-family: var(--mono); font-size: 11px; background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 5px; padding: 1px 5px; margin: 1px 3px 1px 0; white-space: nowrap; }
+  .dt-bad { color: var(--red); font-weight: 700; }
+  .dt-links a { font-size: 11.5px; margin-right: 8px; white-space: nowrap; }
+  .dt-cite a { display: block; font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .dt-empty { border: 2px dashed var(--border); border-radius: 12px; padding: 20px; color: var(--muted); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="dt-head">
+  <div class="dt-kicker">Open data</div>
+  <h1>OpenROAD runs</h1>
+  <p class="dt-lede">
+    Every run behind the drills on this site, with its full log, its reports,
+    the script that launched it, and the numbers read out of it. Most runs
+    change a single setting against a baseline of the same design, so the set
+    works as a controlled sensitivity study as well as a record.
+  </p>
+  {% if data %}
+  <div class="dt-counts">
+    <div class="dt-count"><b>{{ data.runs | length }}</b><span>complete runs</span></div>
+    <div class="dt-count"><b>{{ designs | length }}</b><span>designs</span></div>
+    <div class="dt-count"><b>{{ platforms | length }}</b><span>platforms</span></div>
+    <div class="dt-count"><b>{{ cited }}</b><span>cited by a drill</span></div>
+  </div>
+  <div class="dt-get">
+    <a class="btn btn-submit" href="/data/files/dataset/{{ data.archive }}">Download everything{% if archive_mb %} ({{ archive_mb }} MB){% endif %}</a>
+    <a class="btn" href="/data/files/dataset/runs.csv">runs.csv</a>
+    <a class="btn" href="/data/files/dataset/runs.json">runs.json</a>
+    <a class="btn" href="/data/files/dataset/README.md">README</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if not data %}
+<div class="dt-empty">The manifest has not been built yet. Run <code>python3 -m app.dataset build</code> from the project root.</div>
+{% else %}
+<div class="dt-notes">
+  <div class="dt-note"><b>Read from the logs</b>Every value is greped from the line that printed it. A value a run never printed is left blank, never zero.</div>
+  <div class="dt-note"><b>Deterministic</b>Two independent runs of ibex agreed on every metric to the last digit, so a small difference between runs is real.</div>
+  <div class="dt-note"><b>Units</b>Time is in picoseconds on ASAP7 and nanoseconds elsewhere. Wire is the routed length, not the global estimate.</div>
+  <div class="dt-note"><b>{{ data.tool }}</b>Built {{ data.built }}. Runtime is not published: the runs shared one machine, so it would measure the scheduler.</div>
+</div>
+
+<div class="dt-filter" role="group" aria-label="Filter by design">
+  <button type="button" class="is-on" data-design="">All</button>
+  {% for d in designs %}<button type="button" data-design="{{ d }}">{{ d }}</button>{% endfor %}
+</div>
+
+<div class="dt-wrap">
+  <table class="dt-table">
+    <tr>
+      <th>run</th><th>changed from the defaults</th>
+      <th>clock</th><th>area µm²</th><th>wire µm</th><th>floor</th><th>slack</th>
+      <th>power mW</th><th>drop %</th><th>violations</th><th>cited by</th><th>files</th>
+    </tr>
+    {% for r in data.runs %}
+    <tr data-design="{{ r.design }}"{% if not r.changes %} class="is-base"{% endif %}>
+      <td><div class="dt-run">{{ r.label }}</div><div class="dt-sub">{{ r.design }} · {{ r.platform }}</div></td>
+      <td>{% if r.changes %}{% for k, v in r.changes.items() %}<span class="dt-chg">{{ k }}={{ v }}</span>{% endfor %}{% else %}<span class="dt-sub">none, the baseline</span>{% endif %}</td>
+      <td class="n">{{ r.clock if r.clock is not none else "" }} {{ r.time_unit }}</td>
+      <td class="n">{{ r.area }}</td>
+      <td class="n">{{ r.wire }}</td>
+      <td class="n">{{ r.floor }}</td>
+      <td class="n">{{ r.slack }}</td>
+      <td class="n">{{ r.power if r.power is not none else "" }}</td>
+      <td class="n">{{ r.drop_vdd if r.drop_vdd is not none else "" }}</td>
+      <td class="n{% if r.violations %} dt-bad{% endif %}">{{ r.violations }}</td>
+      <td class="dt-cite">{% for u in r.used_by %}<a href="{{ u.href }}">{{ u.id }}</a>{% endfor %}</td>
+      <td class="dt-links"><a href="/data/files/{{ r.log }}">log</a>{% for rep in r.reports if rep.endswith('6_finish.rpt') %}<a href="/data/files/{{ rep }}">final report</a>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% if data.skipped %}<p class="dt-sub" style="margin-top:10px">Left out because they did not finish: {{ data.skipped | join(", ") }}.</p>{% endif %}
+{% endif %}
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll(".dt-filter button");
+    var rows = document.querySelectorAll(".dt-table tr[data-design]");
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var d = b.getAttribute("data-design");
+        buttons.forEach(function (x) { x.classList.toggle("is-on", x === b); });
+        rows.forEach(function (r) { r.style.display = !d || r.getAttribute("data-design") === d ? "" : "none"; });
+      });
+    });
+  })();
+</script>
+{% endblock %}

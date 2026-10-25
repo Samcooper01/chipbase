@@ -1,0 +1,2436 @@
+# OpenROAD flow commands flash-card deck.
+#
+# Card fields are the same as sdc.yaml, plus `hint`. Sections and tiers come
+# from openroad_scope.md. Command signatures come from the tool's own `help`
+# output (OpenROAD 26Q3, the openroad/orfs Docker image) and the behaviour from
+# the module documentation in the OpenROAD repository (src/<module>/README.md).
+# `source` is the module whose documentation the card follows; it becomes the
+# link under the answer.
+
+deck: openroad
+title: OpenROAD flow commands
+reference: https://github.com/The-OpenROAD-Project/OpenROAD/tree/master/src
+source_link: path   # a card's `source` is a module directory under `reference`
+basis:
+  tool: OpenROAD
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD
+  doc_title: OpenROAD module documentation
+  note: >-
+    These cards follow OpenROAD's own commands, checked against the signatures
+    printed by the tool (OpenROAD 26Q3) and the documentation of the module
+    that implements each one. Each answer links to that module's
+    documentation. Commands differ between versions, and commercial tools use
+    different names entirely.
+
+sections:
+  - id: io
+    title: Reading and writing a design
+    blurb: "Getting a design in and out: libraries, netlist, layout, and the tool's database."
+    commands: [read_lef, read_liberty, read_verilog, link_design, read_def, write_def,
+               read_db, write_db, write_verilog, write_abstract_lef, write_cdl]
+  - id: floorplan
+    title: Floorplan
+    blurb: Die and core area, rows and tracks, boundary pins, macros, and well taps.
+    commands: [initialize_floorplan, make_tracks, place_pins, place_pin, set_io_pin_constraint,
+               place_macro, rtl_macro_placer, set_macro_halo, tapcell, place_tapcells, cut_rows,
+               create_blockage, write_macro_placement]
+  - id: pdn
+    title: Power delivery network
+    blurb: Connecting supplies, describing the grid, building it, and checking the drop.
+    commands: [add_global_connection, global_connect, define_pdn_grid, add_pdn_stripe,
+               add_pdn_ring, add_pdn_connect, pdngen, repair_pdn_vias, analyze_power_grid,
+               check_power_grid]
+  - id: placement
+    title: Placement
+    blurb: Spreading the cells, legalizing them onto rows, and filling the gaps.
+    commands: [global_placement, detailed_placement, check_placement, improve_placement,
+               set_placement_padding, filler_placement, remove_fillers, cluster_flops,
+               balance_row_usage, optimize_mirroring]
+  - id: cts
+    title: Clock tree synthesis
+    blurb: Building and reporting the clock tree.
+    commands: [clock_tree_synthesis, configure_cts_characterization, report_cts,
+               repair_clock_nets, repair_clock_inverters]
+  - id: optimization
+    title: Optimization and repair
+    blurb: Fixing design rules and timing by sizing, buffering, and cloning.
+    commands: [repair_design, repair_timing, repair_tie_fanout, buffer_ports, remove_buffers,
+               set_dont_use, report_dont_use, set_dont_touch, insert_buffer, eliminate_dead_logic,
+               set_opt_config]
+  - id: routing
+    title: Routing
+    blurb: Layer choice, global routing and congestion, detailed routing, and antennas.
+    commands: [set_routing_layers, set_global_routing_layer_adjustment, global_route, pin_access,
+               detailed_route, set_routing_alpha, create_ndr, assign_ndr, write_guides,
+               check_antennas, repair_antennas]
+  - id: parasitics
+    title: Parasitics
+    blurb: Wire resistance and capacitance, estimated early and extracted after routing.
+    commands: [set_wire_rc, set_layer_rc, report_layer_rc, estimate_parasitics,
+               extract_parasitics, write_spef, read_spef, define_process_corner]
+  - id: reports
+    title: Design reports and checks
+    blurb: Area, cell counts, wirelength, and the checks a script uses between stages.
+    commands: [report_design_area, report_cell_usage, report_wire_length, report_floating_nets,
+               report_long_wires, report_buffers, design_is_routed, all_pins_placed]
+  - id: dft
+    title: DFT (Design for Test)
+    blurb: Scan replacement and stitching the scan chains.
+    commands: [set_dft_config, scan_replace, execute_dft_plan, report_dft_plan, report_dft_config,
+               scan_opt]
+  - id: power-intent
+    title: Power intent (UPF)
+    blurb: Power domains, switches, isolation, and level shifters.
+    commands: [read_upf, write_upf, create_power_domain, create_power_switch, map_power_switch,
+               set_isolation, set_level_shifter, use_interface_cell, create_voltage_domain,
+               report_voltage_domains]
+  - id: pads
+    title: Pads and bumps
+    blurb: The pad ring, bond pads, the flip-chip bump array, and redistribution routing.
+    commands: [make_io_sites, place_pad, place_pads, place_corners, place_io_fill,
+               place_io_terminals, connect_by_abutment, place_bondpad, make_io_bump_array,
+               assign_io_bump, rdl_route]
+  - id: packaging
+    title: 3D packaging (3DBlox)
+    blurb: Describing a die stack and checking it.
+    commands: [read_3dbx, report_3dic_summary, check_3dblox,
+               add_3dblox_alignment_marker_rule]
+  - id: reading
+    title: Reading real output
+    blurb: Questions about real log and report output from a flow run, line by line.
+    commands: [global_route, global_placement, detailed_route, tapcell, clock_tree_synthesis,
+               check_antennas, report_design_area]
+
+cards:
+
+  # ---------------------------------------------------------------- Reading and writing
+
+  - id: or-read-lef
+    section: io
+    command: read_lef nangate45.lef
+    hint: "LEF (Library Exchange Format) is the physical library. Ask whether it carries geometry or timing."
+    answer: "Reads the technology and the shapes of the cells."
+    wrong:
+      - Reads the timing and power data of the cells in the library.
+      - Reads the placed and routed layout of the current design.
+      - Reads the synthesized netlist that instantiates the cells.
+    explain: >-
+      LEF (Library Exchange Format) carries the physical data: the layers, vias, sites, and cell
+      outlines. In detail: the metal layers and
+      their rules, the via definitions, the placement site, and each cell's
+      outline, pins, and blockages. A run reads the technology file first, then the cell file.
+    source: odb
+
+  - id: or-read-liberty
+    section: io
+    command: read_liberty NangateOpenCellLibrary_typical.lib
+    hint: "Liberty is the timing library. Ask what a timer needs that geometry cannot give."
+    answer: "Reads the cells' timing and power data: delays, setup and hold, and leakage."
+    wrong:
+      - Reads the cells' physical shapes, pins, and blockages for placement.
+      - Reads the netlist of cells that the design is built from.
+      - Reads the constraints that the design's timing is checked against.
+    explain: >-
+      One Liberty file describes one corner: delays and slews as tables against
+      load and input slew, the timing checks, and power data. Loading the
+      design's database does not bring it, so the library is read separately in
+      every session that reports timing.
+    source: odb
+
+  - id: or-link-design
+    section: io
+    command: |-
+      read_verilog gcd.v
+      link_design gcd
+    hint: "Reading a netlist file and building a design from it are two different steps."
+    answer: Reads the netlist file, then builds the design gcd from it.
+    wrong:
+      - Reads the netlist and flattens its hierarchy into one module named gcd.
+      - Reads the netlist and immediately places the design named gcd.
+      - Creates an empty design named gcd for the netlist to be read into.
+    explain: >-
+      Linking binds each instance to a cell from the libraries.
+      `read_verilog` only parses the file; `link_design` picks the named module
+      as the top, resolves every instance against the cells read from the library files, and builds the design in the database. `-hier` keeps the
+      hierarchy instead of flattening it.
+    source: odb
+
+  - id: or-read-def
+    section: io
+    command: read_def 2_floorplan.def
+    hint: "DEF (Design Exchange Format) is the layout format. Ask what it holds that the library format does not."
+    answer: "Reads a layout: die area, rows, placement, and routing."
+    wrong:
+      - Reads the netlist and creates the design from the cells it names.
+      - "Reads the technology: layers, vias, and the placement site."
+      - Reads the timing constraints that apply to the design.
+    explain: >-
+      DEF (Design Exchange Format) is design-specific layout, so it carries
+      placement and routing as well as the boundary: where the
+      boundary is, where each instance sits, and how the nets are wired. The
+      library data it refers to comes from LEF (Library Exchange Format).
+      `-floorplan_initialize` and `-incremental` control how it merges with
+      what is already loaded.
+    source: odb
+
+  - id: or-write-db
+    section: io
+    command: write_db 3_place.odb
+    hint: "Ask what one flow stage must hand to the next, beyond a layout file."
+    answer: Writes the whole design state, the tool's own database, to one file.
+    wrong:
+      - Writes the layout in DEF (Design Exchange Format) with a .odb name.
+      - Writes the netlist and the constraints, without the placement.
+      - Writes a database of the timing results computed so far.
+    explain: >-
+      The OpenDB database holds the technology, the netlist, and the layout
+      together, so a stage can save its result exactly and the next stage can
+      carry on. Flow scripts write one database per stage.
+    source: odb
+
+  - id: or-read-db
+    section: io
+    command: read_db 6_final.odb
+    hint: "It restores the design, but a timing report also needs something the database has never held."
+    answer: Restores a saved design, with its technology and layout, in one step.
+    wrong:
+      - Restores a saved design, including the Liberty timing data it used.
+      - Restores only the floorplan part of a saved design.
+      - Merges a saved database into the design already loaded.
+    explain: >-
+      The database carries the design, not the Liberty libraries. A session
+      that reads a database and then reports timing must still
+      `read_liberty`, or the timer reports that no libraries were found.
+    source: odb
+
+  - id: or-write-verilog
+    section: io
+    command: write_verilog 6_final.v
+    hint: "Optimization has added, removed, and resized cells since synthesis."
+    answer: Writes the netlist as it now stands, with the tool's changes.
+    wrong:
+      - Writes back the netlist that was read, leaving it unchanged.
+      - Writes only the cells that the tool added or resized.
+      - Writes the netlist together with the placement of each cell.
+    explain: >-
+      Every cell the tool added, removed, or resized is in the file.
+      Buffering, sizing, clock tree synthesis, and filler insertion all change
+      the netlist. The written file is what the layout actually contains, which
+      is what equivalence checking and later flows need.
+    source: odb
+
+  - id: or-write-abstract-lef
+    section: io
+    command: write_abstract_lef gcd.lef
+    hint: "An abstract is what a larger design needs in order to use this block."
+    answer: Writes the block as an outline with pins, hiding its internals.
+    wrong:
+      - Writes the block's full layout, every wire and instance, as a library.
+      - Writes the technology library the block was built with.
+      - Writes a timing model of the block for use at the top level.
+    explain: >-
+      The internals are left out. The top level needs the block's size, its
+      pin positions, and where it
+      blocks routing. An abstract gives exactly that, so the top level stays
+      small. Its timing counterpart is `write_timing_model`.
+    source: odb
+
+  - id: or-write-cdl
+    section: io
+    command: write_cdl -masters cells.cdl gcd.cdl
+    hint: "Physical verification compares the layout against a netlist in this format."
+    answer: Writes a netlist for LVS (Layout Versus Schematic) comparison.
+    wrong:
+      - Writes the gate-level netlist in Verilog for equivalence checking.
+      - Writes the layout in a format the design-rule checker reads.
+      - Writes a circuit simulation deck for the design's critical path.
+    explain: >-
+      The cell subcircuits are included through `-masters`.
+      CDL (Circuit Description Language) is the netlist format physical
+      verification compares the extracted layout against. `-masters` gives the
+      files holding the standard cells' own subcircuits, so the output is
+      complete.
+    source: odb
+
+  # ---------------------------------------------------------------- Floorplan
+
+  - id: or-init-fp-util
+    section: floorplan
+    command: initialize_floorplan -utilization 45 -aspect_ratio 1.0 -core_space 2.0 -site FreePDK45_38x28_10R_NP_162NW_34O
+    hint: "Utilization relates cell area to core area. Ask what the command can derive from it."
+    answer: Sizes die and core so the cells fill 45% of the core.
+    wrong:
+      - Places 45% of the cells and leaves the rest for a later stage.
+      - Sets a utilization target that the placer must reach later.
+      - Creates a square core of 45 square microns with a 2 micron margin.
+    explain: >-
+      Rows are made as well. The core area is the design's cell area divided
+      by the utilization; the
+      aspect ratio turns that into width and height, and `-core_space` adds the
+      margin between core and die. The site sets the row height. Rows for the
+      site are created, and any existing tracks are removed.
+    source: ifp
+
+  - id: or-init-fp-area
+    section: floorplan
+    command: initialize_floorplan -die_area {0 0 100 100} -core_area {5 5 95 95} -site FreePDK45_38x28_10R_NP_162NW_34O
+    hint: "Two rectangles are given. Ask which one the cells go in and what the difference is for."
+    answer: Creates a 100 micron die with its core inset by 5 microns.
+    wrong:
+      - Creates a 100 by 100 micron core inside a larger die of unstated size.
+      - Sets the die and core areas but leaves the rows to a later command.
+      - Reserves the area between die and core for macros and pad cells.
+    explain: >-
+      The core is filled with rows. Giving the two areas explicitly is the
+      alternative to giving a
+      utilization; setting both leads to unexpected results. The margin between
+      die and core holds the power ring and the boundary pins. Rows are built
+      inside the core from the given site.
+    source: ifp
+
+  - id: or-make-tracks
+    section: floorplan
+    command: make_tracks metal1 -x_offset 0.095 -x_pitch 0.19 -y_offset 0.07 -y_pitch 0.14
+    hint: "initialize_floorplan removes tracks. Ask what has to put them back."
+    answer: Creates the routing tracks on metal1 at the given offsets and pitches.
+    wrong:
+      - Creates the placement rows that metal1 standard cells sit on.
+      - Routes the metal1 wires of the design on a 0.19 micron pitch.
+      - Limits metal1 routing to the region the offsets describe.
+    explain: >-
+      Tracks are the legal wire centre lines that the router and the pin placer
+      use. `initialize_floorplan` removes existing tracks, so they are made
+      again per layer, usually from the technology's own values.
+    source: ifp
+
+  - id: or-place-pins
+    section: floorplan
+    command: place_pins -hor_layers metal3 -ver_layers metal2
+    hint: "Horizontal and vertical describe the direction of the tracks a pin shape sits on."
+    answer: Places every unplaced I/O (Input/Output) pin on the die boundary.
+    wrong:
+      - Places the pins of the horizontal edges on metal3 and leaves the rest.
+      - Creates a pin for every port in the netlist, wherever there is room.
+      - Routes each I/O (Input/Output) pin to the cell that it connects to.
+    explain: >-
+      Each pin's shape goes on a track of the given layers: pins on
+      horizontal tracks use `-hor_layers`, pins on
+      vertical tracks on `-ver_layers`. The placer chooses positions that
+      shorten the nets to the cells inside, and it creates a metal shape that
+      meets the minimum-area rule.
+    source: ppl
+
+  - id: or-place-pin
+    section: floorplan
+    command: place_pin -pin_name clk -layer metal3 -location {10.0 20.0} -pin_size {0.5 0.5}
+    hint: "Compare it with place_pins, which does every pin at once."
+    answer: Places the one named pin at exactly that location.
+    wrong:
+      - Constrains clk to a region and lets the tool choose inside it.
+      - Creates a new port named clk on the metal3 layer.
+      - Moves the cell that drives clk to the given location.
+    explain: >-
+      The location and size are fixed, not a suggestion. It is used for pins
+      that must sit at an agreed place, for example to meet
+      a package or a neighbouring block. `write_pin_placement` writes a file of
+      these commands so a placement can be reproduced exactly.
+    source: ppl
+
+  - id: or-io-constraint
+    section: floorplan
+    command: set_io_pin_constraint -direction input -region left:*
+    hint: "It says nothing about when pins move. Ask what it changes for a later command."
+    answer: Restricts the input pins to the left edge when the pins are next placed.
+    wrong:
+      - Moves every input pin to the left edge of the die immediately.
+      - Keeps input pins off the left edge, reserving it for outputs.
+      - Groups the input pins together, anywhere on the die boundary.
+    explain: >-
+      The constraint applies to the following `place_pins` call. A region is an
+      edge and an interval, so `left:15-60` would use only part of that edge.
+      `-group` keeps a list of pins together and `-mirrored_pins` places pairs
+      symmetrically.
+    source: ppl
+
+  - id: or-rtl-macro-placer
+    section: floorplan
+    command: rtl_macro_placer -halo_width 5.0
+    hint: "The name says RTL (Register Transfer Level): the placer reads the netlist hierarchy."
+    answer: Places all macros automatically from the netlist hierarchy.
+    wrong:
+      - Places the standard cells around macros that are already placed.
+      - Adds a 5 micron halo around each macro without moving any of them.
+      - Places the macros at positions listed in a file written earlier.
+    explain: >-
+      `-halo_width` keeps a 5 micron band clear around each macro.
+      The Hier-RTLMP algorithm clusters the netlist into a hierarchy of
+      soft blocks, shapes them, and then places the macros. The halo is the
+      keepout kept around each macro so standard cells and routing are not
+      pinched against it.
+    source: mpl
+
+  - id: or-place-macro
+    section: floorplan
+    command: place_macro -macro_name u_sram -location {100.0 200.0} -orientation R0
+    hint: "This is the manual counterpart to the automatic macro placer."
+    answer: Places one macro at the given location and orientation, by hand.
+    wrong:
+      - Suggests a location that the automatic macro placer may still change.
+      - Creates a placement blockage of the macro's size at that location.
+      - Moves the macro by 100 microns in x and 200 microns in y.
+    explain: >-
+      The location is the macro's lower-left corner in microns and the
+      orientation is a LEF (Library Exchange Format) orientation such as R0 or
+      MX. `-exact` and `-allow_overlap` relax the checks the command otherwise
+      applies.
+    source: mpl
+
+  - id: or-macro-halo
+    section: floorplan
+    command: set_macro_halo -macro_name u_sram -halo 4.0
+    hint: "A halo is empty space, not a physical object."
+    answer: Keeps a 4 micron band around u_sram clear of standard cells.
+    wrong:
+      - Grows the macro u_sram by 4 microns on every side.
+      - Adds a 4 micron power ring around the macro u_sram.
+      - Keeps routing 4 microns away from the macro u_sram.
+    explain: >-
+      Cells packed against a macro edge leave no room for the macro's pins to
+      be reached, and for the repair steps that follow. The halo reserves that
+      room. `set_macro_extension` does the same job for the macro placer's own
+      spacing between macros.
+    source: mpl
+
+  - id: or-tapcell
+    section: floorplan
+    command: tapcell -tapcell_master TAPCELL_X1 -distance 14 -endcap_master TAPCELL_X1
+    hint: "Well taps tie the wells to the supplies; ask what pattern they must follow."
+    answer: Inserts well taps every 14 microns, and endcaps at the row ends.
+    wrong:
+      - Inserts a tap cell beside every standard cell that needs one.
+      - Inserts decoupling capacitors every 14 microns along the rows.
+      - Inserts filler cells to close the gaps left after placement.
+    explain: >-
+      `-distance` is the tap pitch and `-endcap_master` the cell that ends a
+      row. Foundry rules limit how far any transistor may be from a well tap, so
+      taps are placed on a checkerboard at that pitch. Endcaps terminate the
+      rows so the wells and implants end legally. Both go in before placement.
+    source: tap
+
+  - id: or-cut-rows
+    section: floorplan
+    command: cut_rows -endcap_master TAPCELL_X1 -halo_width_x 2 -halo_width_y 2
+    hint: "A row that runs under a macro is not usable. Ask what to do about it."
+    answer: Cuts the placement rows around macros, keeping a 2 micron halo.
+    wrong:
+      - Removes every row that is shorter than 2 microns from the floorplan.
+      - Cuts the design into rows of blocks for hierarchical placement.
+      - Shortens the rows so the core area shrinks by a 2 micron margin.
+    explain: >-
+      Rows must not run through a macro, so they are cut around it, plus the
+      halo given here, plus a halo
+      so cells do not crowd the macro edge. `-row_min_width` and
+      `-row_min_height` drop the fragments left behind that are too small to
+      use.
+    source: tap
+
+  - id: or-create-blockage
+    section: floorplan
+    command: create_blockage -region {100 100 200 200} -soft
+    hint: "The -soft flag is the interesting part: ask what a soft rule allows."
+    answer: Discourages placement in that region without forbidding it.
+    wrong:
+      - Forbids placement in that region entirely, as a hard blockage.
+      - Forbids routing over that region but allows cells beneath it.
+      - Reserves that region for macros, excluding standard cells.
+    explain: >-
+      `-soft` is the difference: a hard blockage keeps every instance out,
+      while a soft blockage steers the
+      global placer away while allowing cells if the placement needs them, and
+      `-max_density` instead caps how full the region may get. `-inst` attaches
+      the blockage to one instance.
+    source: odb
+
+  # ---------------------------------------------------------------- Power delivery network
+
+  - id: or-add-global-connection
+    section: pdn
+    command: add_global_connection -net VDD -inst_pattern .* -pin_pattern VDD -power
+    hint: "Standard cells have supply pins but no supply nets in the netlist. The patterns are regular expressions."
+    answer: Declares that every instance's VDD pin belongs to the VDD net.
+    wrong:
+      - Connects the VDD pin of every instance to VDD immediately, as it runs.
+      - Creates a VDD net and a VDD pin on every instance in the design.
+      - Routes the VDD supply to the VDD pin of every standard cell.
+    explain: >-
+      `-power` marks the net as a supply. Synthesis leaves supply pins
+      unconnected, so they are connected by
+      pattern instead of one by one. `-power` and `-ground` say which kind of
+      supply the net is, which the grid generator and the analysis need.
+    source: pdn
+
+  - id: or-global-connect
+    section: pdn
+    command: global_connect
+    hint: "Compare it with add_global_connection, which comes first."
+    answer: Applies the rules, connecting the matching pins to their nets.
+    wrong:
+      - Adds one more global connection rule to the list already declared.
+      - Connects the power grid straps to the standard-cell rails.
+      - Reports which instance pins have no supply connection yet.
+    explain: >-
+      The rules come from `add_global_connection`. They are declared first and
+      applied afterwards, so a script can add
+      several and connect once. Commands that build the grid also apply the
+      rules, and `-verbose` reports how many pins each rule connected.
+    source: pdn
+
+  - id: or-define-pdn-grid
+    section: pdn
+    command: define_pdn_grid -name main_grid -pins metal7 -voltage_domain CORE
+    hint: "Nothing is built yet. Ask what the command starts."
+    answer: Starts a grid definition that later straps are added to.
+    wrong:
+      - Builds a power grid for the CORE domain up to metal7 at once.
+      - Defines the voltage domain named CORE and its supply voltage.
+      - Reserves metal7 for power, excluding it from signal routing.
+    explain: >-
+      It applies to the voltage domain named, here CORE. A grid is described
+      in pieces: the definition, then straps, rings, and
+      connections, and finally `pdngen` builds it. `-pins` names the layers
+      where block pins for the supplies are made. With `-macro` the definition
+      applies to macros instead of the core.
+    source: pdn
+
+  - id: or-add-pdn-stripe-rails
+    section: pdn
+    command: add_pdn_stripe -grid main_grid -layer metal1 -width 0.48 -followpins
+    hint: "The -followpins flag ties these stripes to something already in the floorplan."
+    answer: Creates the metal1 supply rails that follow the placement rows.
+    wrong:
+      - Creates metal1 straps at a regular pitch across the whole core.
+      - Connects the metal1 rails to the cell power pins with vias.
+      - Follows the existing metal1 routing when adding the straps.
+    explain: >-
+      These are the standard cells' own power and ground rails.
+      With `-followpins` the pitch and the spacing come from the rows, since
+      one rail runs along each row's supply pins. Without it, straps are
+      regular and need `-pitch`, `-offset`, and `-width`.
+    source: pdn
+
+  - id: or-add-pdn-stripe-straps
+    section: pdn
+    command: add_pdn_stripe -grid main_grid -layer metal4 -width 0.48 -pitch 56.0 -offset 2.0
+    hint: "Two numbers describe the pattern: how often, and from where."
+    answer: Adds metal4 straps every 56 microns, offset from the corner.
+    wrong:
+      - Adds metal4 straps that are 56 microns wide, 2 microns apart.
+      - Adds 56 metal4 straps spread evenly across the core area.
+      - Adds metal4 straps only where the core draws the most current.
+    explain: >-
+      Each strap is a power and ground pair. The pitch is the distance between
+      one pair and the next,
+      and the offset is measured from the core's lower-left corner. A wider
+      pitch leaves more room for signal routing and carries less current.
+      `-spacing` sets the gap inside a pair, half the pitch by default.
+    source: pdn
+
+  - id: or-add-pdn-connect
+    section: pdn
+    command: add_pdn_connect -grid main_grid -layers {metal1 metal4}
+    hint: "Straps on different layers cross but do not touch. Ask what is missing."
+    answer: Declares metal1 and metal4 joined, so vias go where they overlap.
+    wrong:
+      - Declares metal1 and metal4 as the only layers the grid may use.
+      - Connects the metal1 rails to the cell pins on both layers.
+      - Routes a connection between the two layers with a wire, not vias.
+    explain: >-
+      Each overlapping pair of same-net straps becomes a via stack when
+      `pdngen` runs. Via rules from the technology are used unless
+      `-fixed_vias` names ready-made vias. Without a connect rule the two
+      layers simply cross.
+    source: pdn
+
+  - id: or-pdngen
+    section: pdn
+    command: pdngen
+    hint: "Everything so far was description. Ask what turns it into metal."
+    answer: Builds the grid that the definitions describe, adding the straps, rings, and vias.
+    wrong:
+      - Prints the grid definitions that have been declared so far.
+      - Checks the grid definitions for errors without building anything.
+      - Builds the grid and also analyses the IR (current times resistance) drop.
+    explain: >-
+      `-report_only` prints the specification, `-check_only` checks it, and
+      `-reset` clears it. `-ripup` removes a grid built earlier so it can be
+      rebuilt, and the final trim step removes metal stubs unless `-skip_trim`
+      is given.
+    source: pdn
+
+  - id: or-repair-pdn-vias
+    section: pdn
+    command: repair_pdn_vias -net VDD
+    hint: "It runs after detailed routing. Ask what routing can do to a via that was already built."
+    answer: Removes power vias that break design rules after routing.
+    wrong:
+      - Adds the vias that the grid generator failed to build earlier.
+      - Repairs the routing that shorts against the power grid vias.
+      - Rebuilds the entire power grid once the routing is finished.
+    explain: >-
+      It runs after detailed routing, because signal routing around a via
+      stack can leave it violating spacing rules.
+      Removing the offending vias keeps the design rule clean at the cost of a
+      little grid connectivity.
+    source: pdn
+
+  - id: or-analyze-power-grid
+    section: pdn
+    command: analyze_power_grid -net VDD -voltage_file vdd.rpt
+    hint: "The grid has resistance and the cells draw current. Ask what that costs."
+    answer: Computes the IR (current times resistance) drop across the VDD grid.
+    wrong:
+      - Computes the total power the design draws from the VDD net.
+      - Checks that the VDD grid is connected everywhere it should be.
+      - Computes the electromigration limit of each VDD grid segment.
+    explain: >-
+      `-voltage_file` writes the voltage at each instance.
+      Current drawn through the grid's resistance lowers the voltage the cells
+      actually see, which slows them. `-enable_em` adds the current per segment
+      for electromigration, and `-error_file` records nodes that could not be
+      solved.
+    source: psm
+
+  - id: or-check-power-grid
+    section: pdn
+    command: check_power_grid -net VDD
+    hint: "It comes before the analysis. Ask what would make the analysis meaningless."
+    answer: Checks that the VDD grid is fully connected, with no island cut off from a source.
+    wrong:
+      - Checks the VDD grid against the IR (current times resistance) drop limit.
+      - Checks that every VDD via obeys the technology's design rules.
+      - Checks that the VDD grid covers the core area evenly.
+    explain: >-
+      A disconnected piece of grid has no path to a supply source, so the
+      analysis cannot solve for its voltage. The check finds that before the
+      analysis runs.
+    source: psm
+
+  # ---------------------------------------------------------------- Placement
+
+  - id: or-global-placement
+    section: placement
+    command: global_placement -density 0.7
+    hint: "Global placement is analytical: cells get positions, not legal ones."
+    answer: Spreads the cells for short wires, up to 70% density per bin.
+    wrong:
+      - Places the cells legally on rows, filling each row to 70%.
+      - Places 70% of the cells and leaves the rest for detailed placement.
+      - Sets the utilization target the floorplan is resized to reach.
+    explain: >-
+      Cells may still overlap; legalization comes later. The placer balances
+      wirelength against a density penalty on a grid of
+      bins, so cells end up near where they belong but not on legal sites.
+      A lower target density spreads cells further apart, which eases routing
+      and costs wirelength.
+    source: gpl
+
+  - id: or-global-placement-td
+    section: placement
+    command: global_placement -timing_driven -routability_driven
+    hint: "Both flags make the placer care about something beyond wirelength, and both cost runtime."
+    answer: Weights critical nets and inflates congested areas while placing the cells.
+    wrong:
+      - Runs placement, then timing analysis, then routing, in that order.
+      - Reports the timing and congestion of the placement it produced.
+      - Places timing-critical cells first, then the remaining cells.
+    explain: >-
+      Timing-driven mode runs a virtual `repair_design` to find slacks and
+      weights low-slack nets so they are shortened; it needs `set_wire_rc` for
+      the estimates. Routability-driven mode estimates congestion and inflates
+      the cells in congested tiles to spread them.
+    source: gpl
+
+  - id: or-detailed-placement
+    section: placement
+    command: detailed_placement -max_displacement {5 1}
+    hint: "Global placement leaves cells overlapping and off-site. Ask what fixes that, and what the limit restricts."
+    answer: Legalizes the cells onto rows, moving each at most 5 sites, 1 row.
+    wrong:
+      - Improves the placement by moving each cell up to 5 sites and 1 row.
+      - Places the cells legally, allowing 5 microns of overlap per cell.
+      - Spreads the cells so no row is more than 5 sites over capacity.
+    explain: >-
+      The displacement limit is in sites and rows. Legalization removes
+      overlaps and snaps cells to legal sites while
+      keeping them near where global placement put them. The displacement limit
+      caps how far a cell may be moved to find a legal spot.
+    source: dpl
+
+  - id: or-check-placement
+    section: placement
+    command: check_placement -verbose
+    hint: "It only looks. Ask what would make a placement illegal."
+    answer: "Reports the cells that are not legally placed, and why."
+    wrong:
+      - Legalizes the cells that are found to be placed illegally.
+      - Reports the cells whose placement hurts timing the most.
+      - Checks that every cell has been given a placement at all.
+    explain: >-
+      Overlapping, off-site, and out-of-row cells are all reported. It is the
+      gate between placement and the stages that assume legality. A
+      script runs it after legalization and stops if anything is reported;
+      `-report_file_name` writes the list to a file.
+    source: dpl
+
+  - id: or-set-placement-padding
+    section: placement
+    command: set_placement_padding -global -left 1 -right 1
+    hint: "The padding is measured in sites, and it exists for the steps that come after placement."
+    answer: Keeps one empty site on each side of every cell when legalizing.
+    wrong:
+      - Adds one site of physical width to every cell in the library.
+      - Leaves a one micron gap between cells during legalization.
+      - Pads the core area by one site on the left and the right.
+    explain: >-
+      The padding is in sites, applied on both sides of each cell.
+      The reserved sites give the router room to reach pins and leave space for
+      buffers added later by repair. Padding applies to legalization, so it is
+      set before `detailed_placement`. `-masters` and `-instances` narrow it to
+      certain cells.
+    source: dpl
+
+  - id: or-filler-placement
+    section: placement
+    command: filler_placement FILL*
+    hint: "The rails run along the rows, and placement leaves gaps in them."
+    answer: Fills the gaps between placed cells with filler cells.
+    wrong:
+      - Fills the gaps with decoupling capacitor cells to steady the supply.
+      - Fills the empty rows left over after placement with spare cells.
+      - Replaces the gaps with wider cells so the rows are exactly full.
+    explain: >-
+      The rails then run unbroken along each row. A filler cell carries the
+      power and ground rails and the well and implant
+      layers across a gap, which keeps the rows legal for manufacturing. The
+      argument is a pattern of filler master names, widest first.
+      `remove_fillers` clears them again so a later stage can edit the rows.
+    source: dpl
+
+  - id: or-improve-placement
+    section: placement
+    command: improve_placement -max_displacement 3
+    hint: "It runs after legalization, and it keeps the placement legal."
+    answer: Swaps and shifts already-placed cells a little to shorten the wiring.
+    wrong:
+      - Re-runs global placement with a tighter displacement limit.
+      - Legalizes cells that detailed placement could not place.
+      - Moves cells to relieve the most congested routing regions.
+    explain: >-
+      The pass makes local improvements: swapping neighbouring cells and moving
+      a cell within the given distance, keeping the result legal. It is cheap
+      compared with placing again.
+    source: dpl
+
+  - id: or-optimize-mirroring
+    section: placement
+    command: optimize_mirroring
+    hint: "A cell can be flipped without changing where it sits."
+    answer: Flips cells about their vertical axis where that shortens the connections.
+    wrong:
+      - Moves cells to mirrored positions on the other side of the core.
+      - Mirrors the whole placement to match a neighbouring block.
+      - Swaps each cell with its mirror-image cell from the library.
+    explain: >-
+      Mirroring changes which side a cell's pins face without moving the cell
+      or breaking legality, so it shortens wires at no cost in area. It is run
+      after legalization.
+    source: dpl
+
+  - id: or-cluster-flops
+    section: placement
+    command: cluster_flops -tray_weight 20.0
+    hint: "The gain is in the clock network, not in the data paths."
+    answer: Groups nearby flip-flops into multi-bit trays that share one clock pin.
+    wrong:
+      - Places the flip-flops together in one region of the core.
+      - Groups flip-flops by clock so each clock tree is built separately.
+      - Replaces flip-flops with latches where timing allows it.
+    explain: >-
+      One multi-bit register has a single clock input for several bits, so the
+      clock tree drives fewer sinks and burns less power. The weights trade the
+      clock saving against the extra wirelength pulling the bits together.
+    source: dpl
+
+  - id: or-balance-row-usage
+    section: placement
+    command: balance_row_usage
+    hint: "Rows are the resource; ask what happens when some are full and others are empty."
+    answer: Evens out how full the placement rows are across the core.
+    wrong:
+      - Balances the power drawn by each row across the core.
+      - Balances the number of clock sinks in each row for the clock tree.
+      - Shortens the rows so each holds the same number of cells.
+    explain: >-
+      Some rows end up packed while their neighbours are empty, and a full row
+      leaves the legalizer and the repair steps nowhere to put
+      anything, and it concentrates routing demand. Evening out row usage keeps
+      later steps possible.
+    source: dpl
+
+  # ---------------------------------------------------------------- Clock tree synthesis
+
+  - id: or-cts
+    section: cts
+    command: clock_tree_synthesis -buf_list {CLKBUF_X1 CLKBUF_X2 CLKBUF_X4} -root_buf CLKBUF_X4 -sink_clustering_enable
+    hint: "The buffer list is the palette. Ask what gets built out of it."
+    answer: Builds the clock tree from those buffers, grouping nearby sinks first.
+    wrong:
+      - Balances the skew by moving the registers closer to each other.
+      - Chooses clock buffers automatically, ignoring the list it is given.
+      - Buffers the existing clock nets without building a tree at all.
+    explain: >-
+      The root buffer drives the top of the tree and the list gives the cells
+      the tree is built from. `-sink_clustering_enable` groups nearby sinks
+      into clusters, each driven by one buffer, which become the leaves of the
+      tree above. It runs after placement.
+    source: cts
+
+  - id: or-cts-obstruction
+    section: cts
+    command: clock_tree_synthesis -buf_list {CLKBUF_X2} -obstruction_aware
+    hint: "Ask where a buffer would otherwise land, and what the legalizer would then do with it."
+    answer: Keeps the clock buffers off macros and blockages.
+    wrong:
+      - Routes the clock nets around the macros and blockages.
+      - Reports the clock buffers that landed on top of a macro.
+      - Stops with an error if a buffer has to sit over a macro.
+    explain: >-
+      The buffers are kept clear as the tree is built. Without it, buffers
+      can be placed over a macro and the legalizer then
+      pushes them somewhere else, which changes the latency and skew the tree
+      was built for. Keeping them clear from the start gives a tree that
+      survives legalization.
+    source: cts
+
+  - id: or-cts-ndr
+    section: cts
+    command: clock_tree_synthesis -buf_list {CLKBUF_X2} -apply_ndr half
+    hint: "A non-default rule changes how the wire is drawn, and half says how much of the tree gets it."
+    answer: Gives double spacing to the clock nets in the tree's top half.
+    wrong:
+      - Gives double spacing to every clock net, leaf nets included.
+      - Halves the number of levels in the clock tree that is built.
+      - Applies the rule to half of the clocks defined in the design.
+    explain: >-
+      The levels counted are the top half of the tree. Extra spacing keeps
+      aggressors away from clock wires, where crosstalk
+      turns straight into skew and jitter. The strategies are `none`,
+      `root_only`, `half`, and `full`, counted from the root; leaf nets are
+      left out. The default is `half`.
+    source: cts
+
+  - id: or-cts-characterization
+    section: cts
+    command: configure_cts_characterization -max_cap 0.6 -max_slew 0.2
+    hint: "Characterization happens before the tree is built. Ask what it produces."
+    answer: Bounds the buffered wire segments the tool characterizes.
+    wrong:
+      - Sets the maximum capacitance and slew design rules for the design.
+      - Limits the capacitance and slew allowed on the clock root net.
+      - Rejects any buffer whose capacitance or slew exceeds those values.
+    explain: >-
+      The limits bound what the tool then uses. It first builds a table of
+      buffered wire segments and their delays,
+      then assembles the tree from it. These limits bound the table, so they
+      decide how long a segment may get before another buffer is needed.
+    source: cts
+
+  - id: or-report-cts
+    section: cts
+    command: report_cts
+    hint: "It describes the tree that exists, not the timing of it."
+    answer: "Reports the tree that was built: how many sinks, buffers, and levels."
+    wrong:
+      - Reports the skew and the latency measured on the clock tree.
+      - Reports the configuration that clock tree synthesis will use.
+      - Reports the clock nets that still have no buffering at all.
+    explain: >-
+      It answers whether the tree looks sensible: the sink count, the buffers
+      inserted, and how deep the tree is. The timing view of the same tree
+      comes from `report_clock_skew` and `report_clock_latency`.
+    source: cts
+
+  - id: or-repair-clock-nets
+    section: cts
+    command: repair_clock_nets -max_wire_length 100
+    hint: "It runs before the tree exists. Ask what a clock net looks like at that point."
+    answer: Splits the long clock nets with buffers before the tree is built.
+    wrong:
+      - Splits the long clock nets after the tree has been built.
+      - Repairs the clock nets that violate the maximum capacitance rule.
+      - Rebuilds the clock tree wherever a net is longer than 100 microns.
+    explain: >-
+      Before clock tree synthesis a clock may be one net stretching across the
+      block, whose delay would distort everything built on it. Buffering it
+      into shorter segments first gives the tree a sane starting point.
+    source: rsz
+
+  - id: or-repair-clock-inverters
+    section: cts
+    command: repair_clock_inverters
+    hint: "One inverter with many fanouts is a fork in the clock network."
+    answer: Replaces a clock inverter that has several fanouts with one inverter each.
+    wrong:
+      - Removes the inverters from the clock network altogether.
+      - Balances the number of inverters on each branch of the clock tree.
+      - Replaces the clock inverters with buffers of the same drive strength.
+    explain: >-
+      An inverter feeding several branches splits the clock network into
+      pieces that clock tree synthesis then treats separately. Giving each
+      fanout its own inverter keeps the tree whole. It runs before
+      `clock_tree_synthesis`.
+    source: rsz
+
+  # ---------------------------------------------------------------- Optimization and repair
+
+  - id: or-repair-design
+    section: optimization
+    command: repair_design
+    hint: "It is about design rules, not about slack."
+    answer: Buffers nets and resizes gates to fix the design-rule violations.
+    wrong:
+      - Fixes the setup and hold violations reported by the timer.
+      - Reports the design-rule violations without changing the netlist.
+      - Rebuilds the nets that the router could not finish routing.
+    explain: >-
+      The violations are slew, capacitance, fanout, and long wires: too slow
+      a transition, too much load,
+      too many loads, or too long a wire. Run `estimate_parasitics -placement`
+      first, so the repair sees wire load. Timing repair is a separate command.
+    source: rsz
+
+  - id: or-repair-design-margins
+    section: optimization
+    command: repair_design -slew_margin 20 -cap_margin 20
+    hint: "Ask why you would repair to a stricter limit than the real one."
+    answer: Repairs to limits 20% tighter than the real ones, leaving margin.
+    wrong:
+      - Allows the slew and capacitance limits to be exceeded by 20%.
+      - Repairs only the nets that are more than 20% over their limit.
+      - Adds 20 nanoseconds of slew margin to each repaired net.
+    explain: >-
+      Before routing, parasitics are estimated from placement and are
+      optimistic; the real wires are worse. Repairing against a tighter limit
+      buys margin so the design still passes once it is routed.
+    source: rsz
+
+  - id: or-repair-design-wire
+    section: optimization
+    command: repair_design -max_wire_length 100
+    hint: "A long wire has resistance as well as capacitance. Ask what buffers do to its delay."
+    answer: Also splits any wire longer than 100 microns by inserting buffers.
+    wrong:
+      - Refuses to repair nets whose wires are longer than 100 microns.
+      - Asks the router to keep every wire shorter than 100 microns.
+      - Reports the wires longer than 100 microns without changing them.
+    explain: >-
+      A wire's delay grows with the square of its length, so splitting it with
+      buffers turns one long quadratic segment into several short ones. The
+      default limit is the length that minimizes wire delay for the values
+      given to `set_wire_rc`.
+    source: rsz
+
+  - id: or-repair-timing-setup
+    section: optimization
+    command: repair_timing -setup -setup_margin 0.05
+    hint: "Ask what the margin is for, given that zero slack already passes."
+    answer: Fixes setup violations and keeps going until 0.05 ns of slack is left.
+    wrong:
+      - Fixes setup violations worse than 0.05 ns and leaves the rest.
+      - Fixes both setup and hold, holding 0.05 ns of margin on each.
+      - Reports the setup violations that are within 0.05 ns of failing.
+    explain: >-
+      Repair works by sizing gates, inserting buffers, cloning gates, and
+      swapping pins. The margin leaves headroom for what later steps add, since
+      routing and extraction usually make timing a little worse.
+    source: rsz
+
+  - id: or-repair-timing-hold
+    section: optimization
+    command: repair_timing -hold -hold_margin 0.02
+    hint: "A hold violation means data arrives too early. Ask what fixes that."
+    answer: Fixes hold violations by adding delay, keeping 0.02 ns of margin.
+    wrong:
+      - Fixes hold violations by speeding up the capture clock path.
+      - Fixes hold violations by relaxing the check by 0.02 ns.
+      - Fixes the setup violations first, then reports the hold ones.
+    explain: >-
+      Delay is added with buffers on the fast paths. Setup is repaired before
+      hold, so hold repair does not undo it, and hold repair refuses to insert
+      a buffer that would break setup unless `-allow_setup_violations` is
+      given. Run it after clock tree synthesis, with propagated clocks.
+    source: rsz
+
+  - id: or-repair-timing-power
+    section: optimization
+    command: repair_timing -recover_power 20
+    hint: "A path with plenty of slack is paying for speed it does not need."
+    answer: Downsizes gates on the 20% of paths that have the most slack.
+    wrong:
+      - Reduces the design's total power consumption by 20 percent.
+      - Repairs the 20% of paths with the worst slack in the design.
+      - Limits the power the design may draw to 20% of its budget.
+    explain: >-
+      Slack is money left on the table: a smaller cell is slower but leaks less
+      and presents less load. Recovering power gives it back on the paths that
+      can afford it, without touching the critical ones.
+    source: rsz
+
+  - id: or-set-dont-use
+    section: optimization
+    command: set_dont_use {CLKBUF_* AOI211_X1}
+    hint: "It names library cells, not instances of them."
+    answer: Keeps optimization from choosing those library cells at all.
+    wrong:
+      - Removes every instance of those cells from the current netlist.
+      - Protects the existing instances of those cells from being changed.
+      - Keeps those cells out of the library when it is next read.
+    explain: >-
+      Sizing and buffering will not pick them. Clock buffers are excluded
+      from data-path use, and cells known to behave
+      badly are excluded outright. `report_dont_use` lists the excluded cells
+      and `reset_dont_use` clears the list. Protecting a specific instance is
+      `set_dont_touch` instead.
+    source: rsz
+
+  - id: or-set-dont-touch
+    section: optimization
+    command: set_dont_touch u_clkgate
+    hint: "Compare it with set_dont_use: one names a library cell, the other an object in the design."
+    answer: Protects that instance from being resized, buffered, or removed.
+    wrong:
+      - Keeps optimization from using that cell type anywhere in the design.
+      - Keeps the placer from moving that instance out of its position.
+      - Keeps the router from routing over the area of that instance.
+    explain: >-
+      It applies to instances and nets in the design, for logic that must
+      survive exactly as it is, such as a synchronizer or a cell a later step
+      depends on. It concerns optimization, not placement or routing.
+    source: rsz
+
+  - id: or-buffer-ports
+    section: optimization
+    command: buffer_ports -inputs
+    hint: "Ask what the block knows about what lies outside it."
+    answer: Inserts a buffer just inside every input port of the block.
+    wrong:
+      - Inserts a buffer just outside every input port of the block.
+      - Inserts buffers on the nets between the input and output ports.
+      - Creates input ports for the nets that cross the block boundary.
+    explain: >-
+      A buffer at the boundary isolates the inside of the block from whatever
+      drives it, so one weak external driver cannot slow a whole cone of logic.
+      `-outputs` does the same for outputs, where the buffer takes the external
+      load.
+    source: rsz
+
+  - id: or-remove-buffers
+    section: optimization
+    command: remove_buffers
+    hint: "It is usually the first thing a placement-aware repair flow does."
+    answer: Removes the netlist's buffers so later steps insert their own.
+    wrong:
+      - Removes only the buffers that violate a design rule.
+      - Removes the filler cells placed between the rows.
+      - Removes the buffers that clock tree synthesis inserted.
+    explain: >-
+      Repair and clock tree synthesis insert their own. Synthesis buffers a
+      netlist without knowing where anything will be
+      placed, so its buffers are guesses. Removing them lets repair rebuild
+      with real distances. Instances marked `set_dont_touch` are kept.
+    source: rsz
+
+  - id: or-repair-tie-fanout
+    section: optimization
+    command: repair_tie_fanout -separation 2 LOGIC0_X1/Z
+    hint: "A tie cell holds a net at a constant. Ask why its loads should not be shared."
+    answer: Gives each constant load its own copy of the tie cell, 2 microns away.
+    wrong:
+      - Limits each tie cell to driving at most two constant loads.
+      - Moves the tie cells 2 microns away from the edge of the core.
+      - Connects all the constant loads to one tie cell, 2 microns away.
+    explain: >-
+      A shared tie cell would drive a long, high-fanout net held at a constant,
+      which is fragile and wastes area. A copy beside each load keeps the net
+      tiny. The separation keeps the copy off its load's own pin.
+    source: rsz
+
+  - id: or-eliminate-dead-logic
+    section: optimization
+    command: eliminate_dead_logic
+    hint: "Ask which logic can be removed without changing what the block does."
+    answer: Removes logic whose output reaches no port and no register.
+    wrong:
+      - Removes the logic whose inputs are tied to a constant value.
+      - Removes the nets that have no driver and no loads.
+      - Removes the logic that a case-analysis constant has disabled.
+    explain: >-
+      Logic that drives nothing costs area, leakage, and routing while
+      affecting nothing. It appears after other transformations, so the pass
+      is run late rather than trusted to synthesis alone.
+    source: rsz
+
+  # ---------------------------------------------------------------- Routing
+
+  - id: or-set-routing-layers
+    section: routing
+    command: set_routing_layers -signal metal1-metal6 -clock metal4-metal6
+    hint: "Two ranges are given. Ask why the clock would get a different one."
+    answer: Lets signals use metal1 to metal6 and confines clocks to metal4 to metal6.
+    wrong:
+      - Routes the signals first on metal1 to metal6, then the clocks.
+      - Reserves metal4 to metal6 for clocks, excluding signals from them.
+      - Lets signals and clocks share metal4 to metal6 as needed.
+    explain: >-
+      Upper layers are thicker, so they are less resistive; putting clocks
+      there keeps their delay and skew low. The signal range usually excludes
+      the top layers, which the power grid uses.
+    source: grt
+
+  - id: or-layer-adjustment
+    section: routing
+    command: set_global_routing_layer_adjustment metal4 0.5
+    hint: "The router counts tracks. Ask what else is already using them."
+    answer: Tells the global router metal4 has half the capacity it appears to.
+    wrong:
+      - Reserves half of the metal4 tracks physically for the power grid.
+      - Halves the width of every wire the router puts on metal4.
+      - Sets a congestion threshold of 50% for the metal4 layer.
+    explain: >-
+      Half the metal4 tracks are treated as unavailable. The power grid,
+      pins, and macro blockages already consume tracks the
+      router would otherwise count. Derating spreads routing out and keeps
+      the detailed router from meeting congestion it cannot resolve. `*` sets
+      every layer, a range sets several, and a negative value adds capacity.
+    source: grt
+
+  - id: or-global-route
+    section: routing
+    command: global_route -congestion_iterations 30 -congestion_report_file congestion.rpt
+    hint: "Global routing works on regions, and it negotiates when too many nets want the same one."
+    answer: Routes every net through regions, retrying 30 times on congestion.
+    wrong:
+      - Routes 30 nets at a time and writes a report for each batch.
+      - Reports the congestion of the current routing without routing.
+      - Runs global routing and then detailed routing in one command.
+    explain: >-
+      Each net gets a path through a grid of regions with limited capacity,
+      and the congestion report is written to the named file.
+      Where demand exceeds capacity, the router reroutes nets over the given
+      number of iterations. The report can be opened in the graphical viewer.
+      Unresolved congestion stops the flow unless `-allow_congestion` is set.
+    source: grt
+
+  - id: or-global-route-guides
+    section: routing
+    command: global_route -guide_file route.guide
+    hint: "Ask what the detailed router is given to work from."
+    answer: Writes each net's regions as a guide for the detailed router.
+    wrong:
+      - Reads the guides written by an earlier global routing run.
+      - Writes the finished wires and vias of the routed design.
+      - Writes a congestion map of the design for the viewer.
+    explain: >-
+      The guides are written to the named file. A guide is the corridor the
+      detailed router keeps a net inside, which is
+      what makes detailed routing tractable. `write_guides` writes the same
+      thing afterwards, and `read_guides` reads one back.
+    source: grt
+
+  - id: or-set-routing-alpha
+    section: routing
+    command: set_routing_alpha 0.4
+    hint: "One extreme is the shortest total wire; the other is the shortest path to each sink."
+    answer: Trades total wirelength against source-to-sink delay per net.
+    wrong:
+      - Sets the router's effort level, where 1.0 is the highest.
+      - Sets a target of 40% for the routing congestion of the design.
+      - Reduces the routing resources of every layer by 40 percent.
+    explain: >-
+      The value applies when each net's route tree is built. At 0 the tree is
+      a minimum-wirelength Steiner tree, which can take a long
+      detour to a far sink. At 1 every sink gets its most direct path, at the
+      cost of wire. Clock and other timing-critical nets get a higher value,
+      with `-clock_nets` or per net.
+    source: grt
+
+  - id: or-pin-access
+    section: routing
+    command: pin_access -min_access_points 3
+    hint: "Before a net can be routed, the router needs to know how a pin can be entered."
+    answer: Works out the points and vias by which each pin can be reached.
+    wrong:
+      - Routes the final connection from each wire into its pin.
+      - Reports the pins that the router was unable to reach.
+      - Moves the pins of each cell so that they are easier to reach.
+    explain: >-
+      A pin is a shape on a low layer that may be reachable only from certain
+      directions and through certain vias. Detailed routing does this itself;
+      the command exists to run and debug the step alone.
+    source: drt
+
+  - id: or-detailed-route
+    section: routing
+    command: detailed_route -output_drc route_drc.rpt -droute_end_iter 10
+    hint: "It is iterative: each pass tries to remove what the last one could not."
+    answer: Routes real wires and vias in up to 10 passes, listing violations.
+    wrong:
+      - Routes ten nets at a time and writes the violations of each batch.
+      - Checks the existing routing for violations, without routing anything.
+      - Repairs the violations that the global router left behind.
+    explain: >-
+      The violations go to the named file. The detailed router turns each
+      guide into metal and vias that obey the
+      technology's rules, then repeats over the remaining violations. The
+      report lists what is left, which is the number a tapeout must drive to
+      zero.
+    source: drt
+
+  - id: or-create-ndr
+    section: routing
+    command: create_ndr -name double -width {*2} -spacing {*2}
+    hint: "Default rules give minimum width and spacing. Ask what a non-default rule changes."
+    answer: Defines a rule whose wires are twice the default width and spacing.
+    wrong:
+      - Applies double width and spacing to every net in the design.
+      - Defines a rule that doubles the number of routing layers used.
+      - Defines a rule that doubles the via count on each connection.
+    explain: >-
+      A wider wire has less resistance and a wider space has less coupling, at
+      the cost of routing room. Clocks and other sensitive nets get such a
+      rule. Defining it changes nothing until `assign_ndr` applies it.
+    source: grt
+
+  - id: or-assign-ndr
+    section: routing
+    command: assign_ndr -ndr double -all_clocks
+    hint: "The rule already exists. Ask what is still missing."
+    answer: Applies the rule named double to every clock net in the design.
+    wrong:
+      - Defines a rule named double and applies it to the clock nets.
+      - Applies the rule to the nets that are currently the most congested.
+      - Assigns the clock nets to their own layers, apart from signals.
+    explain: >-
+      Rules are defined once and then applied to nets, either `-all_clocks` or
+      a named net. The router obeys the rule from then on.
+    source: grt
+
+  - id: or-check-antennas
+    section: routing
+    command: check_antennas -report_violating_nets
+    hint: "The damage happens during manufacturing, not in the finished chip."
+    answer: Reports nets whose metal collects more charge than a gate survives.
+    wrong:
+      - Reports nets whose wires act as antennas and pick up crosstalk.
+      - Reports the nets that reach the die boundary without a pad.
+      - Reports the gates whose input capacitance exceeds the limit.
+    explain: >-
+      `-report_violating_nets` lists the nets. While a layer is being etched,
+      a long piece of metal connected to a gate
+      accumulates charge and can break the thin oxide. The ratio of metal area
+      to gate area must stay under the foundry's limit. The check needs
+      routing, so it runs after `detailed_route`.
+    source: ant
+
+  - id: or-repair-antennas
+    section: routing
+    command: repair_antennas ANTENNA_X1 -iterations 5
+    hint: "A diode gives the collected charge somewhere to go."
+    answer: Adds diode cells to the violating nets and repeats up to five times.
+    wrong:
+      - Reports the antenna violations five times as routing progresses.
+      - Reroutes each violating net up to five times to shorten its metal.
+      - Replaces the cells whose gates the antenna violations threaten.
+    explain: >-
+      A diode placed on the net bleeds the charge to the substrate, so the
+      gate survives the etch. Repair reroutes and rechecks, hence the
+      iterations. `-jumper_only` instead breaks the long metal by hopping to
+      another layer.
+    source: grt
+
+  # ---------------------------------------------------------------- Parasitics
+
+  - id: or-set-wire-rc
+    section: parasitics
+    command: set_wire_rc -layer metal3
+    hint: "Before anything is routed, the tool still needs a number for a wire."
+    answer: Takes metal3's resistance and capacitance for wire estimates.
+    wrong:
+      - Routes all of the design's wires on the metal3 layer.
+      - Sets the resistance of metal3 in the technology database.
+      - Restricts wire estimates to the nets that use metal3.
+    explain: >-
+      The values are taken per unit length from metal3. Every estimate before
+      routing needs a resistance and capacitance per
+      micron; taking them from a middle layer is the usual choice. The values
+      feed timing-driven placement and `repair_design`. `-clock` and `-signal`
+      set them separately, and `-resistance` and `-capacitance` give values
+      directly.
+    source: est
+
+  - id: or-set-layer-rc
+    section: parasitics
+    command: set_layer_rc -layer metal3 -resistance 1.8e-3 -capacitance 1.2e-4
+    hint: "Compare it with set_wire_rc: this one names the layer itself, not an estimate."
+    answer: Sets the resistance and capacitance the tool uses for the metal3 layer.
+    wrong:
+      - Sets the values used to estimate wires, taken from metal3.
+      - Changes the technology file so metal3 carries these values.
+      - Applies these values only to the nets already routed on metal3.
+    explain: >-
+      Technology files sometimes lack per-layer values, or carry values that do
+      not match the corner in use. Setting them per layer fixes what estimates
+      and extraction start from. `report_layer_rc` prints what is in force.
+    source: est
+
+  - id: or-estimate-placement
+    section: parasitics
+    command: estimate_parasitics -placement
+    hint: "There is no routing yet, so the wire has to be guessed from somewhere."
+    answer: Estimates each net's parasitics from the placement, using a Steiner tree.
+    wrong:
+      - Estimates each net's parasitics from the global routing guides.
+      - Extracts the parasitics of the wires the detailed router built.
+      - Reads the parasitics of the placed design from a file on disk.
+    explain: >-
+      The tool builds a tree over the pin locations and applies the per-length
+      values from `set_wire_rc`. It is rough but available early, which is what
+      `repair_design` and timing-driven placement need.
+    source: est
+
+  - id: or-estimate-grt
+    section: parasitics
+    command: estimate_parasitics -global_routing
+    hint: "Something better than pin positions now exists, but the real wires do not."
+    answer: Estimates parasitics from the global route guides.
+    wrong:
+      - Estimates parasitics from the placement, ignoring the guides.
+      - Extracts parasitics from the wires the detailed router built.
+      - Runs global routing and then extracts the resulting parasitics.
+    explain: >-
+      That is closer to the real wires than a placement estimate. The guides
+      say which regions and layers a net will use, so the length and
+      layer mix are much closer to the truth than a Steiner tree over pins.
+      This is what timing between global and detailed routing is based on.
+    source: est
+
+  - id: or-extract-parasitics
+    section: parasitics
+    command: extract_parasitics -ext_model_file rules.rules
+    hint: "The wires exist now. Ask what the rules file is for."
+    answer: Extracts the routed wires' parasitics using that model.
+    wrong:
+      - Estimates the parasitics of the design from its placement.
+      - Writes the extracted parasitics out to a SPEF file.
+      - Builds the resistance and capacitance model from test patterns.
+    explain: >-
+      The model file holds the values for the process. OpenRCX measures each
+      wire's geometry and neighbours and looks the values
+      up in a model built for the process. That is what sign-off timing uses.
+      `write_spef` then writes the result out.
+    source: rcx
+
+  - id: or-write-spef
+    section: parasitics
+    command: write_spef 6_final.spef
+    hint: "Ask what another tool would need in order to time this design exactly as it is."
+    answer: Writes the extracted parasitics to a file another tool can read.
+    wrong:
+      - Writes the netlist with the parasitic devices included in it.
+      - Writes the per-layer resistance and capacitance values in use.
+      - Writes the routing guides that the parasitics were taken from.
+    explain: >-
+      SPEF (Standard Parasitic Exchange Format) lists the resistance and
+      capacitance of every net, which is how extracted parasitics move between
+      tools. `read_spef` loads such a file back.
+    source: rcx
+
+  - id: or-define-process-corner
+    section: parasitics
+    command: define_process_corner -ext_model_index 0 X
+    hint: "Extraction needs to know which set of values in the model to use."
+    answer: Defines an extraction corner and ties it to one model in the rules file.
+    wrong:
+      - Defines a timing corner for the analysis that follows extraction.
+      - Selects the process corner of the Liberty libraries in use.
+      - Extracts the parasitics of the design for the corner named X.
+    explain: >-
+      A rules file holds several sets of values, one per process corner. The
+      corner defined here selects one, so several corners can be extracted in
+      the same session and written to separate files.
+    source: rcx
+
+  - id: or-report-layer-rc
+    section: parasitics
+    command: report_layer_rc
+    hint: "It prints what is in force, which is not always what you think it is."
+    answer: Prints the resistance and capacitance in force for each layer.
+    wrong:
+      - Prints the resistance and capacitance of each net in the design.
+      - Prints the layers whose values are missing from the technology file.
+      - Prints the resistance and capacitance used for wire estimates only.
+    explain: >-
+      Via values are printed too. The values come from the technology file or
+      from `set_layer_rc`. Checking
+      them is worth doing when delays look wrong, since an empty or wrong value
+      silently changes every estimate.
+    source: est
+
+  # ---------------------------------------------------------------- Design reports and checks
+
+  - id: or-report-design-area
+    section: reports
+    command: report_design_area
+    hint: "Two numbers, and the second is a ratio."
+    answer: Prints the instance area and the core's utilization.
+    wrong:
+      - Prints the die area and the core area of the floorplan.
+      - Prints the area of each kind of cell used in the design.
+      - Prints the area still free for placement inside the core.
+    explain: >-
+      Utilization is that instance area divided by the core area. It is the
+      number a flow watches across stages, because repair and clock tree
+      synthesis both add cells.
+    source: rsz
+
+  - id: or-report-cell-usage
+    section: reports
+    command: report_cell_usage
+    hint: "It counts, it does not measure."
+    answer: Prints how many instances of each kind of cell the design contains.
+    wrong:
+      - Prints the total area the instances of each cell occupy.
+      - Prints the library cells that the design does not use.
+      - Prints the cells excluded from optimization by set_dont_use.
+    explain: >-
+      The counts show what the flow has been doing: how many buffers were
+      added, how many fillers, how many taps. `-stage` labels a report so
+      counts from different stages can be compared.
+    source: odb
+
+  - id: or-report-wire-length
+    section: reports
+    command: report_wire_length -global_route -summary
+    hint: "Wirelength can be counted from an estimate or from the real wires."
+    answer: Prints the total wirelength taken from the global routing result.
+    wrong:
+      - Prints the total wirelength taken from the detailed routing.
+      - Prints the longest net that the global router produced.
+      - Prints the wirelength of each layer used by the global route.
+    explain: >-
+      Wirelength is the usual quality measure for placement and routing.
+      `-detailed_route` counts the finished wires instead, `-net` limits the
+      report to given nets, and without `-summary` each net is listed.
+    source: grt
+
+  - id: or-report-floating-nets
+    section: reports
+    command: report_floating_nets
+    hint: "A net needs something at both ends. Ask which end is missing here."
+    answer: Reports the nets that have no driver.
+    wrong:
+      - Reports the nets that have no loads connected to them.
+      - Reports the nets that have not been routed yet.
+      - Reports the nets that have more than one driver.
+    explain: >-
+      An undriven net is usually a netlist mistake: a missing connection or
+      logic that was removed. It is checked before placement, because such a
+      net has no meaningful timing. `report_overdriven_nets` reports the
+      opposite case.
+    source: rsz
+
+  - id: or-report-long-wires
+    section: reports
+    command: report_long_wires 10
+    hint: "The number is a count, not a length."
+    answer: Prints the ten longest nets in the design, longest first.
+    wrong:
+      - Prints every net whose wire is longer than 10 microns.
+      - Prints ten nets that violate the maximum wire length rule.
+      - Prints the ten nets with the largest delay in the design.
+    explain: >-
+      The longest nets are where wire delay and slew problems start, so the
+      list is a quick way to find candidates for buffering or for a placement
+      fix.
+    source: rsz
+
+  - id: or-report-buffers
+    section: reports
+    command: report_buffers
+    hint: "It concerns the library, not the netlist."
+    answer: Reports the library buffers that optimization is allowed to use.
+    wrong:
+      - Reports every buffer instance that the design currently contains.
+      - Reports the buffers that clock tree synthesis inserted.
+      - Reports the buffers whose drive strength is too weak for their load.
+    explain: >-
+      Usable buffers are the standard-cell buffers left after clock buffers,
+      always-on buffers, level shifters, and cells marked `set_dont_use` are
+      excluded. Their threshold voltage, site, footprint, and leakage are
+      listed too. `-filtered` shows the smaller set actually used for
+      rebuffering.
+    source: rsz
+
+  - id: or-design-is-routed
+    section: reports
+    command: if {![design_is_routed]} { error "not routed" }
+    hint: "The square brackets and the if say what kind of command this is."
+    answer: Returns whether every net is routed, so a script can test it.
+    wrong:
+      - Routes the design if it has not been routed already.
+      - Reports the list of nets that are still unrouted.
+      - Checks the finished routing for design-rule violations.
+    explain: >-
+      Flow scripts use such checks as gates between stages, so a later stage
+      does not run on a design that is not ready. `-verbose` lists what is
+      missing.
+    source: odb
+
+  - id: or-all-pins-placed
+    section: reports
+    command: if {![all_pins_placed]} { place_pins -hor_layers metal3 -ver_layers metal2 }
+    hint: "Another gate in a script. Ask what it is guarding against."
+    answer: Returns whether every I/O (Input/Output) pin has a position yet.
+    wrong:
+      - Returns whether every instance in the design has been placed.
+      - Places any I/O (Input/Output) pins that are still unplaced.
+      - Returns whether the pins are placed legally, on tracks.
+    explain: >-
+      Pins may come from the floorplan file or from `place_pins`. The check
+      lets a script place them only when they are missing, rather than
+      overwriting positions that were given on purpose.
+    source: ppl
+
+  # ---------------------------------------------------------------- DFT
+
+  - id: dft-config
+    section: dft
+    command: set_dft_config -max_length 200 -clock_mixing no_mix
+    hint: "Two limits on the chains that will be built later: how long, and what may share one."
+    answer: Caps each scan chain at 200 bits and keeps one clock and edge per chain.
+    wrong:
+      - Builds 200 scan chains, one for each clock and edge in the design.
+      - Allows at most 200 scan flip-flops in the whole design.
+      - Shifts the scan chains at a clock 200 times slower than functional.
+    explain: >-
+      Chains are shift registers built from scan flops. `no_mix` keeps flops of
+      one clock and edge together, which can leave chains of unequal length;
+      `clock_mix` allows mixing and stitches falling-edge flops before
+      rising-edge ones. `-max_chains` takes priority over the length limit.
+    source: dft
+
+  - id: dft-scan-replace
+    section: dft
+    command: scan_replace
+    hint: "It changes cells, not connections, and the cells are bigger afterwards."
+    answer: Swaps each flip-flop for the scan version of the same cell.
+    wrong:
+      - Stitches the scan flip-flops into chains through their scan pins.
+      - Adds the scan enable and scan input ports to the design.
+      - Swaps the flip-flops on the critical paths for faster ones.
+    explain: >-
+      A scan flop has a second data input and a select, so it can shift instead
+      of capture. The swap changes cell areas, so it is done before placement.
+    source: dft
+
+  - id: dft-report-plan
+    section: dft
+    command: report_dft_plan
+    hint: "Ask which of preview and commit this one is."
+    answer: Shows the chains that would be stitched, changing nothing yet.
+    wrong:
+      - Stitches the chains and then reports what it built.
+      - Reports the configuration that the stitching will use.
+      - Reports the chains that could not be built from the flops.
+    explain: >-
+      It is the iteration point: change the configuration, look at the chains,
+      and repeat until the plan is right. It is run after `scan_replace` and
+      global placement, because the plan depends on where the flops are.
+    source: dft
+
+  - id: dft-execute-plan
+    section: dft
+    command: execute_dft_plan
+    hint: "This is the step the preview was previewing."
+    answer: Stitches the scan chains into the netlist, connecting each flop to the next.
+    wrong:
+      - Shows the chains that would be stitched without changing anything.
+      - Replaces the flip-flops with their scan versions and stops.
+      - Runs the test patterns through the scan chains to check them.
+    explain: >-
+      Each chain's scan output feeds the next flop's scan input, and the ends
+      are connected to the scan-in and scan-out drivers named in the
+      configuration. The netlist changes, so timing must be rechecked.
+    source: dft
+
+  - id: dft-report-config
+    section: dft
+    command: report_dft_config
+    hint: "It prints inputs, not results."
+    answer: Prints the configuration that the plan and the stitching will use.
+    wrong:
+      - Prints the chains that the current configuration would build.
+      - Prints the scan chains that exist in the netlist already.
+      - Prints the flip-flops that have no scan equivalent in the library.
+    explain: >-
+      The settings are sticky, so a long script can lose track of them.
+      Printing them before planning keeps the plan explainable.
+    source: dft
+
+  - id: dft-scan-opt
+    section: dft
+    command: scan_opt
+    hint: "It runs after placement, so it knows where the flops are."
+    answer: Reorders the flops within a chain so the chain's wiring is shorter.
+    wrong:
+      - Reduces the number of scan chains to shorten the test time.
+      - Removes the scan flops that the test does not need.
+      - Shortens each chain by dropping bits beyond the length limit.
+    explain: >-
+      A chain stitched in netlist order can wander across the block. Reordering
+      it into a spatial order keeps the same flops and the same test while
+      cutting the wire the chain costs.
+    source: dft
+
+  # ---------------------------------------------------------------- Power intent
+
+  - id: upf-read
+    section: power-intent
+    command: read_upf -file design.upf
+    hint: "Intent is the word: it says what the power structure should be, not what exists."
+    answer: "Reads the power intent: the domains, switches, isolation, and level shifters."
+    wrong:
+      - Reads the power grid definition that the grid generator will build.
+      - Reads the results of a power analysis run on the design.
+      - Reads the supply voltages that the Liberty libraries were made at.
+    explain: >-
+      UPF (Unified Power Format) describes the power architecture separately
+      from the netlist: which logic shares a supply, what switches it, and what
+      guards the boundaries between domains. The tool then implements it.
+    source: upf
+
+  - id: upf-create-domain
+    section: power-intent
+    command: create_power_domain -elements {u_core} PD_CORE
+    hint: "A domain is a set of logic before it is a piece of the die."
+    answer: Declares that the logic under u_core forms the power domain PD_CORE.
+    wrong:
+      - Creates a region of the die named PD_CORE for u_core's cells.
+      - Switches off the logic under u_core when PD_CORE is idle.
+      - Creates a power net named PD_CORE and connects u_core to it.
+    explain: >-
+      The domain is a grouping of modules that share a supply. Giving it a
+      region on the die and a voltage are separate steps, and `.` names the
+      top-level domain.
+    source: upf
+
+  - id: upf-domain-area
+    section: power-intent
+    command: set_domain_area PD_CORE -area {10 10 200 200}
+    hint: "The domain now gets a place, because a separate supply needs its own grid."
+    answer: Gives the domain a region of the die that its cells are placed in.
+    wrong:
+      - Sets the area budget of the domain, in square microns.
+      - Creates a placement blockage over that region of the die.
+      - Restricts the domain's nets to be routed inside that region.
+    explain: >-
+      A domain with its own supply needs its own power grid, which means a
+      contiguous region to build it over. Cells of the domain go inside and
+      others stay out, with level shifters at the boundary.
+    source: upf
+
+  - id: upf-domain-voltage
+    section: power-intent
+    command: set_domain_voltage -domain PD_CORE -voltage 0.9
+    hint: "Ask what the tool needs in order to know whether a crossing signal must be shifted."
+    answer: Says the domain runs at 0.9 V, which fixes what its boundaries need.
+    wrong:
+      - Sets the voltage of the power net that feeds the domain's grid.
+      - Scales the domain's timing as if it ran at 0.9 volts.
+      - Limits the domain's supply to at most 0.9 volts.
+    explain: >-
+      Domains at different voltages need level shifters between them, so the
+      voltage is part of the intent, not only an analysis setting. It also
+      picks the libraries a domain's cells come from.
+    source: upf
+
+  - id: upf-create-power-switch
+    section: power-intent
+    command: create_power_switch -domain PD_CORE -input_supply_port VDD -output_supply_port VDD_SW -control_port nsleep PS_CORE
+    hint: "Everything here is a declaration. Ask what is not yet decided."
+    answer: Declares a switch feeding PD_CORE from VDD through VDD_SW, under nsleep.
+    wrong:
+      - Inserts the switch cells that connect VDD to VDD_SW in the layout.
+      - Creates the net VDD_SW and routes it through the domain's grid.
+      - Turns the domain off whenever the control signal nsleep is high.
+    explain: >-
+      The switch gates a domain's supply so it can be shut off. This says where
+      its supply comes from, what it produces, and what controls it;
+      `map_power_switch` then names the library cell that implements it.
+    source: upf
+
+  - id: upf-map-power-switch
+    section: power-intent
+    command: map_power_switch -switch_name_list PS_CORE -lib_cells HEADER_X4
+    hint: "The switch already exists in the intent. Ask what is still missing to build it."
+    answer: Binds the declared switch to a real library cell that implements it.
+    wrong:
+      - Declares a power switch built from the cell HEADER_X4.
+      - Places the header cells across the domain's region.
+      - Reports the library cells that could implement the switch.
+    explain: >-
+      A header cell passes the supply when enabled and blocks it when not. The
+      mapping ties the abstract switch to that cell and its ports, so the tool
+      can insert real instances.
+    source: upf
+
+  - id: upf-isolation
+    section: power-intent
+    command: set_isolation -domain PD_CORE -clamp_value 0 -isolation_signal iso_en PD_CORE_ISO
+    hint: "Ask what a shut-off domain's outputs look like to the logic still running."
+    answer: Declares isolation holding the domain's outputs at 0 while it is off.
+    wrong:
+      - Declares isolation holding the domain's inputs at 0 while it is off.
+      - Disconnects the domain's outputs from the rest of the design.
+      - Clamps the domain's supply to ground when it is switched off.
+    explain: >-
+      An unpowered output floats, and a floating input into always-on logic
+      draws current and can behave unpredictably. An isolation cell, enabled by
+      the isolation signal, holds a defined value instead.
+    source: upf
+
+  - id: upf-level-shifter
+    section: power-intent
+    command: set_level_shifter -domain PD_CORE -threshold 0.1 LS_CORE
+    hint: "It concerns signals that cross a boundary between two voltages."
+    answer: Declares shifters where the domain's crossings differ by 0.1 V.
+    wrong:
+      - Shifts the domain's supply voltage up by 0.1 volts.
+      - Sets the threshold voltage of the domain's transistors.
+      - Adds a level shifter at every port of the whole design.
+    explain: >-
+      The threshold is the voltage difference that triggers one. A signal
+      driven at one voltage may not register correctly at another, so
+      it is passed through a shifter. The threshold is the difference above
+      which one is required. `-source` and `-sink` restrict which crossings the
+      strategy applies to.
+    source: upf
+
+  - id: upf-use-interface-cell
+    section: power-intent
+    command: use_interface_cell -domain PD_CORE -strategy PD_CORE_ISO -lib_cells ISOLATE_X1
+    hint: "A strategy says what is needed; this says what to build it from."
+    answer: Names the library cells that implement that strategy.
+    wrong:
+      - Declares a new isolation strategy built on the cell ISOLATE_X1.
+      - Places the isolation cells at the boundary of the domain.
+      - Reports which library cells the strategy is currently using.
+    explain: >-
+      The strategy may be an isolation or a level-shifter one. It declares the
+      rule (what to isolate and when); the interface
+      cell declares the implementation. Keeping them apart lets one intent file
+      be used with different libraries.
+    source: upf
+
+  - id: upf-report-voltage-domains
+    section: power-intent
+    command: report_voltage_domains
+    hint: "It reads back what was declared, not what was measured."
+    answer: Lists the voltage domains that are defined in the design.
+    wrong:
+      - Lists the voltage measured at each instance of the design.
+      - Lists the power nets and the voltage each one carries.
+      - Lists the domains whose voltage has not yet been set.
+    explain: >-
+      Each domain's area and voltage are listed with it. Power intent is easy
+      to get subtly wrong, so reading the domains back is
+      the quick check that the intent file was understood as intended.
+      `write_upf` writes the whole intent out again.
+    source: upf
+
+  # ---------------------------------------------------------------- Pads and bumps
+
+  - id: pad-make-io-sites
+    section: pads
+    command: make_io_sites -horizontal_site IOSITE_H -vertical_site IOSITE_V -corner_site IOSITE_C -offset 35
+    hint: "Pads need somewhere legal to sit, as standard cells need rows."
+    answer: Creates the pad rows around the die, set in 35 microns from the edge.
+    wrong:
+      - Places the pad cells in a ring 35 microns from the die edge.
+      - Creates one pad row per side, each 35 microns tall.
+      - Creates the bump array, offset 35 microns from the die edge.
+    explain: >-
+      The east and west rows use the horizontal site, the north and south rows
+      the vertical site, and the four corners their own site. The rotations
+      turn each row's site the right way up; `-ring_index` handles more than
+      one ring.
+    source: pad
+
+  - id: pad-place-pads
+    section: pads
+    command: place_pads -row IO_SOUTH u_reset u_clk_in
+    hint: "The pads are named in order. Ask what decides their exact positions."
+    answer: Places those pads into the south row, keeping the order given.
+    wrong:
+      - Places every pad of the design into the south pad row.
+      - Creates the south row and spreads the pads across it evenly.
+      - Places the pads at the coordinates listed after the row name.
+    explain: >-
+      The order is left to right for the north and south rows and bottom to top
+      for east and west. Positions are chosen to line up with the bumps when
+      bumps exist, and spread evenly otherwise; `-mode` chooses explicitly.
+    source: pad
+
+  - id: pad-place-corners
+    section: pads
+    command: place_corners CORNER_PAD
+    hint: "Two pad rows meet at each corner of the ring."
+    answer: Places the corner cells that join the pad rows.
+    wrong:
+      - Places pad cells in the four corners of the core area.
+      - Rotates the pad rows so that they meet at the corners.
+      - Creates the corner sites that the pad rows are built on.
+    explain: >-
+      There is one at each of the four corners. A corner cell carries the
+      ring's supplies and signals around the turn, so
+      the pad ring stays continuous. Without them the rings on adjacent sides
+      are not connected.
+    source: pad
+
+  - id: pad-io-fill
+    section: pads
+    command: place_io_fill -row IO_SOUTH FILL5 FILL1
+    hint: "The same idea as filler cells in the core, for a different row."
+    answer: Fills the gaps in the south pad row with the filler pads given.
+    wrong:
+      - Fills the gaps between the standard cells in the core rows.
+      - Places the named pad cells in the remaining space in the row.
+      - Closes the gaps by moving the placed pads against each other.
+    explain: >-
+      The fillers are listed widest first, so the row is filled greedily. A
+      continuous row matters because the ring's supplies are carried from pad
+      to pad by abutment.
+    source: pad
+
+  - id: pad-connect-by-abutment
+    section: pads
+    command: connect_by_abutment
+    hint: "Neighbouring pads touch. Ask what that contact is for."
+    answer: Connects the pad ring's signals where neighbouring pad cells touch.
+    wrong:
+      - Moves the pads together until each one abuts its neighbour.
+      - Connects the pads to the core logic that drives them.
+      - Connects each bump to the pad that sits beneath it.
+    explain: >-
+      Pad and filler cells carry the ring's supplies and control signals across
+      their edges, so placing them against each other wires the ring. The
+      command makes those abutting connections explicit in the netlist.
+    source: pad
+
+  - id: pad-bondpad
+    section: pads
+    command: place_bondpad -bond BONDPAD u_pad_*
+    hint: "This is for the older packaging style, where a wire is attached."
+    answer: Places bond pads on those I/O (Input/Output) cells for wire bonding.
+    wrong:
+      - Places the flip-chip bumps on those I/O (Input/Output) cells.
+      - Bonds the pads to the package with wires in the layout.
+      - Creates a separate row of bond pads inside the pad ring.
+    explain: >-
+      In wire bonding a wire runs from a pad on the die to the package, so each
+      I/O (Input/Output) cell needs a bond pad on top of it. Flip-chip parts
+      use a bump array instead.
+    source: pad
+
+  - id: pad-bump-array
+    section: pads
+    command: make_io_bump_array -bump BUMP -origin {100 100} -rows 14 -columns 14 -pitch {200 200}
+    hint: "Read the numbers: a grid, and the distance between its points."
+    answer: Creates a 14 by 14 grid of flip-chip bumps on a 200 micron pitch.
+    wrong:
+      - Creates 14 bumps in each of the four pad rows of the ring.
+      - Creates a bump for each of the 14 rows of pads on the die.
+      - Creates 14 bump rows spread across a 200 micron wide band.
+    explain: >-
+      A flip-chip part is turned over and its bumps meet the package directly,
+      so the connections are spread over the whole die rather than around its
+      edge. The pitch is much coarser than anything inside the die.
+    source: pad
+
+  - id: pad-assign-bump
+    section: pads
+    command: assign_io_bump -net VDD BUMP_0_0
+    hint: "A bump is just metal until something says what it carries."
+    answer: Assigns the VDD net to that bump, and routes the connection to it.
+    wrong:
+      - Creates a new bump carrying the VDD net at that position.
+      - Connects every VDD bump in the array to the pad ring.
+      - Reserves the bump for VDD but leaves it unconnected.
+    explain: >-
+      Each bump is given a net, and a signal bump is also given the
+      I/O (Input/Output) cell it serves with `-terminal`. Routing happens
+      unless `-dont_route` is given, which is used when the redistribution
+      routing is done separately.
+    source: pad
+
+  - id: pad-rdl-route
+    section: pads
+    command: rdl_route -layer RDL -width 10 -spacing 10 {VDD VSS}
+    hint: "The bumps sit above the die, and the pads sit at its edge."
+    answer: Routes those nets on the redistribution layer, from bumps to pads.
+    wrong:
+      - Routes those nets on the top metal layer inside the die.
+      - Creates the redistribution layer above the top metal layer.
+      - Routes the power grid up to the bumps through the metal stack.
+    explain: >-
+      The redistribution layer is a thick metal layer above the die that moves
+      a connection from where the circuit provides it to where the bump needs
+      it. Its wires are wide and widely spaced, hence the values here.
+    source: pad
+
+  - id: pad-remove-io-rows
+    section: pads
+    command: remove_io_rows
+    hint: "It runs at the end. Ask what the rows would otherwise be mistaken for."
+    answer: Removes the pad rows once the ring is placed.
+    wrong:
+      - Removes the pad cells from the rows, leaving the rows empty.
+      - Removes the pad rows that have no pads placed in them.
+      - Removes the rows of the bump array once bumps are assigned.
+    explain: >-
+      Later tools then ignore them. Pad rows are a placement aid for building
+      the ring, and left behind they can
+      be taken for standard-cell rows by tools that look at rows, so they are
+      removed when the ring is complete.
+    source: pad
+
+  # ---------------------------------------------------------------- 3D packaging
+
+  - id: pk-read-3dbx
+    section: packaging
+    command: read_3dbx stack.3dbx
+    hint: "One file describes several dies and how they sit together."
+    answer: "Reads a description of a die stack and its chiplets."
+    wrong:
+      - Reads the layout of one chiplet from the stack.
+      - Reads the package substrate the dies are mounted on.
+      - Reads the routing that connects the stacked dies.
+    explain: >-
+      The file names the chiplets, their instances, and how they bond.
+      3Dblox, standardized as IEEE 3537, is a language for describing chiplets
+      and their interconnection in 2.5D and 3D packaging: size, orientation,
+      interfaces, thickness, and interconnect regions. Reading one gives
+      OpenROAD the stack to work on.
+    source: odb
+
+  - id: pk-report-3dic
+    section: packaging
+    command: report_3dic_summary
+    hint: "A structural summary: counts and names, not measurements."
+    answer: "Prints the stack's structure, counted piece by piece."
+    wrong:
+      - Prints the timing of the paths that cross between chiplets.
+      - Prints the area and the utilization of each chiplet in the stack.
+      - Prints the errors found in the stack description that was read.
+    explain: >-
+      The counts are of chiplets, top-level chip nets, bond regions, and bump
+      pads, and each chip instance is listed with the chiplet it refers to.
+      It is the sanity check after reading a stack, before anything that
+      depends on it, such as timing across chiplets.
+    source: odb
+
+  - id: pk-alignment-rule
+    section: packaging
+    command: add_3dblox_alignment_marker_rule -master_a MARK_A -master_b MARK_B -tolerance 0.5
+    hint: "Two dies are bonded face to face; something has to line up."
+    answer: Requires the paired markers on bonded chiplets to sit within 0.5 microns.
+    wrong:
+      - Places alignment markers on both chiplets at the bond interface.
+      - Moves the two chiplets until they align to within 0.5 microns.
+      - Checks that the two marker cells have identical dimensions.
+    explain: >-
+      Bonded dies carry marker cells that must land on top of each other. The
+      rule pairs the two masters and sets the largest centre-to-centre
+      misalignment allowed; `-relative_orientations` also constrains how one
+      may be turned relative to the other. The checker enforces it.
+    source: odb
+
+  - id: pk-check-3dblox
+    section: packaging
+    command: check_3dblox
+    hint: "It takes no arguments, so ask what it must already have to work on."
+    answer: Checks the stack description that has been read for problems.
+    wrong:
+      - Reads a stack description from a file and then checks it.
+      - Checks each chiplet's own layout against the design rules.
+      - Checks the timing of the connections between the chiplets.
+    explain: >-
+      The checks cover the loaded description, including the alignment marker
+      rules registered for bonded chiplets. This part of OpenROAD is new and
+      its documentation is thin, so the tool's own messages are the best guide.
+    source: odb
+
+  # ---------------------------------------------------------------- Reading real output
+
+  - id: ord-congestion
+    section: reading
+    question: "What does this global routing report say about congestion?"
+    excerpt: |2-
+      [INFO GRT-0096] Final congestion report:
+      Layer         Resource        Demand        Usage (%)    Max H / Max V / Total Congestion
+      ---------------------------------------------------------------------------------------
+      metal1               0             0            0.00%             0 /  0 /  0
+      metal2             957           522           54.55%             0 /  0 /  0
+      metal3            1394           616           44.19%             0 /  0 /  0
+      metal4             957           112           11.70%             0 /  0 /  0
+      metal5             997            41            4.11%             0 /  0 /  0
+      metal6            1013             0            0.00%             0 /  0 /  0
+      metal7             302             0            0.00%             0 /  0 /  0
+      metal8             352             0            0.00%             0 /  0 /  0
+      metal9             143             0            0.00%             0 /  0 /  0
+      metal10            143             0            0.00%             0 /  0 /  0
+      ---------------------------------------------------------------------------------------
+      Total             6258          1291           20.63%             0 /  0 /  0
+
+      [INFO GRT-0018] Total wirelength: 6218 um
+      [INFO GRT-0014] Routed nets: 628
+    hint: "Compare Demand with Resource on each layer, and read the last column."
+    answer: "Nothing is congested: every layer is well under its capacity."
+    wrong:
+      - "metal2 is congested, since it is more than half used."
+      - "The design is 20.63% routed, and the rest has failed."
+      - "6258 tracks are needed but only 1291 of them exist."
+    explain: "Resource is the tracks available and Demand the tracks the router wants; the last columns count the tiles where demand exceeds capacity, and they are all zero. metal2 and metal3 carry the routing because the upper layers are reserved for the power grid and longer nets."
+    source: grt
+
+  - id: ord-gpl-overflow
+    section: reading
+    question: "What is the placer doing over these iterations?"
+    excerpt: |2-
+      Iteration | Overflow |     HPWL (um) |  HPWL(%) |   Penalty | Group
+      ---------------------------------------------------------------
+              0 |   0.8751 |  1.457625e+03 |   +0.00% |  3.54e-14 |      
+             10 |   0.7488 |  1.788887e+03 |  +22.73% |  5.76e-14 |      
+             20 |   0.7303 |  1.810900e+03 |   +1.23% |  9.38e-14 |      
+             30 |   0.7305 |  1.810921e+03 |   +0.00% |  1.53e-13 |      
+             40 |   0.7342 |  1.806647e+03 |   -0.24% |  2.49e-13 |      
+             50 |   0.7323 |  1.812428e+03 |   +0.32% |  4.05e-13 |      
+             60 |   0.7316 |  1.813855e+03 |   +0.08% |  6.60e-13 |      
+             70 |   0.7324 |  1.810754e+03 |   -0.17% |  1.08e-12 |      
+             80 |   0.7318 |  1.809896e+03 |   -0.05% |  1.75e-12 |      
+             90 |   0.7310 |  1.810464e+03 |   +0.03% |  2.85e-12 |      
+    hint: "Overflow measures how much density exceeds the target. Watch it, and watch wirelength."
+    answer: "Spreading cells apart: overflow is still high and wirelength has grown."
+    wrong:
+      - "Shortening wires: wirelength has come down since iteration 0."
+      - "Finishing: the numbers have stopped changing, so it has converged."
+      - "Routing the congested areas, which is why the penalty keeps rising."
+    explain: "Overflow is the density excess over the target; placement ends when it reaches the target, not when wirelength stops moving. Wirelength rose from 1457 to about 1810 because the cells started piled together and are being pushed apart. The penalty grows each iteration to force that spreading."
+    source: gpl
+
+  - id: ord-drt-iterations
+    section: reading
+    question: "What happened in the router's last iterations?"
+    excerpt: |2-
+          Completing 80% with 9 violations.
+          elapsed time = 00:00:00, memory = 1037.00 (MB).
+          Completing 90% with 9 violations.
+          elapsed time = 00:00:01, memory = 1037.01 (MB).
+          Completing 100% with 0 violations.
+          elapsed time = 00:00:01, memory = 1037.01 (MB).
+      [INFO DRT-0199]   Number of violations = 0.
+    hint: "Each line is one pass over the design. Read the last two."
+    answer: "The last pass cleared the nine violations that remained before it."
+    wrong:
+      - "Nine violations are left in the finished routing."
+      - "The router stopped at 100% complete without checking rules."
+      - "Nine nets out of a hundred could not be routed at all."
+    explain: "Detailed routing repeats over the design, ripping up and rerouting what violates the rules. A run is only finished when the violation count reaches zero, which is what the last line confirms."
+    source: drt
+
+  - id: ord-drt-layers
+    section: reading
+    question: "Why is the wire length on metal1 zero?"
+    excerpt: |2-
+      Total wire length = 3605 um.
+      Total wire length on LAYER metal1 = 0 um.
+      Total wire length on LAYER metal2 = 1561 um.
+      Total wire length on LAYER metal3 = 1748 um.
+      Total wire length on LAYER metal4 = 236 um.
+      Total wire length on LAYER metal5 = 41 um.
+      Total wire length on LAYER metal6 = 17 um.
+      Total wire length on LAYER metal7 = 0 um.
+      Total wire length on LAYER metal8 = 0 um.
+      Total wire length on LAYER metal9 = 0 um.
+      Total wire length on LAYER metal10 = 0 um.
+    hint: "One layer has no wire at all. Ask what else that layer is needed for."
+    answer: "Routing was restricted to metal2 and above, leaving metal1 alone."
+    wrong:
+      - "This technology has no routing tracks defined on metal1."
+      - "The router failed on metal1 and moved the wires up a layer."
+      - "metal1 wiring is counted under vias rather than wire length."
+    explain: "The platform sets the routing layers, and metal1 is left out because the standard cells' own pins and power rails already occupy it. The wire length concentrates on metal2 and metal3, the lowest layers the router may use."
+    source: drt
+
+  - id: ord-antenna
+    section: reading
+    question: "What do these lines say together?"
+    excerpt: |2-
+      [WARNING GRT-0246] No diode with LEF class CORE ANTENNACELL found.
+      [INFO ANT-0002] Found 0 net violations.
+      [INFO ANT-0001] Found 0 pin violations.
+      [INFO ANT-0002] Found 0 net violations.
+      [INFO ANT-0001] Found 0 pin violations.
+    hint: "Three different messages here: read the warning together with the counts."
+    answer: "No antenna violations were found, and no diode cell exists to fix any."
+    wrong:
+      - "Violations were found and then fixed by inserting diode cells."
+      - "The check could not run, because no diode cell was available."
+      - "The first check found violations and the second one found none."
+    explain: "The warning says the library has no cell of the antenna-diode class, so repair would have nothing to insert. Here it does not matter: the checks report zero net and zero pin violations. The check runs twice because the flow checks before and after attempting repair."
+    source: ant
+
+  - id: ord-tapcell
+    section: reading
+    question: "The flow ran tapcell with -distance 120 on a core of 1162 square microns. Why no tap cells?"
+    excerpt: |2-
+      [INFO TAP-0004] Inserted 48 endcaps.
+      [INFO TAP-0005] Inserted 0 tapcells.
+      Design area 676 um^2 58% utilization.
+    hint: "Compare the tap spacing the flow asked for with the size of this core."
+    answer: "The core is far smaller than 120 microns across, so no tap fits the spacing."
+    wrong:
+      - "The library has no well-tap cell, so only endcaps could be placed."
+      - "Tap cells are only inserted around macros, and this design has none."
+      - "The endcap cells already contain the well taps that the rows need."
+    explain: "A core of 1162 square microns is about 34 microns square, and taps are placed on a checkerboard every 120 microns, so none land inside. The 48 endcaps are a separate insertion that terminates the rows. On a larger die the same command would insert many taps."
+    source: tap
+
+  - id: ord-area-growth
+    section: reading
+    question: "Why did the design area grow between these two stages?"
+    excerpt: |2-
+      Design area 676 um^2 58% utilization.
+
+      Design area 716 um^2 62% utilization.
+    hint: "The first line is after tap insertion, the second after routing. Ask what ran in between."
+    answer: "Cells were added in between: buffers, resized gates, a clock tree."
+    wrong:
+      - "Routing added wires, and wire area counts towards the design area."
+      - "Filler cells were inserted, which count towards the design area."
+      - "The core area shrank, so the same cells now use a larger share."
+    explain: "Design area counts the instances, not the wires, and the stages in between all add or enlarge cells. Between the two lines came placement, repair, clock tree synthesis, and timing repair, all of which add or enlarge cells. Fillers are added after routing, later than the second line."
+    source: rsz
+
+  - id: ord-cts-tree
+    section: reading
+    question: "What did clock tree synthesis build here?"
+    excerpt: |2-
+      [INFO CTS-0007] Net "clk" found for clock "core_clock".
+      [INFO CTS-0010]  Clock net "clk" has 35 sinks.
+      [INFO CTS-0008] TritonCTS found 1 clock nets.
+         ...
+      [INFO CTS-0027] Generating H-Tree topology for net clk.
+      [INFO CTS-0028]  Total number of sinks: 35.
+         ...
+       Level 1
+          Direction: Vertical
+          Sinks per sub-region: 18
+          Sub-region size: 4.1257 X 2.2000
+      [INFO CTS-0034]     Segment length (rounded): 1.
+       Level 2
+          Direction: Horizontal
+          Sinks per sub-region: 9
+          Sub-region size: 2.0629 X 2.2000
+      [INFO CTS-0034]     Segment length (rounded): 1.
+      [INFO CTS-0032]  Stop criterion found. Max number of sinks is 15.
+      [INFO CTS-0035]  Number of sinks covered: 35.
+    hint: "Read the levels: each one splits the sinks and says which way it cuts."
+    answer: "One H-tree over 35 sinks, split twice, from a single buffer type."
+    wrong:
+      - "One tree per sink, 35 in all, each with its own buffer."
+      - "A clock mesh covering 35 sinks, stopping at 15 buffers."
+      - "Two clock trees, one per level, sharing the same 35 sinks."
+    explain: "An H-tree splits the sink region in half at each level, alternating vertical and horizontal, so the path to every leaf is about the same length. Here two levels take 35 sinks down to sub-regions small enough for the stopping rule, which allows at most 15 sinks."
+    source: cts
+
+  # ---------------------------------------------------------------- Coverage additions
+
+  - id: or-write-def
+    section: io
+    command: write_def 5_route.def
+    hint: "Ask what another tool needs in order to see this layout, without OpenROAD."
+    answer: Writes the current layout out for another tool to read.
+    wrong:
+      - Writes the current layout in the tool's own database format.
+      - Writes the netlist of the design as it currently stands.
+      - Writes the layout and the technology together in one file.
+    explain: >-
+      DEF (Design Exchange Format) is the portable form of the layout: the
+      boundary, the rows, where every instance sits, and the routing. The
+      technology it refers to stays in the library files. Between OpenROAD
+      stages the database is used instead, since it carries more.
+    source: odb
+
+  - id: or-write-macro-placement
+    section: floorplan
+    command: write_macro_placement macros.tcl
+    hint: "Ask how you would get exactly these macro positions back in a later run."
+    answer: Writes the macros' positions as commands that place them again.
+    wrong:
+      - Writes the macro placement as a layout file for another tool.
+      - Writes the constraints that the macro placer was given to work with.
+      - Writes a report of how good the macro placement turned out to be.
+    explain: >-
+      Automatic macro placement is not repeatable across tool versions, and a
+      reviewed floorplan should not change under you. Writing the result as
+      `place_macro` commands freezes it, and later runs source the file.
+      `write_pin_placement` does the same for pins.
+    source: mpl
+
+  - id: or-place-tapcells
+    section: floorplan
+    command: place_tapcells -master TAPCELL_X1 -distance 25
+    hint: "Compare it with tapcell, which takes many more options."
+    answer: Inserts only the well taps, every 25 microns, and no endcaps.
+    wrong:
+      - Inserts well taps and endcaps, spaced 25 microns apart.
+      - Places 25 tap cells spread evenly across the placement rows.
+      - Replaces the existing tap cells with ones spaced 25 microns apart.
+    explain: >-
+      `tapcell` does taps, endcaps, and corner cells together from one long
+      list of masters. This narrower command does the tap checkerboard alone,
+      which suits a flow that places its boundary cells with `place_endcaps`.
+    source: tap
+
+  - id: or-add-pdn-ring
+    section: pdn
+    command: add_pdn_ring -grid main_grid -layers {metal6 metal7} -widths 5.0 -spacings 3.0 -core_offsets 5
+    hint: "Two layers are given because a ring has to go in both directions."
+    answer: Puts a supply ring around the grid, 5 microns outside the core.
+    wrong:
+      - Puts a ring around every macro in the grid, 5 microns clear of it.
+      - Adds straps on metal6 and metal7 across the core, 5 microns wide.
+      - Puts a ring around the die, between the core and the pad row.
+    explain: >-
+      The horizontal layer carries the pairs above and below, the vertical
+      layer the pairs left and right, so the four together form the ring. The
+      straps inside are extended to meet it, which is how current gets from the
+      ring into the grid.
+    source: pdn
+
+  - id: or-remove-fillers
+    section: placement
+    command: remove_fillers
+    hint: "Ask what would block a later step that needs an empty site."
+    answer: Removes the filler cells, freeing the gaps in the rows again.
+    wrong:
+      - Removes the cells that the placer could not legalize.
+      - Removes the fillers that overlap other cells in the rows.
+      - Removes the tap and endcap cells along with the fillers.
+    explain: >-
+      Fillers occupy every free site, so anything that wants to insert or move
+      a cell must clear them first. A flow removes them, makes its change, and
+      fills again, which is why filler insertion is late in the flow.
+    source: dpl
+
+  - id: or-insert-buffer
+    section: optimization
+    command: insert_buffer -buffer_cell BUF_X4 -net n42 -location {100 200}
+    hint: "Every other repair command decides for itself where buffers go."
+    answer: Inserts one buffer of that cell on net n42, at the given point.
+    wrong:
+      - Inserts buffers on net n42 wherever the design rules require them.
+      - Replaces the driver of net n42 with a BUF_X4 of the same strength.
+      - Marks net n42 so later repair steps buffer it with BUF_X4 cells.
+    explain: >-
+      It is the manual escape hatch, for a net that repair keeps getting wrong
+      or an experiment. `-load_pins` chooses which loads move behind the new
+      buffer, so the net can be split deliberately.
+    source: rsz
+
+  - id: or-set-opt-config
+    section: optimization
+    command: set_opt_config -limit_sizing_area 1.2
+    hint: "It changes nothing by itself. Ask what obeys it afterwards."
+    answer: Limits what later repair commands may do, here the area sizing may add.
+    wrong:
+      - Resizes the design now, until its area has grown by 1.2 times.
+      - Limits the area of any single cell that sizing may choose.
+      - Sets the utilization that placement and repair aim to reach.
+    explain: >-
+      The repair commands would otherwise trade as much area, leakage, or
+      site change as they need. The configuration bounds them, with limits on
+      sizing area and leakage and flags to keep the site or the threshold
+      voltage. `report_opt_config` prints it and `reset_opt_config` clears it.
+    source: rsz
+
+  - id: pad-place-pad-single
+    section: pads
+    command: place_pad -master PAD_GPIO -row IO_SOUTH -location 120.0 u_reset
+    hint: "Compare it with place_pads, which takes a list and spreads them out."
+    answer: Places one pad at a given offset along the named row.
+    wrong:
+      - Places one pad 120 microns from the pad it follows in the row.
+      - Places the pad at the coordinates 120, 0 on the die.
+      - Adds a pad of that master to the row and lets the tool place it.
+    explain: >-
+      The offset is measured along the row, so the pad lands where the package
+      needs it. Manual placement is used for pads whose position is fixed by
+      the package, with `place_pads` filling in the rest.
+    source: pad
+
+  - id: pad-place-io-terminals
+    section: pads
+    command: place_io_terminals u_pad_*/PAD
+    hint: "A pad cell is an instance; ask what the outside world connects to."
+    answer: Creates the block's terminals on those pad instance pins.
+    wrong:
+      - Places the pad instances whose pins are named PAD in the rows.
+      - Connects the pad pins to the core logic that drives them.
+      - Creates the bumps that sit above those pad instance pins.
+    explain: >-
+      The terminal is the point where the design's port exists physically, on
+      the pad's own pin rather than at the core boundary. Bumps and bond pads
+      then attach to those terminals.
+    source: pad
+
+  - id: upf-voltage-domain
+    section: power-intent
+    command: create_voltage_domain PD_CORE -area {10 10 200 200}
+    hint: "Compare it with the power domain, which names logic rather than area."
+    answer: Creates a named region of the die that a supply can be built over.
+    wrong:
+      - Creates a power domain from the logic inside that region.
+      - Sets the voltage that the region named PD_CORE runs at.
+      - Builds the power grid that covers the region PD_CORE.
+    explain: >-
+      A power domain is a set of modules; a voltage domain is the area they
+      occupy. The grid generator needs the area, since the region must exist
+      before `set_voltage_domain` names its power and ground nets and
+      `define_pdn_grid` builds a grid over it.
+    source: pdn
+
+  # ---------------------------------------------------------------- Put in order
+
+  - id: or-order-flow
+    section: floorplan
+    style: order
+    question: Put these commands in the order a flow calls them.
+    hint: "Each one needs something the one before it created."
+    items:
+      - initialize_floorplan
+      - pdngen
+      - global_placement
+      - clock_tree_synthesis
+      - detailed_route
+    explain: >-
+      Rows and a core area come first, then the grid, which must exist before
+      cells are placed over it. The clock tree needs the registers placed, and
+      routing needs the tree. Running these out of order does not usually fail
+      cleanly; it produces a worse result.
+    source: ifp
+
+  - id: or-order-inputs
+    section: io
+    style: order
+    question: Put these reads in the order a session must perform them.
+    hint: "One kind of file describes the layers that another kind of file uses."
+    items:
+      - read_lef platform.tech.lef
+      - read_lef platform.macro.lef
+      - read_verilog gcd.v
+      - link_design gcd
+      - read_spef gcd.spef
+    explain: >-
+      The technology file defines the layers and vias that the cell abstracts
+      refer to, so it is read first. The netlist names cells from those
+      abstracts, linking turns it into a design, and parasitics can only be
+      annotated onto nets that exist.
+    source: odb
+
+  - id: or-order-repair
+    section: optimization
+    style: order
+    question: Put these repairs in the order the flow performs them.
+    hint: "One of them adds delay, so it cannot go first; one of them cleans up after the rest."
+    items:
+      - repair_design
+      - repair_timing -setup
+      - repair_timing -hold
+      - detailed_placement
+    explain: >-
+      Design rules are fixed first, since a pin over its transition limit makes
+      every timing number unreliable. Setup comes before hold, because hold
+      fixes add delay and would otherwise be undone. Everything here inserts
+      and resizes cells, so the row has to be legalized afterwards.
+    source: rsz
+
+  # ---------------------------------------------------------------- Name the command
+
+  - id: or-rev-floorplan
+    section: floorplan
+    style: reverse
+    prompt: >-
+      You have a netlist and a die size, and you need a core area with rows and
+      tracks in it before anything can be placed.
+    hint: "Three of these need the thing the fourth one creates."
+    answer: initialize_floorplan -utilization 45 -aspect_ratio 1.0
+    wrong:
+      - place_pins -hor_layers metal3 -ver_layers metal2
+      - insert_tapcells -distance 20 -tapcell_master TAPCELL_X1
+      - global_placement -density 0.6
+    explain: >-
+      The command creates the core, the rows, and the routing tracks, either
+      from a target utilization as here or from an explicit die area, plus the
+      site the rows are built from. Pins, taps, and placement all need those
+      rows. A design read from a layout file already has them.
+    source: ifp
+
+  - id: or-rev-pdngen
+    section: pdn
+    style: reverse
+    prompt: >-
+      The floorplan exists and you need rings and straps built on the upper
+      layers and dropped onto the standard cell rails.
+    hint: "One of these builds the grid; one only measures it afterwards."
+    answer: pdngen
+    wrong:
+      - analyze_power_grid -net VDD
+      - add_global_connection -net VDD -pin_pattern VDD -power
+      - insert_tapcells -distance 20
+    explain: >-
+      The generator builds the grid from a definition written beforehand.
+      Global connections tell the tool which pins belong to which supply, which
+      is a prerequisite rather than the builder, and the analysis command
+      measures the voltage drop on a grid that already exists.
+    source: pdn
+
+  - id: or-rev-extract
+    section: parasitics
+    style: reverse
+    prompt: >-
+      The design is routed and you need resistance and capacitance for every
+      net, taken from the real geometry, without leaving the tool.
+    hint: "Two of these move parasitics in or out; only one computes them."
+    answer: extract_parasitics
+    wrong:
+      - estimate_parasitics -placement
+      - read_spef gcd.spef
+      - write_spef gcd.spef
+    explain: >-
+      Extraction reads the routed shapes and the layer rules and produces the
+      network. Estimation is the pre-route stand-in based on distance, reading
+      brings in someone else's numbers, and writing exports what the tool
+      already holds.
+    source: est

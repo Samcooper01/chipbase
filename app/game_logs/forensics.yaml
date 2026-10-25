@@ -1,0 +1,1306 @@
+# Log forensics: real failures, manufactured on purpose.
+#
+# Every excerpt is the tail of an actual run of the gcd design on Nangate45 in
+# the openroad/orfs container (OpenROAD 26Q3), broken one way at a time with a
+# single make override or an edited constraints file. Nothing here is written
+# by hand: the wording, the message codes, and the line numbers are the tools'
+# own. See forensics_scope.md for how each case was produced.
+
+game: log-forensics
+title: Log forensics
+reference: https://openroad.readthedocs.io/en/latest/main/README.html
+basis:
+  tool: OpenROAD-flow-scripts
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts
+  tag: real runs, broken on purpose
+  doc_title: the OpenROAD documentation
+  note: >-
+    Each case is the tail of a real run of the gcd design on Nangate45 in the
+    openroad/orfs container, with one thing wrong. The same failures happen on
+    commercial tools in different words: what carries across is the reasoning
+    from the last few lines back to the cause.
+
+groups:
+  - id: inputs
+    title: What the tools were told
+    blurb: The run stops, or goes quietly wrong, because of something you wrote before it started.
+  - id: building
+    title: Building the design
+    blurb: A stage cannot do its work, or does it and leaves something worth noticing.
+  - id: judging
+    title: Judging the result
+    blurb: The run finished. Now the numbers and the checks decide whether it counts.
+  - id: machine
+    title: Not the design at all
+    blurb: Failures of the machine the job ran on, which often say nothing about themselves.
+
+sections:
+  - id: setup
+    group: inputs
+    title: Files and configuration
+    blurb: The run stops before any real work, because something it was told to read is not there.
+    kinds: [missing file, wrong site, bad path]
+  - id: synthesis
+    group: building
+    title: Synthesis
+    blurb: The netlist cannot be built from the source it was given.
+    kinds: [undefined module, inferred latch, mapping]
+  - id: constraints
+    group: inputs
+    title: Constraints
+    blurb: The constraints file loads but does not say what the author thought it said.
+    kinds: [no clock, pattern matches nothing, unconstrained ports]
+  - id: placement
+    group: building
+    title: Floorplan and placement
+    blurb: There is not enough room, or what is there cannot be legalized.
+    kinds: [utilization, density, legalization]
+  - id: cts
+    group: building
+    title: Clock tree
+    blurb: The tree cannot be built from the cells it was given.
+    kinds: [no buffers, skew, insertion delay]
+  - id: timing
+    group: judging
+    title: Timing closure
+    blurb: The run finishes and the numbers are the warning.
+    kinds: [setup, hold, repair gave up]
+  - id: routing
+    group: building
+    title: Routing
+    blurb: The wires have to fit, and what the router reports on the way needs reading.
+    kinds: [congestion, violations, antenna]
+
+  - id: signoff
+    group: judging
+    title: Sign-off checks
+    blurb: Geometry, connectivity, and voltage drop, each with its own way of being unhelpful.
+    kinds: [design rules, layout versus schematic, voltage drop]
+  - id: infra
+    group: machine
+    title: The machine, not the design
+    blurb: Failures that have nothing to do with the chip, and often say so badly.
+    kinds: [disk, memory, time, permissions]
+
+cards:
+
+  - id: lf-missing-lib
+    section: setup
+    stage: 1_1_yosys_canonicalize
+    question: The run stopped here, one second in. What is the cause?
+    hint: "Read what make says it was trying to build, and what needed it."
+    answer: A file the flow was told to read does not exist.
+    wrong:
+      - A synthesis step is missing from the makefile.
+      - The results directory has not been created yet.
+      - The library exists but the flow has no rule for reading it.
+    explain: >-
+      Make treats every input as either a file on disk or something it knows how
+      to build. A path that is neither produces this message, and it names both
+      the missing path and the thing that wanted it. The stage named is not at
+      fault: it is simply the first one that needed the file.
+    fix: |-
+      LIB_FILES = $(PLATFORM_DIR)/lib/NangateOpenCellLibrary_typical.lib
+    source: ""
+    excerpt: |2-
+      make: *** No rule to make target '/nonexistent/none.lib', needed by 'results/nangate45/gcd/bad_lib/1_1_yosys_canonicalize.rtlil'.  Stop.
+
+  - id: lf-missing-techlef
+    section: setup
+    stage: 1_synth
+    question: Synthesis finished and then the run stopped. What happened?
+    hint: "Compare the stage that finished with the file make was looking for."
+    answer: The technology file the next stage needs is missing.
+    wrong:
+      - Synthesis failed to write a netlist, so nothing can follow it.
+      - The netlist names cells that the technology file does not contain.
+      - The database written by synthesis is corrupt and cannot be read.
+    explain: >-
+      Synthesis completed: its statistics and its output file are in the log
+      above the error. The failure belongs to the step that turns that netlist
+      into a database, which needs the layers and sites the technology file
+      defines. A missing input is reported when it is first needed, not when it
+      was configured, which is why the stage that stops is rarely the culprit.
+    fix: |-
+      TECH_LEF = $(PLATFORM_DIR)/lef/NangateOpenCellLibrary.tech.lef
+    source: ""
+    excerpt: |2-
+      Time spent: 47% 1x abc (0 sec), 8% 21x opt_clean (0 sec), ...
+      Elapsed time: 0:00.33[h:]min:sec. CPU time: user 0.28 sys 0.05 (99%). Peak memory: 45056KB.
+      Log                       Ext     Elapsed/s Peak Memory/MB sha1sum result [0:20)
+      1_2_yosys                 .v              0             44 756ad24f74de658d5044
+      cp /OpenROAD-flow-scripts/flow/designs/nangate45/gcd/constraint.sdc ./results/nangate45/gcd/bad_techlef/1_2_yosys.sdc
+      make: *** No rule to make target '/nonexistent/none.tech.lef', needed by 'results/nangate45/gcd/bad_techlef/1_synth.odb'.  Stop.
+
+  - id: lf-bad-site
+    section: setup
+    stage: 2_1_floorplan
+    question: What is the cause, and what does it say about the configuration?
+    hint: "The message names something it looked for. Where would that be defined?"
+    answer: The site the rows are built from is not defined in the technology file.
+    wrong:
+      - The utilization is too high for the die area that was given.
+      - The design has no rows, because the floorplan was never initialized.
+      - The library and the technology file are from different processes.
+    explain: >-
+      A site is the unit cell of a placement row, and the floorplan needs one by
+      name before it can build rows at all. The name comes from the platform
+      configuration and has to match a `SITE` in the technology file exactly.
+      The line above shows the die area was already worked out, so everything
+      before this was fine.
+    fix: |-
+      PLACE_SITE = FreePDK45_38x28_10R_NP_162NW_34O
+    source: ifp
+    excerpt: |2-
+
+      ==========================================================================
+      Floorplan check_setup
+      --------------------------------------------------------------------------
+      number instances in verilog is 521
+      [INFO IFP-0107] Defining die area using utilization: 55.00% and aspect ratio: 1.
+      [ERROR IFP-0018] Unable to find site: NOSUCHSITE
+      Error: floorplan.tcl, 91 IFP-0018
+      Elapsed time: 0:00.24[h:]min:sec. CPU time: user 0.21 sys 0.04 (104%). Peak memory: 114796KB.
+
+  - id: lf-sdc-clock-missing
+    section: constraints
+    stage: 1_synth
+    question: The constraints have just been read. What do these warnings mean?
+    hint: "Ask what kind of command names a clock without creating one."
+    answer: Later constraints name a clock that was never created.
+    wrong:
+      - The clock's name does not match the port it is defined on.
+      - The constraints were read before the design was linked.
+      - The clock exists but has no source pin to propagate from.
+    explain: >-
+      Latency, uncertainty, and the port delays all refer to a clock by name,
+      and each one warns separately when that name is unknown. They are
+      warnings, not errors, so the run carries on and the consequences appear
+      several stages later. This is the earliest point at which the mistake is
+      visible.
+    fix: |-
+      create_clock -name core_clock -period 0.46 [get_ports clk]
+    source: ""
+    excerpt: |2-
+      read_sdc ./results/nangate45/gcd/no_clock/1_2_yosys.sdc
+      [WARNING STA-0351] clock 'core_clock' not found.
+      [WARNING STA-0351] clock 'vclk_core_clock' not found.
+      [WARNING STA-0138] clock arg 'vclk_core_clock' clock not found.
+      [WARNING STA-0138] clock arg 'vclk_core_clock' clock not found.
+
+  - id: lf-unclocked-registers
+    section: constraints
+    stage: 2_1_floorplan
+    question: The run is carrying on from here. What will the timing reports look like?
+    hint: "Ask what a timing check needs at both ends of a path."
+    answer: Empty and perfect, because almost nothing is being checked.
+    wrong:
+      - Failing everywhere, because the registers have no clock to capture on.
+      - Normal, since the clock is only propagated later in the flow.
+      - Missing, since the timer will refuse to run without a clock.
+    explain: >-
+      An unclocked register pin has no clock defined on it, so no path through
+      it can be timed, and an unconstrained endpoint is one nothing checks.
+      Worst negative slack then comes back as zero and the run looks like its
+      best ever. A clean run reports neither of these lines, which is why this
+      check is printed at the start of the floorplan.
+    fix: |-
+      check_setup
+      report_checks -unconstrained
+    source: ""
+    excerpt: |2-
+      ==========================================================================
+      Floorplan check_setup
+      --------------------------------------------------------------------------
+      Warning: There are 35 unclocked register/latch pins.
+      Warning: There are 53 unconstrained endpoints.
+      number instances in verilog is 521
+
+  - id: lf-cts-no-nets
+    section: cts
+    stage: 3_1_cts
+    question: Clock tree synthesis just ran. What happened, and what does it cost?
+    hint: "The buffers were chosen. Ask what they were going to be used on."
+    answer: There was no clock to build a tree from, so the clock stays unbuffered.
+    wrong:
+      - The clock buffers are excluded from the library, so no tree was built.
+      - The clock net was already balanced, so nothing needed inserting.
+      - The clock is marked ideal, so the tree is built later during routing.
+    explain: >-
+      The tool picked its buffers, looked for nets driven by a defined clock,
+      and found none. It reports this as a warning and exits cleanly, so the
+      run continues to routing with the clock driven by whatever the netlist
+      had. Everything downstream, from skew to hold repair, is then meaningless.
+    fix: |-
+      # the clock has to exist before this stage
+      create_clock -name core_clock -period 0.46 [get_ports clk]
+    source: cts
+    excerpt: |2-
+      clock_tree_synthesis -sink_clustering_enable -repair_clock_nets
+      [INFO CTS-0050] Root buffer is CLKBUF_X3.
+      [INFO CTS-0051] Sink buffer is CLKBUF_X3.
+      [INFO CTS-0052] The following clock buffers will be used for CTS:
+                          CLKBUF_X3
+      [INFO CTS-0049] Characterization buffer is CLKBUF_X3.
+      [WARNING CTS-0083] No clock nets have been found.
+      [INFO CTS-0008] TritonCTS found 0 clock nets.
+      [WARNING CTS-0082] No valid clock nets in the design.
+      [INFO CTS-0500] Runtime: 0.42s
+
+  - id: lf-repair-fills-rows
+    section: placement
+    stage: 5_1_grt
+    question: Placement failed on three instances. What is the real cause?
+    hint: "Compare the utilization here with the 55 percent the floorplan was built for."
+    answer: Timing repair grew the netlist until the rows were full.
+    wrong:
+      - The die is too small for the netlist that synthesis produced.
+      - Three instances are fixed, and they block the rows around them.
+      - The legalizer's search distance is too small to find a free site.
+    explain: >-
+      The rows were built for 55 percent utilization and this run is at 98.4
+      percent, against about 61 percent on a healthy run of the same design.
+      Nothing added that area except repair, which buffers and upsizes until it
+      meets the constraint or runs out of room. The three instances named are
+      where it finally failed, not why. Follow the utilization back through the
+      log and the cause is a clock period nothing could meet.
+    fix: |-
+      # either give repair a reachable target
+      create_clock -name core_clock -period 0.46 [get_ports clk]
+      # or give it room to work in
+      export CORE_UTILIZATION = 40
+    source: dpl
+    excerpt: |2-
+      global_route -start_incremental
+      detailed_placement
+      [INFO DPL-0006] Core area: 1161.89 um^2, Instances area: 1143.27 um^2, Utilization: 98.4%
+      [INFO DPL-0005] Diamond search max displacement: +/- 500 sites horizontally, +/- 100 rows vertically.
+      [INFO DPL-1101] Legalizing using diamond search.
+      Movements Summary
+      ---------------------------------------
+      Total cells:                     730
+      Diamond Move Success:            727 ( 99.59%)
+      Diamond Move Failure:              3
+      Rip-up and replace Success:        0 (  0.00% of diamond failures)
+      Rip-up and replace Failure:        3
+      Total Placement Failures:          3
+      ---------------------------------------
+      [INFO DPL-0034] Detailed placement failed on the following 3 instances:
+      [INFO DPL-0035]  dpath.a_reg.out[0]$_DFFE_PP_
+      [INFO DPL-0035]  rebuffer312
+      [INFO DPL-0035]  dpath.b_reg.out[0]$_DFFE_PP_
+      [ERROR DPL-0036] Detailed placement failed inside DPL.
+      Error: global_route.tcl, 150 DPL-0036
+      Elapsed time: 0:27.08[h:]min:sec. CPU time: user 419.61 sys 0.93 (1552%). Peak memory: 294840KB.
+      make[1]: *** [Makefile:548: do-5_1_grt] Error 1
+      make: *** [Makefile:548: results/nangate45/gcd/fast_clock/5_1_grt.odb] Error 2
+
+  - id: lf-no-diode-cell
+    section: routing
+    stage: 5_2_route
+    question: This run finished cleanly. Is there anything here to act on?
+    hint: "Read the first line, then ask how the two lines under it were able to say zero."
+    answer: "Yes: antenna repair has no diode to insert, so it fixes nothing."
+    wrong:
+      - "No: the two lines below report no violations, so the warning is moot."
+      - "No: diodes are inserted during detailed routing, not here."
+      - "Yes: the library is missing, which is why no cell was found."
+    explain: >-
+      The tool looked for a cell of the antenna class and found none, so the
+      repair step is doing nothing. On this design nothing was violating, so it
+      cost nothing. On a design that does violate, the same warning means the
+      violations stay and are found much later, at sign-off. A warning in a
+      clean run is worth reading precisely because nothing failed.
+    fix: |-
+      # name a diode from the platform so repair has something to insert
+      export ANTENNA_CELL_NAME = ANTENNA_X1
+    source: grt
+    excerpt: |2-
+      global_route -end_incremental -congestion_report_file ./reports/nangate45/gcd/good/congestion_post_recover_power.rpt
+      Repair antennas...
+      [WARNING GRT-0246] No diode with LEF class CORE ANTENNACELL found.
+      [INFO ANT-0002] Found 0 net violations.
+      [INFO ANT-0001] Found 0 pin violations.
+      Estimate parasitics...
+
+  - id: lf-hold-repair-stalls
+    section: timing
+    stage: 4_1_cts
+    question: Hold repair ran to its last iteration. What is this table telling you?
+    hint: "Compare the first row's numbers with the last row's, and watch the area column."
+    answer: Repair is buying almost nothing for the area it is spending.
+    wrong:
+      - Repair is converging, and needs more iterations to finish.
+      - The buffers being inserted are too small for the paths that fail.
+      - Setup repair keeps undoing the fixes hold repair makes.
+    explain: >-
+      Thirty iterations recovered 0.014 nanoseconds of the 0.186 that was
+      failing, and spent 3.7 percent more area doing it. That shape means the
+      requirement is not reachable by buffering, so the answer is upstream: on
+      this run, 0.30 nanoseconds of hold uncertainty had been added to the
+      constraints, which is far more than any insertion can absorb. A healthy
+      run of this design reports no hold violations at all.
+    fix: |-
+      # uncertainty should reflect jitter and the timer's margin, not a guess
+      set_clock_uncertainty -hold 0.03 [get_clocks core_clock]
+    source: rsz
+    excerpt: |2-
+      [INFO RSZ-0046] Found 35 endpoints with hold violations.
+      Iteration | Resized | Buffers | Cloned Gates |   Area   |   WNS   |   TNS   | Endpoint
+      --------------------------------------------------------------------------------------
+              0 |       0 |       0 |            0 |    +0.0% |  -0.186 |  -5.960 | dpath.b_reg.out[9]$_DFFE_PP_/D
+             10 |       0 |      15 |            0 |    +1.7% |  -0.180 |  -5.704 | dpath.b_reg.out[3]$_DFFE_PP_/D
+             20 |       0 |       1 |            0 |    +3.0% |  -0.172 |  -5.567 | dpath.b_reg.out[1]$_DFFE_PP_/D
+             30 |       0 |       0 |            0 |    +3.5% |  -0.172 |  -5.481 | dpath.b_reg.out[1]$_DFFE_PP_/D
+          final |       0 |       0 |            0 |    +3.7% |  -0.172 |  -5.434 | dpath.b_reg.out[1]$_DFFE_PP_/D
+      --------------------------------------------------------------------------------------
+      [WARNING RSZ-0066] Unable to repair all hold violations.
+
+  - id: lf-missing-io-delays
+    section: constraints
+    stage: 2_1_floorplan
+    question: The clock is fine and the run continues. What is not being checked?
+    hint: "Count the ports named, and ask what a path from a port needs before it can be timed."
+    answer: Every path that starts or ends at a port.
+    wrong:
+      - Every path that starts or ends at a register.
+      - The 18 endpoints listed, which are unconnected outputs.
+      - "Nothing yet: port delays are applied later, at sign-off."
+    explain: >-
+      A port has no arrival time of its own, so without an input delay the
+      timer has nothing to start from, and without an output delay nothing to
+      finish against. Those paths simply vanish from the reports. The interface
+      is usually the tightest part of a block, so this is a comfortable way to
+      close timing on a design that will fail in the system.
+    fix: |-
+      set_input_delay  [expr 0.2 * $clk_period] -clock $clk [all_inputs -no_clocks]
+      set_output_delay [expr 0.2 * $clk_period] -clock $clk [all_outputs]
+    source: ""
+    excerpt: |2-
+
+      ==========================================================================
+      Floorplan check_setup
+      --------------------------------------------------------------------------
+      Warning: There are 35 input ports missing set_input_delay.
+      Warning: There are 18 output ports missing set_output_delay.
+      Warning: There are 18 unconstrained endpoints.
+      number instances in verilog is 521
+
+  - id: lf-place-density
+    section: placement
+    stage: 3_1_place_gp_skip_io
+    question: Placement stopped before it started. What does this mean?
+    hint: "The number it complains about is computed, not something you set directly."
+    answer: The target density works out above one, which is not a thing.
+    wrong:
+      - The variable it names was set above one in the configuration.
+      - The placer filled every row and stopped where it ran out.
+      - Fixed macros leave too little free area for the cells.
+    explain: >-
+      The placer works to a density target built from the design's utilization
+      plus an allowance. Ask for 95 percent utilization and add the allowance
+      and the target passes one, meaning the cells would have to overlap. The
+      run stops before placing anything, which is the useful behaviour: the
+      floorplan is what needs changing.
+    fix: |-
+      export CORE_UTILIZATION = 55
+      export PLACE_DENSITY_LB_ADDON = 0.20
+    source: gpl
+    excerpt: |2-
+      read_sdc ./results/nangate45/gcd/tiny_die/2_floorplan.sdc
+      source /OpenROAD-flow-scripts/flow/platforms/nangate45/setRC.tcl
+      [INFO GPL-0022] Initialize gpl and calculate uniform density.
+      [ERROR FLW-0024] Place density exceeds 1.0 (current PLACE_DENSITY_LB_ADDON =  0.20). Please check if the value of  PLACE_DENSITY_LB_ADDON is between 0 and 0.99.
+      Error: global_place_skip_io.tcl, 19 FLW-0024
+      Elapsed time: 0:00.43[h:]min:sec. CPU time: user 4.28 sys 0.04 (1013%). Peak memory: 116140KB.
+      make[1]: *** [Makefile:458: do-3_1_place_gp_skip_io] Error 1
+      make: *** [Makefile:458: results/nangate45/gcd/tiny_die/3_1_place_gp_skip_io.odb] Error 2
+
+  - id: lf-abc-status
+    section: setup
+    stage: 1_2_yosys
+    question: The mapper failed with a status code and nothing else. What do you do?
+    hint: "The tool says nothing useful, so read the line that invoked it."
+    answer: Read the command above it, which lists what was excluded.
+    wrong:
+      - Rerun the stage, since mapper failures are usually transient.
+      - Raise the effort, since the mapper ran out of time.
+      - Check the Verilog, since the design failed to elaborate.
+    explain: >-
+      A bare status code carries no information, so the next move is to read
+      what the tool was asked to do. The command line here excludes every
+      buffer and clock buffer in the library, which leaves the mapper unable to
+      finish. Passes before it completed normally, so the netlist itself is
+      fine. Reading the invocation is the habit worth keeping.
+    fix: |-
+      # keep the buffers the mapper and every later stage need
+      export DONT_USE_CELLS = AOI211_X1 OAI211_X1
+    source: ""
+    excerpt: |2-
+      10. Executing ABC pass (technology mapping using ABC).
+      10.1. Extracting gate netlist of module `\gcd' to `<abc-temp-dir>/input.blif'..
+      ERROR: ABC failed with status 8B
+      Elapsed time: 0:00.37[h:]min:sec. CPU time: user 0.24 sys 0.06 (81%). Peak memory: 42496KB.
+      make[1]: *** [Makefile:266: do-yosys] Error 1
+      make: *** [Makefile:277: results/nangate45/gcd/no_buffers/1_2_yosys.v] Error 2
+
+  - id: lf-undefined-module
+    section: synthesis
+    stage: 1_1_yosys_canonicalize
+    question: What is the cause, and where do you look for it?
+    hint: "The message names three things. Ask which of them is the one that does not exist."
+    answer: A module is instantiated that no source file defines.
+    wrong:
+      - A module is defined twice, so the hierarchy cannot be resolved.
+      - A module is missing a port that its instance connects to.
+      - The file holding the module was read after the module that uses it.
+    explain: >-
+      The hierarchy check walks from the top down and stops at the first
+      instance whose module it cannot find. It names the missing module, the
+      module that instantiates it, and the instance, which is everything needed
+      to find the line. The usual causes are a file left out of the file list,
+      a typo, and a cell that should have been declared a black box.
+    fix: |-
+      # add the file that defines it, or declare it a black box
+      (* blackbox *) module missing_helper (input clk); endmodule
+    source: ""
+    excerpt: |2-
+      6.12. Analyzing design hierarchy..
+      ERROR: Module `\missing_helper' referenced in module `\Subtractor_0x422b1f52edd46a85' in cell `\u_helper' is not part of the design.
+      Elapsed time: 0:00.09[h:]min:sec. CPU time: user 0.07 sys 0.02 (99%). Peak memory: 38144KB.
+      make[1]: *** [Makefile:271: do-yosys-canonicalize] Error 1
+      make: *** [Makefile:274: results/nangate45/gcd/undef_module/1_1_yosys_canonicalize.rtlil] Error 2
+
+  - id: lf-wrong-design-name
+    section: setup
+    stage: 1_1_yosys_canonicalize
+    question: The design's files have not moved. Why is this path being looked for?
+    hint: "Compare the directory in the path with the design you meant to run."
+    answer: The design's name is used to build the path, and it is wrong.
+    wrong:
+      - The source file was deleted or renamed after the last run.
+      - The design is configured for another platform's directory.
+      - The file list names a directory that the flow does not search.
+    explain: >-
+      The same message as a missing library, from a different cause. The name
+      is substituted into the source directory, the results directory, and the
+      top module, so one typo makes the flow look in a directory that never
+      existed. Reading which part of the path looks wrong is faster than
+      checking whether the file is there.
+    fix: |-
+      export DESIGN_NAME = gcd
+    source: ""
+    excerpt: |2-
+      make: *** No rule to make target '/OpenROAD-flow-scripts/flow/designs/src/not_gcd/gcd.v', needed by 'results/nangate45/not_gcd/wrong_top/1_1_yosys_canonicalize.rtlil'.  Stop.
+
+  - id: lf-clock-on-nothing
+    section: constraints
+    stage: 1_synth
+    question: The constraints do create a clock. What has this warning cost?
+    hint: "Ask what `create_clock` does when the object list it is given is empty."
+    answer: The clock was created on nothing, so it clocks nothing.
+    wrong:
+      - The clock was created on the wrong port, so the timing is shifted.
+      - The port exists but is not yet in the database at this stage.
+      - "Nothing: the warning is about a port, not about the clock."
+    explain: >-
+      A port query that matches nothing returns an empty list, and creating a
+      clock on an empty list is legal: it makes a virtual clock. The
+      constraints file looks right, the clock is defined, and not one register
+      is clocked. One warning line, among the normal output of reading the
+      constraints, is the whole of the evidence.
+    fix: |-
+      set clk_port_name clk
+    source: ""
+    excerpt: |2-
+      link_design gcd
+      read_sdc ./results/nangate45/gcd/bad_port/1_2_yosys.sdc
+      [WARNING STA-0366] port 'nosuchport' not found.
+      source /OpenROAD-flow-scripts/flow/platforms/nangate45/setRC.tcl
+      eliminate_dead_logic
+      Removed 0 unused instances and 0 unused nets.
+
+  - id: lf-two-virtual-clocks
+    section: constraints
+    stage: 4_1_cts
+    question: Two clocks report the same thing. Which one is the problem?
+    hint: "One of these two clocks is meant to be virtual. Ask which, and why."
+    answer: The core clock, since only the interface one should be virtual.
+    wrong:
+      - Both are problems, since no clock should ever be virtual.
+      - The interface clock, which should have been created on the port.
+      - "Neither: a virtual clock is normal before the tree is built."
+    explain: >-
+      A constraints file usually defines a second, source-less clock for the
+      port delays, so the message about it is expected. The same message about
+      the clock that should drive the registers means it never found its port.
+      Reading warnings is often like this: the line is not new, the name in it
+      is.
+    fix: |-
+      create_clock -name core_clock -period 0.46 [get_ports clk]
+      create_clock -name vclk_core_clock -period 0.46
+    source: ""
+    excerpt: |2-
+      [INFO GRT-0014] Routed nets: 612
+      [INFO GRT-0303] Global routing runtime = 00:00:00
+      [WARNING STA-0450] virtual clock core_clock can not be propagated.
+      [WARNING STA-0450] virtual clock vclk_core_clock can not be propagated.
+      estimate_parasitics -global_routing
+      Perform buffer insertion and gate resizing...
+
+  - id: lf-implicit-signal
+    section: synthesis
+    stage: 1_1_yosys_canonicalize
+    question: The run completed after this. What has it silently built?
+    hint: "Ask what width a signal gets when nothing declares it."
+    answer: A one-bit wire where a sixteen-bit one was meant.
+    wrong:
+      - A sixteen-bit wire, left unconnected because nothing drives it.
+      - "Nothing: the signals are declared in the module above this one."
+      - A constant, since the tool could not resolve the range.
+    explain: >-
+      Verilog lets an undeclared identifier become an implicit one-bit wire, so
+      a misspelled name never stops the run. The third line is the consequence:
+      the range select cannot fit, so the bits become undefined. This is the
+      kind of warning that is worth failing a build on, because everything
+      downstream is built on it and none of it complains again.
+    fix: |-
+      // declare what you use, and fail the build on implicit declarations
+      wire [15:0] req_msg;
+    source: ""
+    excerpt: |2-
+      6.5. Executing AST frontend in derive mode using pre-parsed AST for module `\RegRst_0x9f365fdf6c8998a'.
+      6.6. Executing AST frontend in derive mode using pre-parsed AST for module `\RegEn_0x68db79c4ec1d6e5b'.
+      6.7. Executing AST frontend in derive mode using pre-parsed AST for module `\Subtractor_0x422b1f52edd46a85'.
+      /tmp/rtl/gcd_latch.v:760: Warning: Identifier `\req_val' is implicitly declared.
+      /tmp/rtl/gcd_latch.v:760: Warning: Identifier `\req_msg' is implicitly declared.
+      /tmp/rtl/gcd_latch.v:760: Warning: Range select [15:0] out of bounds on signal `\req_msg': Setting all 16 result bits to undef.
+      6.8. Executing AST frontend in derive mode using pre-parsed AST for module `\Mux_0xdd6473406d1a99a'.
+
+  - id: lf-cts-no-master
+    section: cts
+    stage: 4_1_cts
+    question: What is wrong, and where was it decided?
+    hint: "The name in the message also appears in the command above it."
+    answer: The buffer list names a cell the library does not contain.
+    wrong:
+      - The library was not read before the clock tree stage.
+      - The buffer exists in the library but not in the layout view.
+      - No buffer was given, so the tool had nothing to build with.
+    explain: >-
+      The buffer list overrides the tool's own choice, and nothing checks the
+      names until they are needed. The command line is printed directly above
+      the error, which is where to read the name from. The same failure follows
+      a library swap, when the new library spells its buffers differently.
+    fix: |-
+      export CTS_BUF_LIST = CLKBUF_X1 CLKBUF_X2 CLKBUF_X3
+    source: cts
+    excerpt: |2-
+      clock_tree_synthesis -sink_clustering_enable -repair_clock_nets -buf_list NOSUCHBUF_X1
+      [ERROR CTS-0126] No physical master cell found for buffer NOSUCHBUF_X1.
+      Error: cts.tcl, 36 CTS-0126
+      Elapsed time: 0:00.23[h:]min:sec. CPU time: user 0.19 sys 0.05 (100%). Peak memory: 114032KB.
+      make[1]: *** [Makefile:511: do-4_1_cts] Error 1
+      make: *** [Makefile:511: results/nangate45/gcd/no_clkbuf/4_1_cts.odb] Error 2
+
+  - id: lf-pdn-layer
+    section: setup
+    stage: 2_4_floorplan_pdn
+    question: The grid could not be built. What was it asked for?
+    hint: "The layer it names is not one the technology has."
+    answer: A layer the technology file does not define.
+    wrong:
+      - A layer that exists but is reserved for signal routing.
+      - A layer above the top layer the router is allowed to use.
+      - A layer with no via rule connecting it to the one below.
+    explain: >-
+      The grid definition names the layers its straps and rings are drawn on,
+      and those names have to exist in the technology file. It is the usual
+      failure when a grid written for one platform is pointed at another,
+      since every process names its metals differently.
+    fix: |-
+      # name layers this technology actually has
+      add_pdn_stripe -layer metal7 -width 1.4 -pitch 40 -offset 2
+    source: pdn
+    excerpt: |2-
+      [ERROR PDN-1023] Unable to find metalX layer.
+      Error: pdn.tcl, 6 PDN-1023
+      Elapsed time: 0:00.22[h:]min:sec. CPU time: user 0.19 sys 0.03 (100%). Peak memory: 114348KB.
+      make[1]: *** [Makefile:429: do-2_4_floorplan_pdn] Error 1
+      make: *** [Makefile:429: results/nangate45/gcd/bad_pdn/2_4_floorplan_pdn.odb] Error 2
+
+  - id: lf-layer-conflict
+    section: setup
+    stage: 2_1_floorplan
+    question: Only one variable was changed, to route on fewer layers. What broke?
+    hint: "Two limits are being compared. One of them was not changed with the other."
+    answer: The clock's lowest layer is now above the highest layer allowed.
+    wrong:
+      - The clock needs a layer that the technology does not provide.
+      - The lowest signal layer was raised above the highest one.
+      - The clock layers must be given as a range, not as one layer.
+    explain: >-
+      A platform routes its clocks on upper layers on purpose, so it sets a
+      minimum layer for them. Lower the maximum for the whole design and the
+      two settings cross, which the floorplan catches before anything is built.
+      Retargeting a design to a thinner stack means moving both limits.
+    fix: |-
+      export MAX_ROUTING_LAYER = metal3
+      export MIN_CLK_ROUTING_LAYER = metal3
+    source: ""
+    excerpt: |2-
+      source /OpenROAD-flow-scripts/flow/platforms/nangate45/fastroute.tcl
+      [ERROR ODB-0137] In argument -clock_layers, min routing layer is greater than max routing layer.
+      Error: floorplan.tcl, 111 ODB-0137
+      Elapsed time: 0:00.23[h:]min:sec. CPU time: user 0.21 sys 0.05 (109%). Peak memory: 116372KB.
+      make[1]: *** [Makefile:415: do-2_1_floorplan] Error 1
+      make: *** [Makefile:415: results/nangate45/gcd/few_layers/2_1_floorplan.odb] Error 2
+
+  - id: lf-congestion-report
+    section: routing
+    stage: 5_1_grt
+    question: What is this report saying about the tile it names?
+    hint: "Read the comment line as three numbers about one small square of the die."
+    answer: One more wire wants to cross the tile than it has tracks for.
+    wrong:
+      - One net is routed over its own capacity and must be rerouted.
+      - Eight nets cross the tile, of which seven are allowed.
+      - The tile has seven tracks, and one of them is broken.
+    explain: >-
+      Global routing divides the die into tiles and counts how many wires want
+      to cross each boundary against how many can. Usage above capacity is the
+      overflow, reported per direction with the nets involved. A little is
+      normal and the detailed router will resolve it; a lot, or a cluster of
+      it in one place, is the congestion that makes a design unroutable.
+    fix: |-
+      # give the region room, or the tool more layers to use
+      export CORE_UTILIZATION = 45
+      export MAX_ROUTING_LAYER = metal6
+    source: grt
+    excerpt: |2-
+      violation type: Horizontal congestion
+      	srcs: net:_105_ net:_107_ net:_109_ net:_189_ net:clk net:net52
+      	comment: capacity:7 usage:8 congestion:1
+      	bbox = (16.8000, 16.8000) - (18.9000, 18.9000) on Layer -
+      violation type: Vertical congestion
+      	srcs: net:_149_ net:_150_ net:dpath.a_lt_b$in0\[10\] net:clknet_0_clk
+      	comment: capacity:5 usage:6 congestion:1
+      	bbox = (21.0000, 21.0000) - (23.1000, 23.1000) on Layer -
+
+  - id: lf-drt-iterations
+    section: routing
+    stage: 5_2_route
+    question: Detailed routing is reporting violations. Should you be worried?
+    hint: "Read down the percentages, then read the last line."
+    answer: "No: the router clears them as it goes, and ended at zero."
+    wrong:
+      - "Yes: 31 violations were found and only four were fixed."
+      - "Yes: the router gave up at 90 percent and stopped counting."
+      - "No: violations at this stage are always cosmetic."
+    explain: >-
+      The router works in passes, ripping up and rerouting what does not fit,
+      so a count part way through a pass means nothing on its own. What matters
+      is the number at the end of the last iteration. A healthy run of this
+      design also reports violations in its early passes. The number to watch
+      is one that stops falling between iterations.
+    fix: |-
+      # nothing to fix here; the line that matters is the last one
+      report_design_area
+    source: drt
+    excerpt: |2-
+      [INFO DRT-0195] Start 3rd guides tiles iteration.
+          Completing 10% with 31 violations.
+          Completing 20% with 31 violations.
+          Completing 30% with 31 violations.
+          Completing 40% with 31 violations.
+          Completing 50% with 27 violations.
+          Completing 60% with 27 violations.
+          Completing 70% with 27 violations.
+          Completing 80% with 27 violations.
+          Completing 90% with 0 violations.
+          Completing 100% with 0 violations.
+      [INFO DRT-0199]   Number of violations = 0.
+
+  - id: lf-final-report-tell
+    section: timing
+    stage: 6_report
+    question: The run finished and reported an area. One line here says the result is a fiction. Which?
+    hint: "Three warnings. Two of them appear in a healthy run of the same design."
+    answer: The one about a clock, since nothing was timed at all.
+    wrong:
+      - The two about heat maps, since the analyses behind them never ran.
+      - The one about the runtime directory, since the report was written elsewhere.
+      - "None of them: the area is reported, so the run is sound."
+    explain: >-
+      A clean run of this design prints the same two heat-map warnings and the
+      same runtime directory line, so neither means anything. The clock line
+      does: the reporting script asked for every clock and there were none, so
+      every timing number in the summary is empty rather than good. This is the
+      last chance to notice, at the end of two hundred lines that all look
+      normal.
+    fix: |-
+      # compare against a known-good log rather than reading warnings one by one
+      diff <(grep WARNING good.log) <(grep WARNING this.log)
+    source: ""
+    excerpt: |2-
+      Design area 691 um^2 59% utilization.
+      [WARNING GUI-0076] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-root'
+      [WARNING GUI-0066] Heat map "IR Drop" has not been populated with data.
+      [WARNING STA-0351] clock '*' not found.
+      [WARNING GUI-0066] Heat map "Routing Congestion" has not been populated with data.
+      Elapsed time: 0:01.06[h:]min:sec. CPU time: user 1.10 sys 0.13 (116%). Peak memory: 180016KB.
+
+  - id: lf-cts-healthy
+    section: cts
+    stage: 4_1_cts
+    question: This is a run that worked. What is the tool doing here?
+    hint: "Read the levels: what is being halved each time, and along which axis?"
+    answer: Splitting the sinks in half, alternating direction, to build a balanced tree.
+    wrong:
+      - Routing the clock net level by level, from the root outward.
+      - Clustering the sinks by distance before choosing a buffer for each.
+      - Measuring the existing clock net to decide how many buffers it needs.
+    explain: >-
+      An H-tree is built by bisecting the region the sinks occupy, vertically
+      then horizontally, until each sub-region holds few enough sinks to drive
+      directly. The numbers to read are the sink count, the region it spans,
+      and where it stopped. Knowing what a healthy log looks like is what makes
+      an unhealthy one obvious.
+    fix: |-
+      # nothing to fix; this is the shape a working clock tree leaves behind
+      report_clock_skew
+    source: cts
+    excerpt: |2-
+      [INFO CTS-0010]  Clock net "clk" has 35 sinks.
+      [INFO CTS-0008] TritonCTS found 1 clock nets.
+      [INFO CTS-0097] Characterization used 1 buffer(s) types.
+      [INFO CTS-0201] 0 blockages from hard placement blockages and placed macros will be used.
+      [INFO CTS-0027] Generating H-Tree topology for net clk.
+      [INFO CTS-0028]  Total number of sinks: 35.
+      [INFO CTS-0090]  Sinks will be clustered based on buffer max cap.
+      [INFO CTS-0030]  Number of static layers: 0.
+      [INFO CTS-0020]  Wire segment unit: 14000  dbu (7 um).
+      [INFO CTS-0023]  Original sink region: [(5890, 7170), (63650, 68770)].
+      [INFO CTS-0024]  Normalized sink region: [(0.420714, 0.512143), (4.54643, 4.91214)].
+      [INFO CTS-0025]     Width:  4.1257.
+      [INFO CTS-0026]     Height: 4.4000.
+       Level 1
+          Direction: Vertical
+          Sinks per sub-region: 18
+          Sub-region size: 4.1257 X 2.2000
+
+  - id: lf-setup-repair-stalls
+    section: timing
+    stage: 3_5_place_dp
+    question: Setup repair ran to its limit. What should you conclude?
+    hint: "Read the first data row and the last one, and look at what the area column did in between."
+    answer: The target is out of reach, since the area bought no slack.
+    wrong:
+      - Repair is converging slowly and needs a higher iteration limit.
+      - All 49 endpoints lie on one path, which needs restructuring first.
+      - Buffers are being inserted where gates should have been resized.
+    explain: >-
+      Nearly eight hundred iterations moved the worst slack from -0.123 to
+      -0.120 nanoseconds and spent 8.5 percent more area doing it, with the
+      same 49 endpoints failing at the end as at the start. That is what an
+      unreachable constraint looks like from inside the optimizer. The
+      conversation to have is about the clock period or the architecture, not
+      about optimization effort.
+    fix: |-
+      # give it a period the design can hold, then tighten in steps
+      set clk_period 0.46
+    source: rsz
+    excerpt: |2-
+      [INFO RSZ-0094] Found 49 endpoints with setup violations.
+      [INFO RSZ-0099] Repairing 49 out of 49 (100.00%) violating endpoints...
+         Iter   | Removed | Resized | Inserted | Cloned |  Pin  |   Area   |    WNS   |   StTNS    |   EnTNS    |  Viol  |  Worst
+                | Buffers |  Gates  | Buffers  |  Gates | Swaps |          |          |            |            | Endpts | St/EnPt
+      ------------------------------------------------------------------------------------------------------------------------------
+             0* |       0 |       0 |        0 |      0 |     0 |    +0.0% |   -0.123 |       -3.7 |       -4.9 |     49 | resp_msg[14]
+            10* |       0 |       3 |        0 |      1 |     5 |    +0.6% |   -0.129 |       -3.9 |       -5.2 |     49 | dpath.a_reg.out[2]$_DFFE_PP_/D
+            20* |       0 |      11 |        0 |      1 |     7 |    +1.2% |   -0.129 |       -3.9 |       -5.3 |     49 | dpath.a_reg.out[6]$_DFFE_PP_/D
+              ...
+          final |       0 |      88 |        3 |      1 |    16 |    +8.5% |   -0.120 |       -3.8 |       -5.0 |     49 | resp_msg[14]
+      ------------------------------------------------------------------------------------------------------------------------------
+      [INFO RSZ-0040] Inserted 3 buffers.
+      [INFO RSZ-0051] Resized 88 instances: 88 up, 0 up match, 0 down, 0 VT
+      [INFO RSZ-0043] Swapped pins on 16 instances.
+      [INFO RSZ-0049] Cloned 1 instances.
+      [WARNING RSZ-0062] Unable to repair all setup violations.
+
+  - id: lf-worst-endpoint-port
+    section: timing
+    stage: 3_5_place_dp
+    question: The worst endpoint is resp_msg[14]. What does that name tell you?
+    hint: "Compare that name with the register names in the rows above it."
+    answer: The worst path ends at an output port, so the budget is the suspect.
+    wrong:
+      - The worst path ends at a register in the response logic.
+      - The worst path ends at a bus, so all its bits are failing together.
+      - The worst path ends outside the block, which cannot be timed here.
+    explain: >-
+      Register endpoints carry the flop's name and a pin, as the rows above do.
+      A bare port name means the path is checked against an output delay
+      instead, which is a number someone chose. Before optimizing the logic it
+      is worth asking whether the block was given a fair share of the period.
+    fix: |-
+      # check what the interface was promised before reoptimizing the logic
+      report_checks -to [get_ports resp_msg*] -path_delay max
+    source: rsz
+    excerpt: |2-
+      [INFO RSZ-0094] Found 49 endpoints with setup violations.
+      [INFO RSZ-0099] Repairing 49 out of 49 (100.00%) violating endpoints...
+         Iter   | Removed | Resized | Inserted | Cloned |  Pin  |   Area   |    WNS   |   StTNS    |   EnTNS    |  Viol  |  Worst
+                | Buffers |  Gates  | Buffers  |  Gates | Swaps |          |          |            |            | Endpts | St/EnPt
+      ------------------------------------------------------------------------------------------------------------------------------
+             0* |       0 |       0 |        0 |      0 |     0 |    +0.0% |   -0.123 |       -3.7 |       -4.9 |     49 | resp_msg[14]
+            10* |       0 |       3 |        0 |      1 |     5 |    +0.6% |   -0.129 |       -3.9 |       -5.2 |     49 | dpath.a_reg.out[2]$_DFFE_PP_/D
+            20* |       0 |      11 |        0 |      1 |     7 |    +1.2% |   -0.129 |       -3.9 |       -5.3 |     49 | dpath.a_reg.out[6]$_DFFE_PP_/D
+              ...
+          final |       0 |      88 |        3 |      1 |    16 |    +8.5% |   -0.120 |       -3.8 |       -5.0 |     49 | resp_msg[14]
+      ------------------------------------------------------------------------------------------------------------------------------
+      [INFO RSZ-0040] Inserted 3 buffers.
+      [INFO RSZ-0051] Resized 88 instances: 88 up, 0 up match, 0 down, 0 VT
+      [INFO RSZ-0043] Swapped pins on 16 instances.
+      [INFO RSZ-0049] Cloned 1 instances.
+      [WARNING RSZ-0062] Unable to repair all setup violations.
+
+  - id: lf-exception-silence
+    section: timing
+    stage: 3_5_place_dp
+    question: The setup check is clean and repair found nothing. What would you verify?
+    hint: "Every earlier sign of an untimed design is absent here. What else could empty the reports?"
+    answer: Whether an exception has removed the paths from the analysis.
+    wrong:
+      - The clock period, since a loose one makes everything pass.
+      - The library, since a missing timing arc would hide paths.
+      - "Nothing: a clean check with no violations is the result."
+    explain: >-
+      This run carries a false path from the clock to itself, which removes
+      every register-to-register path in the design. Unlike an undefined clock,
+      it leaves no unclocked pins and no unconstrained endpoints, so the checks
+      that catch the other mistakes say nothing. Counting the paths that were
+      timed, or reporting the exceptions, is what finds it.
+    fix: |-
+      report_checks -path_delay max -group_path_count 1000 | grep -c Startpoint
+      report_exceptions
+    source: ""
+    excerpt: |2-
+
+      ==========================================================================
+      Floorplan check_setup
+      --------------------------------------------------------------------------
+      number instances in verilog is 521
+      [INFO IFP-0107] Defining die area using utilization: 55.00% and aspect ratio: 1.
+      [WARNING IFP-0028] Core area lower left (1.000, 1.000) snapped to (1.140, 1.400).
+      [INFO IFP-0001] Added 24 rows of 182 site FreePDK45_38x28_10R_NP_162NW_34O.
+              ...
+      [WARNING EST-0027] no estimated parasitics. Using wire load models.
+      [INFO RSZ-0100] Repair move sequence: UnbufferMove SizeUpMove SwapPinsMove
+      [INFO RSZ-0098] No setup violations found
+      [INFO RSZ-0505] Runtime: 0.03s
+
+  - id: lf-too-much-room
+    section: placement
+    stage: 6_report
+    question: This run closed with room to spare. What did the spare room cost?
+    hint: "Compare the wire length and the area with a run of the same design at 57 percent."
+    answer: Longer wires, and the buffers repair added to drive them.
+    wrong:
+      - "Nothing measurable: a larger die only wastes silicon."
+      - A longer runtime, since the placer has more space to search.
+      - More congestion, since the wires are spread over more tiles.
+    explain: >-
+      The same netlist at 57 percent utilization routes 3605 micrometres of
+      wire and finishes at 716 square micrometres of cells. Here the core is
+      seven times larger, the wire length is 6098, and the cell area has grown
+      to 767 because timing repair had to drive those longer wires. Too much
+      room is a real cost, not just a wasted one.
+    fix: |-
+      export CORE_UTILIZATION = 55
+    source: gpl
+    excerpt: |2-
+      [INFO IFP-0100] Die BBox:  (  0.000  0.000 ) ( 93.045 93.045 ) um
+      [INFO IFP-0101] Core BBox: (  1.140  1.400 ) ( 91.960 91.000 ) um
+      [INFO IFP-0102] Core area:                         8137.472 um^2
+      [INFO IFP-0103] Total instances area:               663.138 um^2
+      [INFO IFP-0104] Effective utilization:                0.081
+      [INFO IFP-0105] Number of instances:                    521
+              ...
+      Total wire length = 6098 um.
+      Design area 767 um^2 9% utilization.
+
+  - id: lf-pin-layers
+    section: placement
+    stage: 3_2_place_iop
+    question: Pin placement stopped. What was it told to do?
+    hint: "The command is printed above the error, with both of its arguments."
+    answer: Place the ports on layers the technology does not have.
+    wrong:
+      - Place the ports on layers reserved for the power grid.
+      - Place the ports before the floorplan had created any tracks.
+      - Place the ports on a layer with no tracks in that direction.
+    explain: >-
+      The port placer is told which layers to use for horizontal and vertical
+      pins, and it checks the names against the technology. The choice matters
+      beyond spelling: a layer too low makes the pins hard for the router to
+      reach, and one too high wastes the upper stack. Both names here are
+      simply wrong, which the tool says plainly.
+    fix: |-
+      export IO_PLACER_H = metal3
+      export IO_PLACER_V = metal2
+    source: ppl
+    excerpt: |2-
+      Found 0 macro blocks.
+      Using 2 tracks default min distance between IO pins.
+      [ERROR PPL-0051] Layer metalX not found.
+      Error: io_placement.tcl, 21 PPL-0051
+      Elapsed time: 0:00.21[h:]min:sec. CPU time: user 0.17 sys 0.04 (100%). Peak memory: 113920KB.
+      make[1]: *** [Makefile:460: do-3_2_place_iop] Error 1
+      make: *** [Makefile:460: results/nangate45/gcd/bad_pins/3_2_place_iop.odb] Error 2
+
+  - id: lf-cts-buffer-spacing
+    section: cts
+    stage: 4_1_cts
+    question: The spacing between clock buffers was set to one micrometre. What did that do?
+    hint: "Compare seven buffers and a minimum depth of three against five and two."
+    answer: More buffers and a deeper tree, on a block too small to need either.
+    wrong:
+      - Fewer buffers, since each one now covers a shorter distance.
+      - A shallower tree, since the buffers sit closer to the sinks.
+      - "Nothing measurable: the spacing is advisory, not a rule."
+    explain: >-
+      The default run of this design builds five buffers with a minimum depth
+      of two. Forcing one every micrometre gives seven and a depth of three,
+      and the design area grows from 716 to 764 square micrometres. Depth costs
+      variation and power. The knob is there for large blocks with long clock
+      runs, and it does harm on a small one.
+    fix: |-
+      # leave the spacing to the tool unless the tree is genuinely long
+      export CTS_BUF_DISTANCE = 60
+    source: cts
+    excerpt: |2-
+      clock_tree_synthesis -sink_clustering_enable -repair_clock_nets -distance_between_buffers 1
+              ...
+      [INFO CTS-0021]  Distance between buffers: 0 units (1 um).
+      [INFO CTS-0035]  Number of sinks covered: 35.
+      [INFO CTS-0018]     Created 7 clock buffers.
+      [INFO CTS-0012]     Minimum number of buffers in the clock path: 3.
+      [INFO CTS-0013]     Maximum number of buffers in the clock path: 3.
+      [INFO CTS-0015]     Created 7 clock nets.
+
+  - id: lf-multiple-drivers
+    section: synthesis
+    stage: 1_2_yosys
+    question: The error is at the end. Which line above it is the cause?
+    hint: "The error says a check failed. The check printed what it found one step earlier."
+    answer: The warning, which says one signal has two drivers.
+    wrong:
+      - The buffer insertion pass, which created a driver that clashes.
+      - The technology mapping, which produced a cell with two outputs.
+      - The splitting of multi-bit signals, which duplicated a net.
+    explain: >-
+      A net with two drivers has no defined value, so the check refuses to pass
+      the netlist on. The error line itself says only that a check failed; the
+      detail is in the warning above, which names the signal and both of the
+      things driving it. One of them here is a module input, which usually
+      means an output was assigned a name that already belongs to a port.
+    fix: |-
+      // drive each net from exactly one place
+      assign clash = req_val;
+    source: ""
+    excerpt: |2-
+      14. Executing INSBUF pass (insert buffer cells for connected wires).
+      15. Executing CHECK pass (checking for obvious problems).
+      Warning: multiple conflicting drivers for gcd.\resp_rdy:
+          port Z[0] of cell $auto$insbuf.cc:97:execute$2712 (BUF_X1)
+          module input resp_rdy[0]
+      16. Printing statistics.
+      17. Executing CHECK pass (checking for obvious problems).
+      ERROR: Found 1 problems in 'check -assert'.
+
+  - id: lf-placer-congestion
+    section: routing
+    stage: 3_1_place_gp
+    question: Global placement printed this, before any routing ran. What is it?
+    hint: "Ask how a placer could know anything about congestion at all."
+    answer: The placer's own estimate of how routable its placement is.
+    wrong:
+      - The router's congestion, reported back for the placer to fix.
+      - The share of routing tracks that the placement has used up.
+      - The overflow left over after the placer stopped improving.
+    explain: >-
+      A placer in routability mode runs a quick trial route and reads the
+      overflow back, which is how it knows to spread cells apart before the
+      real router ever starts. The averages of the worst tiles matter far more
+      than the overall figure: congestion is local, and a design with an
+      average of 0.72 and a handful of tiles at 1.0 is the one that fails.
+    fix: |-
+      # if the top percentiles are near or above 1, spread the design out
+      export PLACE_DENSITY_LB_ADDON = 0.30
+    source: gpl
+    excerpt: |2-
+      [INFO GPL-0041] Total routing overflow: 0.0000
+      [INFO GPL-0042] Number of overflowed tiles: 0 (0.00%)
+      [INFO GPL-0043] Average top 0.5% routing congestion: 0.7465
+      [INFO GPL-0044] Average top 1.0% routing congestion: 0.7361
+      [INFO GPL-0045] Average top 2.0% routing congestion: 0.7240
+      [INFO GPL-0046] Average top 5.0% routing congestion: 0.6931
+      [INFO GPL-0047] Routability iteration weighted routing congestion: 0.7413
+
+  - id: lf-drt-convergence
+    section: routing
+    stage: 5_2_route
+    question: Detailed routing on a larger design. Is this going to finish?
+    hint: "Look at the ratio between one pass and the next, not at the first number."
+    answer: "Yes: each pass clears most of what the one before it left."
+    wrong:
+      - "No: five thousand violations means the design cannot be routed."
+      - "No: the third pass barely improved, so it has stopped converging."
+      - "Cannot tell: the counts are per pass and do not accumulate."
+    explain: >-
+      The shape is what matters. Five thousand becomes two thousand, then two
+      thousand becomes a hundred, and the last pass finishes clean, which is a
+      router that is winning. The pass to worry about is one that returns
+      almost the same number as the pass before it, over and over: that is a
+      design the router cannot fix by rerouting, and it needs the placement or
+      the floorplan changed instead.
+    fix: |-
+      # nothing here; read the trajectory before reacting to the first number
+      grep "Number of violations" 5_2_route.log
+    source: drt
+    excerpt: |2-
+      [INFO DRT-0195] Start 0th optimization iteration.
+      [INFO DRT-0199]   Number of violations = 5434.
+      [INFO DRT-0195] Start 1st optimization iteration.
+      [INFO DRT-0199]   Number of violations = 2304.
+      [INFO DRT-0195] Start 2nd optimization iteration.
+      [INFO DRT-0199]   Number of violations = 1925.
+      [INFO DRT-0195] Start 3rd optimization iteration.
+      [INFO DRT-0199]   Number of violations = 100.
+      [INFO DRT-0195] Start 4th guides tiles iteration.
+      [INFO DRT-0199]   Number of violations = 0.
+
+  - id: lf-disk-full
+    section: infra
+    stage: 2_4_floorplan_pdn
+    question: The grid was built, and then this. What would you check first?
+    hint: "Read what the tool was doing when it failed, not what it was doing before."
+    answer: Whether there is room on the disk to write the file.
+    wrong:
+      - Whether the database from the previous stage is corrupt.
+      - Whether the power grid definition produced an illegal shape.
+      - Whether another run is writing to the same results directory.
+    explain: >-
+      The grid was inserted and the area reported, so the work succeeded. The
+      failure is in closing the file it was written to, and a stream error on
+      close is what a full disk looks like from inside a program. Nothing in
+      the message says disk, which is exactly why this one is worth
+      recognizing: check the filesystem before you doubt the design.
+    fix: |-
+      df -h .
+      make clean_all   # or point the flow somewhere with room
+    source: ""
+    excerpt: |2-
+      [INFO PDN-0500] Runtime: 0.00s
+      Design area 676 um^2 58% utilization.
+      write_db ./results/nangate45/gcd/dfull/2_4_floorplan_pdn.odb
+      Error: close for ./results/nangate45/gcd/dfull/2_4_floorplan_pdn.odb failed: basic_ios::clear: iostream error
+      Error: pdn.tcl, 24 basic_ios::clear: iostream error
+      Elapsed time: 0:00.38[h:]min:sec. CPU time: user 0.33 sys 0.05 (98%). Peak memory: 117448KB.
+      make[1]: *** [Makefile:429: do-2_4_floorplan_pdn] Error 1
+      make: *** [Makefile:429: results/nangate45/gcd/dfull/2_4_floorplan_pdn.odb] Error 2
+
+  - id: lf-order-messages
+    section: setup
+    stage: any
+    style: order
+    question: Put these messages in the order a run prints them.
+    hint: "The three letters before the number name the tool that printed it."
+    items:
+      - "[INFO ODB-0227] LEF file: ... created 22 layers, 27 vias"
+      - "[INFO IFP-0001] Added 24 rows of 182 site FreePDK45"
+      - "[INFO CTS-0008] TritonCTS found 1 clock nets."
+      - "[INFO DRT-0199]   Number of violations = 0."
+      - "[INFO RCX-0045] Extract 648 nets, 2366 rsegs"
+    explain: >-
+      The prefix is the module: reading the technology, initializing the
+      floorplan, building the clock tree, detailed routing, and extraction.
+      Knowing them turns a wall of output into a map, and it is how you find
+      the right log without reading any of them. The full list is in the
+      tool's documentation, and the codes are stable across versions.
+    source: ""
+
+  - id: lf-order-too-good
+    section: timing
+    stage: any
+    style: order
+    question: A design closes with suspiciously good timing. Put these checks in the order that finds the cause fastest.
+    hint: "Each step catches a cause the step before it cannot see."
+    items:
+      - read the constraint log for a clock or port that was not found
+      - read the floorplan check for unclocked pins and unconstrained endpoints
+      - count how many paths the timer actually reported
+      - report the exceptions that remove paths from the analysis
+    explain: >-
+      The first two are free and catch the common cases: a clock created on
+      nothing, or ports with no delay. Counting the paths catches a design
+      that is timed but barely. Exceptions come last because they take the
+      most reading, and they are the only thing that catches a false path
+      wide enough to empty the analysis while every check stays clean.
+    source: ""
+
+  - id: lf-order-hold
+    section: cts
+    stage: any
+    style: order
+    question: Hold violations appear everywhere after the clock tree. Put these in the order you would work through them.
+    hint: "Rule out what you wrote before you rule out what the tool did."
+    items:
+      - check the hold uncertainty in the constraints
+      - check the skew the clock tree actually achieved
+      - confirm setup is closed, since hold fixes will slow the paths
+      - let repair insert hold buffers
+    explain: >-
+      Everywhere at once means a common cause, and the cheapest common cause
+      is a number someone typed. Skew comes next, since a badly balanced tree
+      creates hold failures across a whole region. Setup has to be settled
+      before hold, because the buffers hold repair inserts add delay. Only
+      then is inserting buffers the right move rather than a way to hide
+      something.
+    source: ""
+
+  - id: lf-out-of-memory
+    section: infra
+    stage: 5_2_route
+    question: The router was making progress and then stopped. What happened?
+    hint: "One column climbs on every line. Read that one, then read the exit code."
+    answer: The machine killed it for taking too much memory.
+    wrong:
+      - The router reached its iteration limit and gave up.
+      - The database from the previous stage was corrupt.
+      - The design cannot be routed, so the tool stopped early.
+    explain: >-
+      There is no tool error here at all: the last line the tool wrote was a
+      normal progress line at 342 megabytes, having started the stage at 267.
+      An exit code in the 240s with no message is the shell reporting that
+      something outside the tool ended it, and the growing memory column says
+      what. On a shared machine, look at the job's memory limit before you
+      look at the design.
+    fix: |-
+      # give the job room, or ask the router for fewer threads
+      make DESIGN_CONFIG=... NUM_CORES=4
+    source: ""
+    excerpt: |2-
+      [INFO DRT-0195] Start 0th optimization iteration.
+          Completing 20% with 0 violations.
+          elapsed time = 00:00:01, memory = 278.67 (MB).
+          Completing 50% with 25 violations.
+          elapsed time = 00:00:02, memory = 302.66 (MB).
+          Completing 70% with 45 violations.
+          elapsed time = 00:00:03, memory = 324.15 (MB).
+          Completing 100% with 67 violations.
+          elapsed time = 00:00:04, memory = 342.52 (MB).
+      Elapsed time: 0:05.62[h:]min:sec. CPU time: user 15.44 sys 0.14 (277%). Peak memory: 350108KB.
+      make[1]: *** [Makefile:552: do-5_2_route] Error 247
+      make: *** [Makefile:552: results/nangate45/gcd/oom/5_2_route.odb] Error 2
+
+  - id: lf-drc-clean
+    section: signoff
+    stage: 6_drc
+    question: The design-rule count is zero. What has that proved?
+    hint: "Read what the report says about itself before reading its result."
+    answer: That this deck's rules found nothing, which is narrower than clean.
+    wrong:
+      - That the layout obeys every rule of the process.
+      - That the checker ran without an error of its own.
+      - That the layout is identical to the one the foundry would accept.
+    explain: >-
+      The report names the deck it came from and lists the rules it knows,
+      each with its own description. An open deck implements a subset of what
+      a foundry's sign-off deck checks, so a zero means only that the subset
+      passed. The number itself is counted by matching markers in the report
+      database, which is why the count file and the database must be read
+      together.
+    fix: |-
+      # know which rules your deck implements before trusting the count
+      grep -c "<category>" 6_drc.lyrdb
+    source: ""
+    excerpt: |2-
+      $ cat reports/sky130hd/gcd/6_drc_count.rpt
+      0
+
+      $ head reports/sky130hd/gcd/6_drc.lyrdb
+      <report-database>
+       <description>SKY130 DRC runset</description>
+       <original-file/>
+       <generator>drc: script='/OpenROAD-flow-scripts/flow/platforms/sky130hd/drc/sky130hd.lydrc'</generator>
+       <top-cell>gcd</top-cell>
+       <tags>
+       </tags>
+       <categories>
+        <category>
+         <name>li.1</name>
+         <description>li.1 : min. li width : 0.17um</description>
+         <categories>
+         </categories>
+
+  - id: lf-lvs-did-not-run
+    section: signoff
+    stage: 6_lvs
+    question: Did layout versus schematic find a mismatch?
+    hint: "Ask what stage of the check this message comes from."
+    answer: "No: it stopped while reading the netlist, before comparing."
+    wrong:
+      - "Yes: a device in the layout has no matching device in the netlist."
+      - "Yes: a resistor's value differs between the two."
+      - "No: the layout matched, and this is a warning about the netlist."
+    explain: >-
+      The comparison never started. The reader hit a passive device with no
+      value on it and gave up, which usually means the netlist handed to the
+      check was assembled wrongly rather than that the design is wrong. A
+      check that did not run is not a check that passed, and it is worth being
+      strict about the difference: the line to look at is the one the error
+      names.
+    fix: |-
+      sed -n '5740p' 6_final_concat.cdl
+    source: ""
+    excerpt: |2-
+      KLayout 0.30.7
+      ERROR: In /OpenROAD-flow-scripts/flow/platforms/sky130hd/lvs/sky130hd.lylvs: Can't find a value for a R, C or L device in /OpenROAD-flow-scripts/flow/objects/sky130hd/gcd/sky_signoff/6_final_concat.cdl, line 5740 in Netlist::read
+      ERROR: RuntimeError: Can't find a value for a R, C or L device in /OpenROAD-flow-scripts/flow/objects/sky130hd/gcd/sky_signoff/6_final_concat.cdl, line 5740 in Netlist::read in Executable::execute
+
+  - id: lf-ir-drop
+    section: signoff
+    stage: 6_report
+    question: The same design on the default grid drops 0.38 percent. What does this run tell you?
+    hint: "The power is the same in both runs. Only one thing changed."
+    answer: The grid is carrying the same current through less metal.
+    wrong:
+      - The design is drawing three times the current it was.
+      - The supply voltage was set too low for this library.
+      - The analysis used a different corner from the default run.
+    explain: >-
+      Total power is 2.61 milliwatts here against 2.62 in the default run, so
+      the design is doing the same work. The straps were narrowed and spread
+      out, and the drop tripled. A percentage of a percent is still healthy,
+      since limits are usually a few percent, but the trend is what a grid
+      review watches: the number means nothing without the grid and the
+      activity that produced it.
+    fix: |-
+      # widen or tighten the straps until the drop fits the budget
+      add_pdn_stripe -layer metal4 -width 1.4 -pitch 6.5 -offset 0
+    source: psm
+    excerpt: |2-
+      [INFO PSM-0040] All shapes on net VDD are connected.
+      ########## IR report #################
+      Net              : VDD
+      Corner           : default
+      Total power      : 2.61e-03 W
+      Supply voltage   : 1.10e+00 V
+      Worstcase voltage: 1.09e+00 V
+      Average voltage  : 1.09e+00 V
+      Average IR drop  : 8.77e-03 V
+      Worstcase IR drop: 1.25e-02 V
+      Percentage drop  : 1.14 %
+      ######################################

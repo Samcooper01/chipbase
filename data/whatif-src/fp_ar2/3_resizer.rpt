@@ -1,0 +1,542 @@
+
+==========================================================================
+resizer report_tns
+--------------------------------------------------------------------------
+tns max 0.00
+
+==========================================================================
+resizer report_wns
+--------------------------------------------------------------------------
+wns max 0.00
+
+==========================================================================
+resizer report_worst_slack
+--------------------------------------------------------------------------
+worst slack max 0.02
+
+==========================================================================
+resizer report_clock_min_period
+--------------------------------------------------------------------------
+core_clock period_min = 0.43 fmax = 2306.76
+vclk_core_clock period_min = 0.00 fmax = inf
+
+==========================================================================
+resizer report_checks -path_delay min
+--------------------------------------------------------------------------
+Startpoint: dpath.b_reg.out[0]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: dpath.b_reg.out[0]$_DFFE_PP_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: min
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                  0.00    0.00    0.07 ^ dpath.b_reg.out[0]$_DFFE_PP_/CK (DFF_X1)
+     3    4.82    0.01    0.08    0.15 v dpath.b_reg.out[0]$_DFFE_PP_/Q (DFF_X1)
+                                         dpath.a_lt_b$in1[0] (net)
+                  0.01    0.00    0.15 v _843_/A (INV_X1)
+     1    3.23    0.01    0.02    0.17 ^ _843_/ZN (INV_X1)
+                                         _360_ (net)
+                  0.01    0.00    0.17 ^ _844_/B1 (OAI21_X2)
+     1    1.14    0.00    0.01    0.18 v _844_/ZN (OAI21_X2)
+                                         _033_ (net)
+                  0.00    0.00    0.18 v dpath.b_reg.out[0]$_DFFE_PP_/D (DFF_X1)
+                                  0.18   data arrival time
+
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                          0.00    0.07   clock reconvergence pessimism
+                                  0.07 ^ dpath.b_reg.out[0]$_DFFE_PP_/CK (DFF_X1)
+                          0.00    0.07   library hold time
+                                  0.07   data required time
+-----------------------------------------------------------------------------
+                                  0.07   data required time
+                                 -0.18   data arrival time
+-----------------------------------------------------------------------------
+                                  0.11   slack (MET)
+
+
+Startpoint: ctrl.state.out[0]$_DFF_P_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: req_rdy (output port clocked by vclk_core_clock)
+Path Group: vclk_core_clock
+Path Type: min
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                  0.00    0.00    0.07 ^ ctrl.state.out[0]$_DFF_P_/CK (DFF_X1)
+     6    9.90    0.01    0.09    0.16 v ctrl.state.out[0]$_DFF_P_/Q (DFF_X1)
+                                         net36 (net)
+                  0.01    0.00    0.16 v output36/A (BUF_X1)
+     1    0.52    0.00    0.03    0.19 v output36/Z (BUF_X1)
+                                         req_rdy (net)
+                  0.00    0.00    0.19 v req_rdy (out)
+                                  0.19   data arrival time
+
+                  0.00    0.00    0.00   clock vclk_core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                          0.00    0.07   clock reconvergence pessimism
+                         -0.09   -0.02   output external delay
+                                 -0.02   data required time
+-----------------------------------------------------------------------------
+                                 -0.02   data required time
+                                 -0.19   data arrival time
+-----------------------------------------------------------------------------
+                                  0.21   slack (MET)
+
+
+
+==========================================================================
+resizer report_checks -path_delay max
+--------------------------------------------------------------------------
+Startpoint: dpath.a_reg.out[13]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: dpath.a_reg.out[1]$_DFFE_PP_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: max
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                  0.00    0.00    0.07 ^ dpath.a_reg.out[13]$_DFFE_PP_/CK (DFF_X1)
+     4    6.78    0.01    0.09    0.16 v dpath.a_reg.out[13]$_DFFE_PP_/Q (DFF_X1)
+                                         dpath.a_lt_b$in0[13] (net)
+                  0.01    0.00    0.16 v _586_/A1 (NAND2_X1)
+     2    5.20    0.02    0.02    0.18 ^ _586_/ZN (NAND2_X1)
+                                         _127_ (net)
+                  0.02    0.00    0.18 ^ _587_/A (INV_X1)
+     2    4.30    0.01    0.01    0.20 v _587_/ZN (INV_X1)
+                                         _128_ (net)
+                  0.01    0.00    0.20 v _589_/A1 (NOR2_X2)
+     2    5.84    0.02    0.03    0.22 ^ _589_/ZN (NOR2_X2)
+                                         _130_ (net)
+                  0.02    0.00    0.22 ^ _594_/A1 (NAND2_X2)
+     3    9.75    0.01    0.02    0.25 v _594_/ZN (NAND2_X2)
+                                         _135_ (net)
+                  0.01    0.00    0.25 v _753_/A2 (NOR2_X4)
+     2    5.63    0.01    0.03    0.28 ^ _753_/ZN (NOR2_X4)
+                                         _284_ (net)
+                  0.01    0.00    0.28 ^ _754_/A1 (AND2_X2)
+     1    6.40    0.01    0.04    0.31 ^ _754_/ZN (AND2_X2)
+                                         _285_ (net)
+                  0.01    0.00    0.31 ^ _755_/A2 (NAND2_X4)
+    12   35.22    0.02    0.03    0.34 v _755_/ZN (NAND2_X4)
+                                         _286_ (net)
+                  0.02    0.00    0.34 v _854_/B1 (AOI21_X4)
+    16   34.45    0.05    0.06    0.41 ^ _854_/ZN (AOI21_X4)
+                                         _370_ (net)
+                  0.05    0.00    0.41 ^ _947_/A1 (NAND2_X1)
+     1    2.26    0.02    0.02    0.43 v _947_/ZN (NAND2_X1)
+                                         _450_ (net)
+                  0.02    0.00    0.43 v _950_/A1 (NAND3_X1)
+     1    1.68    0.01    0.02    0.45 ^ _950_/ZN (NAND3_X1)
+                                         _453_ (net)
+                  0.01    0.00    0.45 ^ _952_/A1 (NAND2_X1)
+     1    1.70    0.01    0.01    0.46 v _952_/ZN (NAND2_X1)
+                                         _455_ (net)
+                  0.01    0.00    0.46 v _953_/A (INV_X1)
+     1    1.24    0.01    0.01    0.47 ^ _953_/ZN (INV_X1)
+                                         _047_ (net)
+                  0.01    0.00    0.47 ^ dpath.a_reg.out[1]$_DFFE_PP_/D (DFF_X1)
+                                  0.47   data arrival time
+
+                  0.00    0.46    0.46   clock core_clock (rise edge)
+                          0.07    0.53   clock network delay (ideal)
+                          0.00    0.53   clock reconvergence pessimism
+                                  0.53 ^ dpath.a_reg.out[1]$_DFFE_PP_/CK (DFF_X1)
+                         -0.03    0.50   library setup time
+                                  0.50   data required time
+-----------------------------------------------------------------------------
+                                  0.50   data required time
+                                 -0.47   data arrival time
+-----------------------------------------------------------------------------
+                                  0.03   slack (MET)
+
+
+Startpoint: dpath.a_reg.out[13]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: resp_msg[14] (output port clocked by vclk_core_clock)
+Path Group: vclk_core_clock
+Path Type: max
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                  0.00    0.00    0.07 ^ dpath.a_reg.out[13]$_DFFE_PP_/CK (DFF_X1)
+     4    6.78    0.01    0.09    0.16 v dpath.a_reg.out[13]$_DFFE_PP_/Q (DFF_X1)
+                                         dpath.a_lt_b$in0[13] (net)
+                  0.01    0.00    0.16 v _586_/A1 (NAND2_X1)
+     2    5.20    0.02    0.02    0.18 ^ _586_/ZN (NAND2_X1)
+                                         _127_ (net)
+                  0.02    0.00    0.18 ^ _587_/A (INV_X1)
+     2    4.30    0.01    0.01    0.20 v _587_/ZN (INV_X1)
+                                         _128_ (net)
+                  0.01    0.00    0.20 v _589_/A1 (NOR2_X2)
+     2    5.84    0.02    0.03    0.22 ^ _589_/ZN (NOR2_X2)
+                                         _130_ (net)
+                  0.02    0.00    0.22 ^ _594_/A1 (NAND2_X2)
+     3    9.75    0.01    0.02    0.25 v _594_/ZN (NAND2_X2)
+                                         _135_ (net)
+                  0.01    0.00    0.25 v _605_/A1 (NOR2_X1)
+     2    3.21    0.02    0.03    0.28 ^ _605_/ZN (NOR2_X1)
+                                         _146_ (net)
+                  0.02    0.00    0.28 ^ _638_/A1 (AND2_X1)
+     1    2.07    0.01    0.04    0.32 ^ _638_/ZN (AND2_X1)
+                                         _179_ (net)
+                  0.01    0.00    0.32 ^ _639_/A2 (NAND2_X1)
+     1    2.34    0.01    0.01    0.33 v _639_/ZN (NAND2_X1)
+                                         _180_ (net)
+                  0.01    0.00    0.33 v _640_/A2 (NAND2_X1)
+     1    4.74    0.02    0.02    0.36 ^ _640_/ZN (NAND2_X1)
+                                         _181_ (net)
+                  0.02    0.00    0.36 ^ _646_/A (XNOR2_X1)
+     2    2.91    0.02    0.04    0.40 ^ _646_/ZN (XNOR2_X1)
+                                         net42 (net)
+                  0.02    0.00    0.40 ^ output42/A (BUF_X1)
+     1    0.25    0.00    0.02    0.42 ^ output42/Z (BUF_X1)
+                                         resp_msg[14] (net)
+                  0.00    0.00    0.42 ^ resp_msg[14] (out)
+                                  0.42   data arrival time
+
+                  0.00    0.46    0.46   clock vclk_core_clock (rise edge)
+                          0.07    0.53   clock network delay (ideal)
+                          0.00    0.53   clock reconvergence pessimism
+                         -0.09    0.44   output external delay
+                                  0.44   data required time
+-----------------------------------------------------------------------------
+                                  0.44   data required time
+                                 -0.42   data arrival time
+-----------------------------------------------------------------------------
+                                  0.02   slack (MET)
+
+
+
+==========================================================================
+resizer report_checks -unconstrained
+--------------------------------------------------------------------------
+Startpoint: dpath.a_reg.out[13]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: dpath.a_reg.out[1]$_DFFE_PP_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: max
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                  0.00    0.00    0.07 ^ dpath.a_reg.out[13]$_DFFE_PP_/CK (DFF_X1)
+     4    6.78    0.01    0.09    0.16 v dpath.a_reg.out[13]$_DFFE_PP_/Q (DFF_X1)
+                                         dpath.a_lt_b$in0[13] (net)
+                  0.01    0.00    0.16 v _586_/A1 (NAND2_X1)
+     2    5.20    0.02    0.02    0.18 ^ _586_/ZN (NAND2_X1)
+                                         _127_ (net)
+                  0.02    0.00    0.18 ^ _587_/A (INV_X1)
+     2    4.30    0.01    0.01    0.20 v _587_/ZN (INV_X1)
+                                         _128_ (net)
+                  0.01    0.00    0.20 v _589_/A1 (NOR2_X2)
+     2    5.84    0.02    0.03    0.22 ^ _589_/ZN (NOR2_X2)
+                                         _130_ (net)
+                  0.02    0.00    0.22 ^ _594_/A1 (NAND2_X2)
+     3    9.75    0.01    0.02    0.25 v _594_/ZN (NAND2_X2)
+                                         _135_ (net)
+                  0.01    0.00    0.25 v _753_/A2 (NOR2_X4)
+     2    5.63    0.01    0.03    0.28 ^ _753_/ZN (NOR2_X4)
+                                         _284_ (net)
+                  0.01    0.00    0.28 ^ _754_/A1 (AND2_X2)
+     1    6.40    0.01    0.04    0.31 ^ _754_/ZN (AND2_X2)
+                                         _285_ (net)
+                  0.01    0.00    0.31 ^ _755_/A2 (NAND2_X4)
+    12   35.22    0.02    0.03    0.34 v _755_/ZN (NAND2_X4)
+                                         _286_ (net)
+                  0.02    0.00    0.34 v _854_/B1 (AOI21_X4)
+    16   34.45    0.05    0.06    0.41 ^ _854_/ZN (AOI21_X4)
+                                         _370_ (net)
+                  0.05    0.00    0.41 ^ _947_/A1 (NAND2_X1)
+     1    2.26    0.02    0.02    0.43 v _947_/ZN (NAND2_X1)
+                                         _450_ (net)
+                  0.02    0.00    0.43 v _950_/A1 (NAND3_X1)
+     1    1.68    0.01    0.02    0.45 ^ _950_/ZN (NAND3_X1)
+                                         _453_ (net)
+                  0.01    0.00    0.45 ^ _952_/A1 (NAND2_X1)
+     1    1.70    0.01    0.01    0.46 v _952_/ZN (NAND2_X1)
+                                         _455_ (net)
+                  0.01    0.00    0.46 v _953_/A (INV_X1)
+     1    1.24    0.01    0.01    0.47 ^ _953_/ZN (INV_X1)
+                                         _047_ (net)
+                  0.01    0.00    0.47 ^ dpath.a_reg.out[1]$_DFFE_PP_/D (DFF_X1)
+                                  0.47   data arrival time
+
+                  0.00    0.46    0.46   clock core_clock (rise edge)
+                          0.07    0.53   clock network delay (ideal)
+                          0.00    0.53   clock reconvergence pessimism
+                                  0.53 ^ dpath.a_reg.out[1]$_DFFE_PP_/CK (DFF_X1)
+                         -0.03    0.50   library setup time
+                                  0.50   data required time
+-----------------------------------------------------------------------------
+                                  0.50   data required time
+                                 -0.47   data arrival time
+-----------------------------------------------------------------------------
+                                  0.03   slack (MET)
+
+
+Startpoint: dpath.a_reg.out[13]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: resp_msg[14] (output port clocked by vclk_core_clock)
+Path Group: vclk_core_clock
+Path Type: max
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.07    0.07   clock network delay (ideal)
+                  0.00    0.00    0.07 ^ dpath.a_reg.out[13]$_DFFE_PP_/CK (DFF_X1)
+     4    6.78    0.01    0.09    0.16 v dpath.a_reg.out[13]$_DFFE_PP_/Q (DFF_X1)
+                                         dpath.a_lt_b$in0[13] (net)
+                  0.01    0.00    0.16 v _586_/A1 (NAND2_X1)
+     2    5.20    0.02    0.02    0.18 ^ _586_/ZN (NAND2_X1)
+                                         _127_ (net)
+                  0.02    0.00    0.18 ^ _587_/A (INV_X1)
+     2    4.30    0.01    0.01    0.20 v _587_/ZN (INV_X1)
+                                         _128_ (net)
+                  0.01    0.00    0.20 v _589_/A1 (NOR2_X2)
+     2    5.84    0.02    0.03    0.22 ^ _589_/ZN (NOR2_X2)
+                                         _130_ (net)
+                  0.02    0.00    0.22 ^ _594_/A1 (NAND2_X2)
+     3    9.75    0.01    0.02    0.25 v _594_/ZN (NAND2_X2)
+                                         _135_ (net)
+                  0.01    0.00    0.25 v _605_/A1 (NOR2_X1)
+     2    3.21    0.02    0.03    0.28 ^ _605_/ZN (NOR2_X1)
+                                         _146_ (net)
+                  0.02    0.00    0.28 ^ _638_/A1 (AND2_X1)
+     1    2.07    0.01    0.04    0.32 ^ _638_/ZN (AND2_X1)
+                                         _179_ (net)
+                  0.01    0.00    0.32 ^ _639_/A2 (NAND2_X1)
+     1    2.34    0.01    0.01    0.33 v _639_/ZN (NAND2_X1)
+                                         _180_ (net)
+                  0.01    0.00    0.33 v _640_/A2 (NAND2_X1)
+     1    4.74    0.02    0.02    0.36 ^ _640_/ZN (NAND2_X1)
+                                         _181_ (net)
+                  0.02    0.00    0.36 ^ _646_/A (XNOR2_X1)
+     2    2.91    0.02    0.04    0.40 ^ _646_/ZN (XNOR2_X1)
+                                         net42 (net)
+                  0.02    0.00    0.40 ^ output42/A (BUF_X1)
+     1    0.25    0.00    0.02    0.42 ^ output42/Z (BUF_X1)
+                                         resp_msg[14] (net)
+                  0.00    0.00    0.42 ^ resp_msg[14] (out)
+                                  0.42   data arrival time
+
+                  0.00    0.46    0.46   clock vclk_core_clock (rise edge)
+                          0.07    0.53   clock network delay (ideal)
+                          0.00    0.53   clock reconvergence pessimism
+                         -0.09    0.44   output external delay
+                                  0.44   data required time
+-----------------------------------------------------------------------------
+                                  0.44   data required time
+                                 -0.42   data arrival time
+-----------------------------------------------------------------------------
+                                  0.02   slack (MET)
+
+
+
+==========================================================================
+resizer report_check_types -max_slew -max_cap -max_fanout -violators
+--------------------------------------------------------------------------
+
+==========================================================================
+resizer max_slew_check_slack
+--------------------------------------------------------------------------
+0.09993401914834976
+
+==========================================================================
+resizer max_slew_check_limit
+--------------------------------------------------------------------------
+0.1985349953174591
+
+==========================================================================
+resizer max_slew_check_slack_limit
+--------------------------------------------------------------------------
+0.5034
+
+==========================================================================
+resizer max_fanout_check_slack
+--------------------------------------------------------------------------
+1.0000000150474662e+30
+
+==========================================================================
+resizer max_fanout_check_limit
+--------------------------------------------------------------------------
+1.0000000150474662e+30
+
+==========================================================================
+resizer max_capacitance_check_slack
+--------------------------------------------------------------------------
+6.272407054901123
+
+==========================================================================
+resizer max_capacitance_check_limit
+--------------------------------------------------------------------------
+10.47130012512207
+
+==========================================================================
+resizer max_capacitance_check_slack_limit
+--------------------------------------------------------------------------
+0.5990
+
+==========================================================================
+resizer max_slew_violation_count
+--------------------------------------------------------------------------
+max slew violation count 0
+
+==========================================================================
+resizer max_fanout_violation_count
+--------------------------------------------------------------------------
+max fanout violation count 0
+
+==========================================================================
+resizer max_cap_violation_count
+--------------------------------------------------------------------------
+max cap violation count 0
+
+==========================================================================
+resizer setup_violation_count
+--------------------------------------------------------------------------
+setup violation count 0
+
+==========================================================================
+resizer hold_violation_count
+--------------------------------------------------------------------------
+hold violation count 0
+
+==========================================================================
+resizer report_checks -path_delay max reg to reg
+--------------------------------------------------------------------------
+Startpoint: dpath.a_reg.out[13]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: dpath.a_reg.out[1]$_DFFE_PP_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: max
+
+  Delay    Time   Description
+---------------------------------------------------------
+   0.00    0.00   clock core_clock (rise edge)
+   0.07    0.07   clock network delay (ideal)
+   0.00    0.07 ^ dpath.a_reg.out[13]$_DFFE_PP_/CK (DFF_X1)
+   0.09    0.16 v dpath.a_reg.out[13]$_DFFE_PP_/Q (DFF_X1)
+   0.02    0.18 ^ _586_/ZN (NAND2_X1)
+   0.01    0.20 v _587_/ZN (INV_X1)
+   0.03    0.22 ^ _589_/ZN (NOR2_X2)
+   0.02    0.25 v _594_/ZN (NAND2_X2)
+   0.03    0.28 ^ _753_/ZN (NOR2_X4)
+   0.04    0.31 ^ _754_/ZN (AND2_X2)
+   0.03    0.34 v _755_/ZN (NAND2_X4)
+   0.07    0.41 ^ _854_/ZN (AOI21_X4)
+   0.02    0.43 v _947_/ZN (NAND2_X1)
+   0.02    0.45 ^ _950_/ZN (NAND3_X1)
+   0.01    0.46 v _952_/ZN (NAND2_X1)
+   0.01    0.47 ^ _953_/ZN (INV_X1)
+   0.00    0.47 ^ dpath.a_reg.out[1]$_DFFE_PP_/D (DFF_X1)
+           0.47   data arrival time
+
+   0.46    0.46   clock core_clock (rise edge)
+   0.07    0.53   clock network delay (ideal)
+   0.00    0.53   clock reconvergence pessimism
+           0.53 ^ dpath.a_reg.out[1]$_DFFE_PP_/CK (DFF_X1)
+  -0.03    0.50   library setup time
+           0.50   data required time
+---------------------------------------------------------
+           0.50   data required time
+          -0.47   data arrival time
+---------------------------------------------------------
+           0.03   slack (MET)
+
+
+
+==========================================================================
+resizer report_checks -path_delay min reg to reg
+--------------------------------------------------------------------------
+Startpoint: dpath.b_reg.out[0]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: dpath.b_reg.out[0]$_DFFE_PP_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: min
+
+  Delay    Time   Description
+---------------------------------------------------------
+   0.00    0.00   clock core_clock (rise edge)
+   0.07    0.07   clock network delay (ideal)
+   0.00    0.07 ^ dpath.b_reg.out[0]$_DFFE_PP_/CK (DFF_X1)
+   0.08    0.15 v dpath.b_reg.out[0]$_DFFE_PP_/Q (DFF_X1)
+   0.02    0.17 ^ _843_/ZN (INV_X1)
+   0.01    0.18 v _844_/ZN (OAI21_X2)
+   0.00    0.18 v dpath.b_reg.out[0]$_DFFE_PP_/D (DFF_X1)
+           0.18   data arrival time
+
+   0.00    0.00   clock core_clock (rise edge)
+   0.07    0.07   clock network delay (ideal)
+   0.00    0.07   clock reconvergence pessimism
+           0.07 ^ dpath.b_reg.out[0]$_DFFE_PP_/CK (DFF_X1)
+   0.00    0.07   library hold time
+           0.07   data required time
+---------------------------------------------------------
+           0.07   data required time
+          -0.18   data arrival time
+---------------------------------------------------------
+           0.11   slack (MET)
+
+
+
+==========================================================================
+resizer critical path target clock latency max path
+--------------------------------------------------------------------------
+0.0700
+
+==========================================================================
+resizer critical path target clock latency min path
+--------------------------------------------------------------------------
+0.0700
+
+==========================================================================
+resizer critical path source clock latency min path
+--------------------------------------------------------------------------
+0.0700
+
+==========================================================================
+resizer critical path delay
+--------------------------------------------------------------------------
+0.4214
+
+==========================================================================
+resizer critical path slack
+--------------------------------------------------------------------------
+0.0166
+
+==========================================================================
+resizer slack div critical path delay
+--------------------------------------------------------------------------
+3.939250
+
+==========================================================================
+resizer report_power
+--------------------------------------------------------------------------
+Group                  Internal  Switching    Leakage      Total
+                          Power      Power      Power      Power (Watts)
+----------------------------------------------------------------
+Sequential             4.95e-04   1.34e-04   2.76e-06   6.31e-04  27.2%
+Combinational          7.82e-04   8.92e-04   1.39e-05   1.69e-03  72.8%
+Clock                  0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.0%
+Macro                  0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.0%
+Pad                    0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.0%
+----------------------------------------------------------------
+Total                  1.28e-03   1.03e-03   1.66e-05   2.32e-03 100.0%
+                          55.1%      44.2%       0.7%

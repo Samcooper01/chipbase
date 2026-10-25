@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Explore{% endblock %}
+{% block content %}
+<div class="hero">
+  <div class="hero-body">
+    <h1>Explore</h1>
+    <p>
+      The learning side of Chipbase: interactive ways to build intuition
+      before (and between) the graded problems. Everything here runs in
+      your browser - no installs, no accounts.
+    </p>
+  </div>
+</div>
+
+<div class="cc-cards explore-hub-cards">
+  {% for s in sections %}
+  {% if s.live %}
+  <a class="cc-card" href="{{ s.href }}">
+    <div class="cc-card-tag">
+      {% for tag in s.tags %}<span class="chip eng-openroad">{{ tag }}</span>{% endfor %}
+    </div>
+    <div class="cc-card-title">{{ s.title }}</div>
+    <p class="cc-card-body">{{ s.blurb }}</p>
+    <div class="cc-card-foot">{{ s.foot }}</div>
+  </a>
+  {% else %}
+  <div class="cc-card cc-card-planned">
+    <div class="cc-card-tag"><span class="chip chip-soon">in the works</span></div>
+    <div class="cc-card-title">{{ s.title }}</div>
+    <p class="cc-card-body">{{ s.blurb }}</p>
+    <div class="cc-card-foot">{{ s.foot }}</div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}

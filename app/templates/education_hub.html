@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Education{% endblock %}
+{% block head %}
+<style>
+  /* The Education library: one shelf per reference page, one book per section.
+     Page-local styles. Book colours are muted leathers; the cream spine text
+     on each clears 4.5:1 contrast. */
+  .lib-head { margin: -24px calc(50% - 50vw) 0; padding: 30px 0 26px; color: #f3ead7;
+    background-color: #2e2118;
+    background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 9px),
+                      linear-gradient(180deg, #3a2a1e, #2a1e15); }
+  .lib-head-inner { max-width: 1400px; margin: 0 auto; padding: 0 22px; }
+  .lib-head .crumb, .lib-head .crumb a { color: rgba(243,234,215,0.6); }
+  .lib-head h1 { font-family: Georgia, "Times New Roman", serif; font-size: 34px; font-weight: 700; letter-spacing: 0.01em; margin: 4px 0 8px; color: #fbf4e4; }
+  .lib-head p { max-width: 760px; font-size: 15px; line-height: 1.6; color: rgba(243,234,215,0.82); margin: 0; }
+  .lib-head p a { color: #e8c983; }
+
+  /* the bookcase: a dark back panel, shelves stacked on it */
+  .lib-case { margin: 26px 0 30px; padding: 18px 18px 6px; border-radius: 14px;
+    background: linear-gradient(180deg, #3b2b20, #33251b); box-shadow: inset 0 0 0 6px #4a3627, inset 0 0 0 8px #2a1e16; }
+  .lib-shelf { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: end; padding: 14px 10px 0; }
+  .lib-shelf + .lib-shelf { margin-top: 10px; }
+
+  /* the label at the left end of each shelf */
+  .lib-label { align-self: stretch; display: flex; flex-direction: column; background: #f6efdf; color: #2b2118;
+    border-radius: 6px; padding: 14px 16px 12px; margin-bottom: 18px; box-shadow: 0 2px 0 rgba(0,0,0,0.35);
+    border: 1px solid #d9c9a6; text-decoration: none; }
+  .lib-label:hover { text-decoration: none; background: #fbf6ea; }
+  .lib-label-num { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; color: #8a6d45; }
+  .lib-label-name { font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-weight: 700; line-height: 1.2; margin: 3px 0 6px; color: #2b2118; }
+  .lib-label-blurb { font-size: 12.5px; line-height: 1.5; color: #5b4b3a; margin: 0 0 10px; }
+  .lib-label-foot { margin-top: auto; font-family: var(--mono); font-size: 11px; color: #8a6d45; display: flex; justify-content: space-between; gap: 8px; }
+  .lib-label-foot b { color: #7a4a22; font-family: inherit; }
+
+  /* the books, lying flat in piles on a plank */
+  .lib-books { position: relative; display: flex; align-items: flex-end; gap: 16px; padding: 0 8px 18px; overflow-x: auto; }
+  .lib-books::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18px; border-radius: 3px;
+    background: linear-gradient(180deg, #a77a4f 0%, #8a6038 45%, #6c4a2b 100%); box-shadow: 0 5px 8px rgba(0,0,0,0.45); }
+  .lib-pile { display: flex; flex-direction: column; width: 270px; flex: 0 0 auto; position: relative; z-index: 1; }
+  a.lib-book { position: relative; display: flex; align-items: center; gap: 10px; min-height: 30px;
+    padding: 6px 16px 6px 12px; border-radius: 3px; text-decoration: none; color: #f6ecd6; background: var(--c);
+    box-shadow: inset 0 2px 0 rgba(255,255,255,0.12), inset 0 -3px 0 rgba(0,0,0,0.25), 0 1px 0 rgba(0,0,0,0.45);
+    transition: transform 0.14s ease; }
+  a.lib-book + a.lib-book { margin-top: 1px; }
+  a.lib-book:hover, a.lib-book:focus-visible { transform: translateX(8px); text-decoration: none; }
+  a.lib-book:focus-visible { outline: 2px solid #e8c983; outline-offset: 2px; }
+  /* gold bands near both ends of the spine */
+  a.lib-book::before, a.lib-book::after { content: ""; position: absolute; top: 5px; bottom: 5px; width: 3px;
+    border-left: 1px solid #d4b06a; border-right: 1px solid #d4b06a; opacity: 0.75; }
+  a.lib-book::before { left: 5px; } a.lib-book::after { right: 5px; }
+  .lib-book-num { flex: 0 0 auto; min-width: 18px; margin-left: 6px; font-family: var(--mono); font-size: 10px; color: #e6cf98; text-align: right; }
+  .lib-book-title { font-family: Georgia, "Times New Roman", serif; font-size: 13px; line-height: 1.25; letter-spacing: 0.01em; }
+  .lib-shelf-soon .lib-label { opacity: 0.7; }
+  .lib-empty { color: rgba(243,234,215,0.6); font-size: 13px; padding: 0 8px 36px; }
+
+  @media (max-width: 760px) {
+    .lib-shelf { grid-template-columns: 1fr; gap: 6px; }
+    .lib-label { margin-bottom: 0; }
+    /* on a phone the piles stack one above another instead of scrolling sideways */
+    .lib-books { flex-direction: column; align-items: stretch; gap: 1px; overflow-x: visible; }
+    .lib-pile { width: auto; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<header class="lib-head">
+  <div class="lib-head-inner">
+    <div class="crumb">Education</div>
+    <h1>The library</h1>
+    <p>
+      One shelf for each physical design topic, and one book for each section
+      of its reference page. Take a book down to open that section, or start a
+      shelf from the beginning. Practise what you read in
+      <a href="/problems">Problems</a>, and go deeper into the methods under
+      <a href="/explore/algorithms">Methods and algorithms</a>.
+    </p>
+  </div>
+</header>
+
+{# muted leather covers: oxblood, navy, forest, umber, plum, teal, slate, walnut #}
+{% set leathers = ['#6e2a2a', '#2c4566', '#355437', '#6a4a22', '#553a57', '#2b5656', '#454b55', '#5b3a26'] %}
+<div class="lib-case">
+  {% for t in topics %}
+  {% set books = chapters[t.slug] %}
+  <section class="lib-shelf{% if not t.live %} lib-shelf-soon{% endif %}" id="shelf-{{ t.slug }}">
+    {% if t.live %}
+    <a class="lib-label" href="/education/{{ t.slug }}">
+      <span class="lib-label-num">SHELF {{ "%02d"|format(loop.index) }}</span>
+      <span class="lib-label-name">{{ "ECO (Engineering Change Order)" if t.name == "ECO" else t.name }}</span>
+      <span class="lib-label-blurb">{{ t.shelf or t.blurb }}</span>
+      <span class="lib-label-foot"><span>{{ books | length }} books</span><b>Start reading →</b></span>
+    </a>
+    {% else %}
+    <div class="lib-label">
+      <span class="lib-label-num">SHELF {{ "%02d"|format(loop.index) }}</span>
+      <span class="lib-label-name">{{ "ECO (Engineering Change Order)" if t.name == "ECO" else t.name }}</span>
+      <span class="lib-label-blurb">{{ t.shelf or t.blurb }}</span>
+      <span class="lib-label-foot"><span>in the works</span></span>
+    </div>
+    {% endif %}
+    <div class="lib-books" role="list" aria-label="Sections of {{ t.name }}">
+      {% if t.live %}
+      {# books lie flat in piles of at most five, split evenly; book 1 is at the top of
+         the first pile, and the order runs down each pile, then on to the next #}
+      {% set piles = ((books | length) + 4) // 5 %}
+      {% set count = namespace(n=0) %}
+      {% for pile in books | slice(piles) %}
+      <div class="lib-pile">
+        {% for title, anchor in pile %}
+        {% set count.n = count.n + 1 %}
+        {# a small sideways offset per position, fixed so the piles never shift #}
+        {% set off = [4, 14, 0, 10, 6, 16, 2, 12][count.n % 8] %}
+        <a class="lib-book" role="listitem" href="/education/{{ t.slug }}#{{ anchor }}"
+           style="--c: {{ leathers[(count.n + (books | length) * 3) % leathers | length] }}; margin-left: {{ off }}px; margin-right: {{ 16 - off }}px;">
+          <span class="lib-book-num">{{ count.n }}</span>
+          <span class="lib-book-title">{{ title }}</span>
+        </a>
+        {% endfor %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="lib-empty">This shelf is still being written.</div>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

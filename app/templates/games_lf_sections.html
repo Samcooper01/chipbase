@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / {{ game.title }}</div>
+  <h1 class="lab-title">{{ game.title }} <span class="gm-basis-tag">{{ data.basis.tag }}</span></h1>
+  <p class="gm-intro">
+    Every case is the tail of a real run. Read it, say what went wrong or what
+    to do next, and the fix is shown with the answer. Choose the stage you want
+    to practise, or take them all mixed together.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}
+    Reference: <a href="{{ data.reference }}" target="_blank" rel="noopener">{{ data.basis.doc_title }}</a>
+    (<a href="{{ data.basis.tool_url }}" target="_blank" rel="noopener">{{ data.basis.tool }} on GitHub</a>).</span></div>
+  <div class="gm-grid gm-grid-auto">
+    <a class="gm-tile is-mixed" href="/games/log-forensics/all"><div class="gm-tile-body">
+      <h2 class="gm-title">Every stage</h2>
+      <p class="gm-blurb">A mixed round drawn from every stage, in the order a real week gives them to you: no idea which one is coming.</p>
+      <div class="gm-mixed-num">{{ total }}<small>cases across {{ data.sections | length }} stages</small></div>
+      <div class="gm-tile-foot">
+        <span class="gm-count">mixed round</span>
+        <span class="chip diff-easy">play</span>
+      </div>
+    </div></a>
+  </div>
+
+  {% for grp in groups %}
+  <section class="gm-group">
+    <div class="gm-group-head">
+      <h2 class="gm-group-title">{{ grp.title }} <span class="gm-group-count">{{ grp.cases }} case{% if grp.cases != 1 %}s{% endif %}</span></h2>
+      <p class="gm-group-blurb">{{ grp.blurb }}</p>
+    </div>
+    <div class="gm-grid gm-grid-auto">
+      {% for s in grp.stages %}
+      {% if s.count %}<a class="gm-tile" href="/games/log-forensics/{{ s.id }}">{% else %}<div class="gm-tile is-off">{% endif %}<div class="gm-tile-body">
+        <h3 class="gm-title">{{ s.title }}</h3>
+        <p class="gm-blurb">{{ s.blurb }}</p>
+        <div class="gm-cmds">{% for k in s.kinds %}<code>{{ k }}</code>{% endfor %}</div>
+        <div class="gm-tile-foot">
+          <span class="gm-count">{{ s.count }} case{% if s.count != 1 %}s{% endif %}</span>
+          {% if s.count %}<span class="chip diff-easy">play</span>{% else %}<span class="chip chip-soon">no cases yet</span>{% endif %}
+        </div>
+      </div>{% if s.count %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</article>
+{% endblock %}

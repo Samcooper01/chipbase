@@ -1,0 +1,22 @@
+id: place-density
+title: "Pick a global placement density that routes"
+topic: Placement
+difficulty: medium
+points: 150
+engine: sim
+kind: files
+order: 1
+editable:
+  - path: place.tcl
+    language: tcl
+checks:
+  - id: wirelength
+    label: "Total estimated wirelength ≤ 1,150,000 µm"
+    metric: hpwl_um
+    op: "<="
+    value: 1150000
+  - id: congestion
+    label: "Routing congestion overflow ≤ 2.5%"
+    metric: congestion_overflow_pct
+    op: "<="
+    value: 2.5

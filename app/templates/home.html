@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - learn chip physical design by doing{% endblock %}
+{% block main_class %}page-full{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/gemmini-fig.css?v={{ asset_v }}">
+<link rel="stylesheet" href="/static/explore/layout3d.css?v={{ asset_v }}">
+<style>
+  /* Front page catalog: every section with what is in it, in the site's card
+     language (2px ink border, hard offset shadow). Counts and links come from
+     app/site_catalog.py, which reads each section's own content. */
+  .hc-hero { padding: 30px 0 8px; }
+  .hc-hero h1 { font-size: 46px; line-height: 1.08; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 18px; max-width: 860px; }
+  .hc-hero-sub { max-width: 700px; }
+  .hc-card { scroll-margin-top: 84px; }
+  @media (max-width: 720px) { .hc-hero h1 { font-size: 34px; } }
+  .hc-challenge { padding: 40px 22px; }
+  .hc-ch-inner { display: flex; align-items: center; justify-content: space-between; gap: 28px; flex-wrap: wrap; }
+  .hc-ch-text { flex: 1 1 420px; }
+  .hc-ch-status { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; border: 1px solid #34d399; color: #34d399;
+    letter-spacing: 0.8px; }
+  .hc-ch-title { color: #fff; font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 8px 0 8px; }
+  .hc-ch-blurb { color: rgba(255, 255, 255, 0.72); font-size: 14.5px; line-height: 1.55; margin: 0; max-width: 820px; }
+  #challenge { scroll-margin-top: 70px; }
+  .hc-lb { flex: 0 0 330px; border: 1.5px solid rgba(255, 255, 255, 0.28); border-radius: 12px; padding: 12px 14px 14px; background: rgba(255, 255, 255, 0.04); }
+  .hc-lb-head { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); margin-bottom: 6px; }
+  .hc-lb-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; padding: 7px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 13.5px; color: #fff; }
+  .hc-lb-place { font-family: var(--mono); font-weight: 700; color: #34d399; }
+  /* medals: a disc with an inner ring and a ribbon notch above it */
+  .hc-medal { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+    margin-top: 6px; border-radius: 50%; font-family: var(--mono); font-size: 12px; font-weight: 800; color: #1c1a14;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.45), inset 0 0 0 4px rgba(0, 0, 0, 0.12), 0 1px 0 rgba(0, 0, 0, 0.4); }
+  .hc-medal::before { content: ""; position: absolute; top: -8px; left: 50%; width: 14px; height: 9px; transform: translateX(-50%);
+    clip-path: polygon(0 0, 100% 0, 78% 100%, 50% 62%, 22% 100%); background: #2f6fed; }
+  .hc-medal-1 { background: radial-gradient(circle at 35% 30%, #fff3b0, #f2c230 55%, #b8860b); }
+  .hc-medal-2 { background: radial-gradient(circle at 35% 30%, #ffffff, #c9ced6 55%, #8a929e); }
+  .hc-medal-3 { background: radial-gradient(circle at 35% 30%, #ffd9b3, #cd8a4b 55%, #8a5325); }
+  .hc-medal-1::before { background: #dc2626; }
+  .hc-medal-3::before { background: #16a34a; }
+  .hc-lb-row.is-open .hc-medal { opacity: 0.85; }
+  .hc-lb-fom { font-family: var(--mono); font-weight: 700; }
+  .hc-lb-row.is-open .hc-lb-name { color: rgba(255, 255, 255, 0.55); font-style: italic; }
+  .hc-lb-row.is-base { border-top: 1px dashed rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.75); font-size: 12.5px; }
+  .hc-ch-btn { display: inline-block; margin-top: 18px; }
+  /* hero artwork: placed cell rows with a few routed nets, faint, on the right,
+     fading out before the text; generated once from a fixed seed, and static */
+  .hc-hero-band { position: relative; overflow: hidden; }
+  .hc-hero-band > .band-inner { position: relative; z-index: 1; }
+  .hc-art { position: absolute; top: 0; right: 0; height: 100%; width: 62%; pointer-events: none;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 44%, #000 80%); mask-image: linear-gradient(to right, transparent 0%, transparent 44%, #000 80%); }
+  .hc-art-cells rect { fill: none; stroke: var(--navy); stroke-opacity: 0.13; stroke-width: 1; }
+  .hc-art-cells rect.is-hot { fill: var(--green); fill-opacity: 0.16; stroke: var(--green); stroke-opacity: 0.35; }
+  .hc-art-rails line { stroke: var(--navy); stroke-opacity: 0.07; stroke-width: 2; }
+  .hc-art-nets path { fill: none; stroke: var(--green); stroke-opacity: 0.5; stroke-width: 2; stroke-linejoin: round; }
+  .hc-art-nets circle { fill: var(--green); fill-opacity: 0.7; }
+  .hc-art-via { fill: var(--navy); fill-opacity: 0.45; }
+  .hc-mark { background: linear-gradient(transparent 62%, rgba(22, 163, 74, 0.28) 62%, rgba(22, 163, 74, 0.28) 92%, transparent 92%);
+    padding: 0 2px; }
+  @media (max-width: 720px) { .hc-art { width: 100%; opacity: 0.5; } }
+  /* the challenge banner; the figure's own styles are in static/gemmini-fig.css */
+  .hc-challenge { background: linear-gradient(115deg, #0e1812 0%, var(--navy) 48%, #173323 100%);
+    border-bottom: 3px solid var(--green); }
+  .hc-sa { flex: 0 0 300px; }
+  .hc-lb { box-shadow: 5px 5px 0 rgba(52, 211, 153, 0.35); background: rgba(8, 16, 11, 0.55); }
+  @media (max-width: 1180px) { .hc-sa { display: none; } }
+  /* the banner's "Challenge / open" label, larger than the site's usual eyebrow so it reads at a glance */
+  .hc-challenge .eyebrow { display: flex; align-items: center; gap: 16px; font-size: 32px; letter-spacing: 3px; line-height: 1.1; margin-bottom: 12px; }
+  .hc-challenge .hc-ch-status { margin-left: 0; font-size: 18px; letter-spacing: 1.8px; padding: 4px 14px; border-width: 2px; }
+  /* the word Challenge: pops in on load, then a band of light sweeps across it
+     every few seconds; the status tag carries a pulsing live dot */
+  .hc-ch-word { display: inline-block; color: #6ee7a0; transform-origin: left center; margin-right: 18px;  /* room to swell into */
+    background: linear-gradient(100deg, #6ee7a0 0%, #6ee7a0 32%, #ffffff 44%, #ffffff 56%, #6ee7a0 68%, #6ee7a0 100%);
+    background-size: 250% 100%; background-position: 100% 0; -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.35));
+    animation: hcPop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.3) both, hcShine 2.6s 0.8s ease-in-out infinite, hcPulse 2.6s 0.8s ease-in-out infinite; }
+  @keyframes hcPop { 0% { transform: scale(0.8); opacity: 0; } 65% { transform: scale(1.07); opacity: 1; } 100% { transform: scale(1); } }
+  /* every 2.6 seconds: the band of light crosses the word while it swells and glows, then it settles */
+  @keyframes hcShine { 0% { background-position: 100% 0; } 55%, 100% { background-position: 0% 0; } }
+  @keyframes hcPulse {
+    0%, 70%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.35)); }
+    25% { transform: scale(1.1); filter: drop-shadow(0 0 22px rgba(52, 211, 153, 0.9)); }
+  }
+  .hc-ch-status { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+  .hc-ch-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #34d399;
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); animation: hcLive 1.8s ease-out infinite; }
+  @keyframes hcLive { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); } 70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .hc-ch-word, .hc-ch-status::before { animation: none; }
+    .hc-ch-word { -webkit-text-fill-color: #6ee7a0; background: none; }
+  }
+  /* the tutor example: what resolve_reference hands back, the page's own text with the quote and the answer highlighted */
+  .hc-tutor-mock { font-size: 12px; line-height: 1.55; }
+  .hc-tutor-mock sub { font-size: 0.75em; }
+  .hc-hl { color: #fde68a; }
+  /* the tools and process kits the site is built on, under the hero buttons */
+  .hc-built { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; margin: 30px 0 0; padding-top: 20px; border-top: 1px solid var(--border); }
+  .hc-built-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+  .hc-built-item { display: inline-flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; opacity: 0.85; }
+  .hc-built-item:hover { opacity: 1; text-decoration: none; }
+  .hc-built-item:hover .hc-built-name { color: var(--green-deep); }
+  .hc-built-item img { width: 30px; height: 30px; object-fit: contain; }
+  .hc-built-mark { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 5px;
+    border: 1.5px solid var(--navy); border-radius: 7px; font-family: var(--mono); font-size: 10.5px; font-weight: 800; background: var(--panel); }
+  .hc-built-name { font-size: 13.5px; font-weight: 600; }
+  /* the tutor demo: a looping storyboard of highlight, copy, paste, look up. A small
+     script below steps a data-scene attribute on .hc-demo; the CSS shows each scene. */
+  .hc-demo { width: 100%; max-width: 560px; }
+  .hc-demo-steps { display: flex; gap: 6px; list-style: none; margin: 0 0 10px; padding: 0; counter-reset: s; }
+  .hc-demo-steps li { flex: 1; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.4px; color: var(--muted);
+    padding: 6px 4px 6px; border-top: 3px solid var(--border); text-align: center; transition: color 0.3s, border-color 0.3s; }
+  .hc-demo-steps li::before { counter-increment: s; content: counter(s) " "; font-weight: 800; }
+  .hc-demo[data-scene="1"] [data-step="1"], .hc-demo[data-scene="2"] [data-step="1"], .hc-demo[data-scene="2"] [data-step="2"],
+  .hc-demo[data-scene="3"] [data-step="1"], .hc-demo[data-scene="3"] [data-step="2"], .hc-demo[data-scene="3"] [data-step="3"],
+  .hc-demo[data-scene="4"] li, .hc-demo[data-scene="5"] li { color: var(--green-deep); border-color: var(--green); }
+  .hc-demo-stage { position: relative; height: 440px; border: 2px solid var(--navy); border-radius: 12px; overflow: hidden;
+    box-shadow: 5px 5px 0 var(--shadow-hard); background: var(--panel); }
+  .hc-demo-page, .hc-demo-chat { position: absolute; inset: 0; transition: opacity 0.5s ease, transform 0.5s ease; }
+  /* the page */
+  .hc-demo-page { padding: 22px 24px; font-size: 14px; line-height: 1.6; color: var(--text); }
+  .hc-demo-crumb { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-bottom: 8px; }
+  .hc-demo-h { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .hc-demo-page p { margin: 0; }
+  .hc-demo-page-eq { margin-top: 22px; padding: 10px 14px; border-left: 3px solid var(--green); background: var(--panel-2); font-family: var(--mono); font-size: 12.5px; line-height: 1.7; }
+  .hc-demo-more { margin-top: 16px !important; }
+  .hc-demo-pasted { display: block; margin-top: 6px; font-family: var(--mono); font-size: 10.5px; color: rgba(255,255,255,0.55); line-height: 1.45; }
+  .hc-demo-pasted:empty { display: none; }
+  .hc-demo-sel { background: linear-gradient(rgba(47, 111, 237, 0.28), rgba(47, 111, 237, 0.28)) no-repeat 0 0 / 0% 100%;
+    transition: background-size 1.2s linear; }
+  .hc-demo-copy { position: absolute; left: 24px; top: 160px; font: 600 12px var(--mono); padding: 7px 10px; border: 2px solid var(--navy);
+    border-radius: 8px; background: var(--panel); box-shadow: 3px 3px 0 var(--shadow-hard); opacity: 0; transform: scale(0.8);
+    transition: opacity 0.25s, transform 0.25s, background 0.2s, color 0.2s, border-color 0.2s; }
+  .hc-demo-cursor { position: absolute; width: 16px; left: 470px; top: 330px; opacity: 0; transition: left 0.9s ease, top 0.9s ease, opacity 0.3s; }
+  /* the chat */
+  .hc-demo-chat { background: #10151a; color: #e6ebe7; opacity: 0; transform: translateY(12px); display: flex; flex-direction: column; font-size: 12.5px; }
+  .hc-demo-bar { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid rgba(255,255,255,0.1);
+    font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.7); }
+  .hc-demo-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; }
+  .hc-demo-tag { margin-left: auto; color: #34d399; }
+  .hc-demo-msgs { flex: 1; overflow: hidden; padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .hc-demo-user { align-self: flex-end; max-width: 92%; background: #1f2a33; border-radius: 10px; padding: 8px 10px; opacity: 0; }
+  .hc-demo-q { font-family: var(--mono); font-size: 10.5px; color: rgba(255,255,255,0.6); line-height: 1.45; }
+  .hc-demo-ask { margin-bottom: 5px; }
+  .hc-demo-tool, .hc-demo-pulled, .hc-demo-answer { opacity: 0; }
+  .hc-demo-tool { font-family: var(--mono); font-size: 11px; color: #34d399; display: flex; align-items: center; gap: 6px; }
+  .hc-demo-tool b { color: #e6ebe7; font-weight: 700; }
+  .hc-demo-found { display: none; }
+  .hc-demo-looking { color: rgba(255,255,255,0.5); }
+  .hc-demo-spin { width: 9px; height: 9px; border-radius: 50%; border: 2px solid rgba(52,211,153,0.3); border-top-color: #34d399; animation: hcSpin 0.7s linear infinite; }
+  @keyframes hcSpin { to { transform: rotate(360deg); } }
+  .hc-demo-pulled { border-left: 2px solid rgba(52,211,153,0.55); padding: 2px 0 2px 10px; font-size: 11.5px; line-height: 1.5; color: rgba(255,255,255,0.85);
+    max-height: 0; overflow: hidden; transition: max-height 0.8s ease, opacity 0.4s; }
+  .hc-demo-path { font-family: var(--mono); font-size: 10.5px; color: rgba(255,255,255,0.5); margin-bottom: 3px; }
+  .hc-demo-eq { font-family: var(--mono); font-size: 11px; margin-top: 5px; color: #e6ebe7; }
+  .hc-demo-pulled mark { background: none; color: #fde68a; }
+  .hc-demo-answer { line-height: 1.5; transition: opacity 0.5s; }
+  .hc-demo-input { margin: 0 12px 12px; min-height: 34px; border: 1px solid rgba(255,255,255,0.18); border-radius: 9px; padding: 8px 10px;
+    font-size: 12.5px; color: #e6ebe7; white-space: pre-wrap; }
+  .hc-demo-caret { display: inline-block; width: 7px; height: 14px; background: #34d399; vertical-align: -2px; animation: hcBlink 1s steps(1) infinite; }
+  @keyframes hcBlink { 50% { opacity: 0; } }
+  /* scene switches */
+  .hc-demo.is-selected .hc-demo-sel { background-size: 100% 100%; }
+  .hc-demo.is-button .hc-demo-copy { opacity: 1; transform: scale(1); }
+  .hc-demo.is-pointing .hc-demo-cursor { opacity: 1; left: 80px; top: 174px; }
+  .hc-demo.is-copied .hc-demo-copy { background: #16a34a; color: #fff; border-color: #16a34a; transform: scale(0.96); }
+  .hc-demo[data-scene="3"] .hc-demo-page, .hc-demo[data-scene="4"] .hc-demo-page, .hc-demo[data-scene="5"] .hc-demo-page { opacity: 0; transform: translateY(-12px); }
+  .hc-demo[data-scene="3"] .hc-demo-chat, .hc-demo[data-scene="4"] .hc-demo-chat, .hc-demo[data-scene="5"] .hc-demo-chat { opacity: 1; transform: none; }
+  .hc-demo.is-sent .hc-demo-user { opacity: 1; }
+  .hc-demo.is-looking .hc-demo-tool { opacity: 1; }
+  .hc-demo.is-found .hc-demo-spin, .hc-demo.is-found .hc-demo-looking { display: none; }
+  .hc-demo.is-found .hc-demo-found { display: inline; }
+  .hc-demo.is-found .hc-demo-pulled { opacity: 1; max-height: 220px; }
+  .hc-demo.is-answered .hc-demo-answer { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .hc-demo-page { display: none; }
+    .hc-demo-chat { opacity: 1; transform: none; }
+    .hc-demo-user, .hc-demo-tool, .hc-demo-pulled, .hc-demo-answer { opacity: 1; max-height: none; }
+    .hc-demo-spin, .hc-demo-looking, .hc-demo-caret { display: none; }
+    .hc-demo-found { display: inline; }
+    .hc-demo-steps li { color: var(--green-deep); border-color: var(--green); }
+  }
+  /* scene 3: the paste is shown, not implied: a cursor right-clicks the box and picks Paste */
+  .hc-demo-cursor2 { left: 360px; top: 190px; }
+  .hc-demo.is-chatcursor .hc-demo-cursor2 { opacity: 1; left: 162px; top: 398px; }
+  .hc-demo.is-pastehover .hc-demo-cursor2 { left: 200px; top: 360px; }
+  .hc-demo.is-pasted .hc-demo-cursor2 { opacity: 0; }
+  .hc-demo-menu { position: absolute; left: 158px; bottom: 50px; margin: 0; padding: 4px; list-style: none; width: 116px;
+    background: #f7f7f5; color: #16241b; border: 1px solid #c8cbc4; border-radius: 7px; box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    font-size: 12.5px; opacity: 0; transform: scale(0.94); transform-origin: top left; transition: opacity 0.15s, transform 0.15s; }
+  .hc-demo-menu li { padding: 4px 10px; border-radius: 4px; }
+  .hc-demo-menu li:not(.hc-demo-paste) { color: #8a8f88; }
+  .hc-demo.is-menu .hc-demo-menu { opacity: 1; transform: none; }
+  .hc-demo.is-pastehover .hc-demo-paste { background: #2f6fed; color: #fff; }
+  .hc-demo.is-pasted .hc-demo-menu { opacity: 0; transition: opacity 0.1s; }
+  @media (prefers-reduced-motion: reduce) { .hc-demo-menu, .hc-demo-cursor2 { display: none; } }
+  .hc-group-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 0 0 18px; }
+  .hc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 18px; }
+  .hc-card { display: flex; flex-direction: column; border: 2px solid var(--navy); border-radius: 14px; background: var(--panel);
+    box-shadow: 5px 5px 0 var(--shadow-hard); padding: 16px 18px 14px; }
+  .hc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .hc-title { font-size: 18px; font-weight: 800; margin: 0; }
+  .hc-title a { color: var(--text); text-decoration: none; }
+  .hc-title a:hover { color: var(--green-deep); }
+  .hc-count { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--green-deep); line-height: 1; white-space: nowrap; }
+  .hc-unit { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  .hc-blurb { font-size: 13.5px; line-height: 1.5; margin: 10px 0 10px; color: var(--text); }
+  .hc-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+  .hc-list li { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; line-height: 1.35; }
+  .hc-list a { color: var(--text); }
+  .hc-list a:hover { color: var(--green-deep); }
+  .hc-note { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; text-align: right; }
+  .hc-foot { margin-top: auto; padding-top: 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .hc-foot a { font-weight: 700; font-size: 13.5px; }
+  .hc-prog { font-family: var(--mono); font-size: 11px; color: var(--green-deep); }
+  .hc-more { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; margin-top: 5px; }
+  /* the try-it band: riscv32i through the browser engine, run from the
+     front page. static/explore/home-try.js fills the knobs, stages and
+     numbers; before the first run the picture is the real layout. */
+  .hc-try-inner { grid-template-columns: minmax(0, 1.14fr) minmax(0, 1fr); align-items: start; }
+  .hc-try .band-title { font-size: 28px; }
+  .hc-try-sub { margin-bottom: 18px; }
+  .hc-try-knob { display: grid; grid-template-columns: 150px 1fr 70px; gap: 4px 12px; align-items: center; margin: 0 0 8px; }
+  .hc-try-kname { font-weight: 700; font-size: 14px; }
+  .hc-try-knob input { width: 100%; accent-color: var(--green); }
+  .hc-try-knob output { font-family: var(--mono); font-size: 13px; font-weight: 700; text-align: right; }
+  .hc-try-go { display: flex; align-items: center; gap: 14px; margin: 14px 0 12px; }
+  .hc-try-go button:disabled { opacity: 0.6; cursor: progress; }
+  .hc-try-status { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .hc-try-stages { display: flex; gap: 6px; list-style: none; margin: 0 0 10px; padding: 0; counter-reset: s; }
+  /* each stage: its top border shows progress, its button shows that stage's picture once a run is done */
+  .hc-try-stages li { flex: 1; border-top: 3px solid var(--border); transition: border-color 0.3s; }
+  .hc-try-stages li[data-state="run"] { border-color: #f59e0b; }
+  .hc-try-stages li[data-state="done"] { border-color: var(--green); }
+  .hc-try-stages button { width: 100%; padding: 6px 2px; border: 0; border-radius: 0 0 6px 6px; background: none; cursor: pointer;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.3px; color: var(--muted); transition: background 0.15s, color 0.15s; }
+  .hc-try-stages button::before { counter-increment: s; content: counter(s) " "; font-weight: 800; }
+  .hc-try-stages li[data-state="run"] button { color: #b45309; }
+  .hc-try-stages li[data-state="done"] button { color: var(--green-deep); }
+  .hc-try-stages button:disabled { cursor: default; }
+  .hc-try-stages button:not(:disabled):hover { background: rgba(22, 163, 74, 0.1); }
+  .hc-try-stages li[data-state="done"] button[aria-pressed="true"] { background: var(--green); color: #fff; font-weight: 700; }
+  .hc-try-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .hc-try-table th, .hc-try-table td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); }
+  .hc-try-table thead th { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .hc-try-table td { font-family: var(--mono); font-size: 12.5px; }
+  .hc-try-table td:nth-child(3) { color: var(--muted); }
+  .hc-try-ok { color: var(--green-deep); font-weight: 700; }
+  .hc-try-bad { color: #dc2626; font-weight: 700; }
+  .hc-try-dim { color: var(--muted); }
+  .hc-try-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 10px 0 0; }
+  .hc-try-view { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel); box-shadow: 5px 5px 0 var(--shadow-hard); padding: 14px; }
+  .hc-try-view img, .hc-try-view canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 6px; background: #eef1f4; }
+  .hc-try-view img { object-fit: contain; }
+  .hc-try-view [hidden] { display: none; }
+  .hc-try-label { font-family: var(--mono); font-size: 12px; margin: 7px 0 3px; min-height: 1.4em; }
+  .hc-try-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); min-height: 40px; align-content: flex-start; }
+  .hc-try-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .hc-try-more { display: block; margin-top: 9px; padding: 7px 16px; font-size: 14.5px; text-align: center; }
+  @media (max-width: 900px) { .hc-try-inner { grid-template-columns: 1fr; } }
+  .hc-try-knob select { grid-column: 2 / 4; font: inherit; font-size: 13.5px; padding: 5px 8px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--panel); color: var(--text); }
+  .hc-try-3d { margin-top: 28px; }
+  /* shorter than on the design page; the panel drops its note on layer heights to fit */
+  .hc-try-3d .dz3-stage { height: 440px; }
+  .hc-try-3d .dz3-panel { max-height: 440px; }
+  .hc-try-3d .dz3-panel .dz3-note { display: none; }
+  .hc-try-3d .dz3-panel h3 { margin: 8px 0 4px; }
+  .hc-try-3d .dz3-toggle { padding: 1px 0; }
+  .hc-try-3d .dz3-cams { margin-top: 6px; }
+  @media (min-width: 801px) { .hc-try-3d .dz3 { grid-template-columns: minmax(0, 1fr) 310px; } }
+  .hc-try-3d > h3 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 6px; }
+  .hc-try-3d > p { color: var(--muted); font-size: 14.5px; line-height: 1.55; max-width: 900px; margin: 0 0 12px; }
+  .hc-try-3dstill { display: grid; grid-template-columns: minmax(0, 1fr) 310px; height: 440px; border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12); background: #e7ebf0; }
+  .hc-try-3dstill img { width: 100%; height: 440px; object-fit: cover; object-position: center 60%; display: block; }
+  .hc-try-3dside { background: #fff; border-left: 1px solid var(--border); padding: 18px 16px; display: flex; flex-direction: column;
+    align-items: flex-start; gap: 12px; }
+  .hc-try-3dside p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text); }
+  .hc-try-tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--copper, #b8692e);
+    border: 1px solid currentColor; border-radius: 999px; padding: 2px 9px; }
+  @media (max-width: 800px) { .hc-try-3dstill { grid-template-columns: 1fr; height: auto; } .hc-try-3dstill img { height: 300px; } }
+  .hc-try-3dwait { display: grid; place-items: center; height: 220px; border: 2px dashed var(--border); border-radius: 12px;
+    color: var(--muted); font-family: var(--mono); font-size: 13px; text-align: center; padding: 0 16px; }
+</style>
+{% endblock %}
+{% block content %}
+
+
+<!-- hero -->
+<section class="band hc-hero-band">
+  <svg class="hc-art" viewBox="0 0 640 380" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false"><g class="hc-art-cells"><rect x="-10" y="8" width="18" height="20" rx="2" class="is-hot"/><rect x="10" y="8" width="50" height="20" rx="2"/><rect x="62" y="8" width="14" height="20" rx="2"/><rect x="78" y="8" width="14" height="20" rx="2" class="is-hot"/><rect x="94" y="8" width="14" height="20" rx="2" class="is-hot"/><rect x="110" y="8" width="34" height="20" rx="2"/><rect x="146" y="8" width="42" height="20" rx="2" class="is-hot"/><rect x="190" y="8" width="34" height="20" rx="2"/><rect x="226" y="8" width="14" height="20" rx="2"/><rect x="242" y="8" width="26" height="20" rx="2"/><rect x="270" y="8" width="22" height="20" rx="2"/><rect x="294" y="8" width="14" height="20" rx="2"/><rect x="374" y="8" width="14" height="20" rx="2"/><rect x="390" y="8" width="34" height="20" rx="2"/><rect x="426" y="8" width="34" height="20" rx="2"/><rect x="462" y="8" width="18" height="20" rx="2"/><rect x="500" y="8" width="22" height="20" rx="2"/><rect x="524" y="8" width="42" height="20" rx="2"/><rect x="582" y="8" width="26" height="20" rx="2"/><rect x="610" y="8" width="26" height="20" rx="2"/><rect x="638" y="8" width="14" height="20" rx="2"/><rect x="8" y="34" width="50" height="20" rx="2"/><rect x="60" y="34" width="34" height="20" rx="2"/><rect x="96" y="34" width="14" height="20" rx="2"/><rect x="112" y="34" width="26" height="20" rx="2" class="is-hot"/><rect x="140" y="34" width="42" height="20" rx="2"/><rect x="184" y="34" width="42" height="20" rx="2"/><rect x="228" y="34" width="26" height="20" rx="2"/><rect x="256" y="34" width="26" height="20" rx="2"/><rect x="310" y="34" width="50" height="20" rx="2"/><rect x="362" y="34" width="26" height="20" rx="2"/><rect x="390" y="34" width="14" height="20" rx="2"/><rect x="406" y="34" width="22" height="20" rx="2"/><rect x="430" y="34" width="50" height="20" rx="2"/><rect x="482" y="34" width="22" height="20" rx="2"/><rect x="506" y="34" width="18" height="20" rx="2"/><rect x="526" y="34" width="18" height="20" rx="2" class="is-hot"/><rect x="546" y="34" width="50" height="20" rx="2"/><rect x="598" y="34" width="14" height="20" rx="2"/><rect x="614" y="34" width="34" height="20" rx="2"/><rect x="2" y="60" width="50" height="20" rx="2"/><rect x="54" y="60" width="42" height="20" rx="2"/><rect x="98" y="60" width="50" height="20" rx="2"/><rect x="150" y="60" width="50" height="20" rx="2"/><rect x="228" y="60" width="42" height="20" rx="2"/><rect x="272" y="60" width="18" height="20" rx="2"/><rect x="326" y="60" width="14" height="20" rx="2"/><rect x="342" y="60" width="22" height="20" rx="2"/><rect x="366" y="60" width="18" height="20" rx="2"/><rect x="386" y="60" width="22" height="20" rx="2"/><rect x="410" y="60" width="26" height="20" rx="2"/><rect x="438" y="60" width="26" height="20" rx="2"/><rect x="484" y="60" width="22" height="20" rx="2"/><rect x="508" y="60" width="42" height="20" rx="2" class="is-hot"/><rect x="552" y="60" width="34" height="20" rx="2"/><rect x="588" y="60" width="14" height="20" rx="2"/><rect x="604" y="60" width="42" height="20" rx="2"/><rect x="-12" y="86" width="34" height="20" rx="2"/><rect x="24" y="86" width="50" height="20" rx="2"/><rect x="76" y="86" width="34" height="20" rx="2"/><rect x="112" y="86" width="50" height="20" rx="2"/><rect x="164" y="86" width="18" height="20" rx="2"/><rect x="184" y="86" width="42" height="20" rx="2"/><rect x="228" y="86" width="26" height="20" rx="2" class="is-hot"/><rect x="256" y="86" width="14" height="20" rx="2"/><rect x="272" y="86" width="18" height="20" rx="2"/><rect x="292" y="86" width="26" height="20" rx="2"/><rect x="320" y="86" width="22" height="20" rx="2"/><rect x="362" y="86" width="26" height="20" rx="2"/><rect x="390" y="86" width="34" height="20" rx="2"/><rect x="426" y="86" width="14" height="20" rx="2"/><rect x="442" y="86" width="50" height="20" rx="2"/><rect x="494" y="86" width="14" height="20" rx="2"/><rect x="510" y="86" width="50" height="20" rx="2"/><rect x="562" y="86" width="26" height="20" rx="2"/><rect x="590" y="86" width="50" height="20" rx="2"/><rect x="-6" y="112" width="26" height="20" rx="2"/><rect x="22" y="112" width="18" height="20" rx="2"/><rect x="42" y="112" width="18" height="20" rx="2"/><rect x="62" y="112" width="42" height="20" rx="2"/><rect x="106" y="112" width="26" height="20" rx="2"/><rect x="134" y="112" width="34" height="20" rx="2" class="is-hot"/><rect x="170" y="112" width="50" height="20" rx="2"/><rect x="222" y="112" width="34" height="20" rx="2"/><rect x="258" y="112" width="50" height="20" rx="2"/><rect x="310" y="112" width="14" height="20" rx="2"/><rect x="326" y="112" width="18" height="20" rx="2"/><rect x="346" y="112" width="34" height="20" rx="2"/><rect x="382" y="112" width="42" height="20" rx="2"/><rect x="426" y="112" width="34" height="20" rx="2"/><rect x="462" y="112" width="50" height="20" rx="2"/><rect x="514" y="112" width="34" height="20" rx="2"/><rect x="550" y="112" width="50" height="20" rx="2"/><rect x="602" y="112" width="14" height="20" rx="2"/><rect x="618" y="112" width="18" height="20" rx="2"/><rect x="1" y="138" width="34" height="20" rx="2"/><rect x="121" y="138" width="18" height="20" rx="2"/><rect x="141" y="138" width="34" height="20" rx="2" class="is-hot"/><rect x="177" y="138" width="14" height="20" rx="2"/><rect x="193" y="138" width="34" height="20" rx="2"/><rect x="229" y="138" width="22" height="20" rx="2"/><rect x="253" y="138" width="26" height="20" rx="2"/><rect x="281" y="138" width="34" height="20" rx="2"/><rect x="317" y="138" width="22" height="20" rx="2"/><rect x="341" y="138" width="18" height="20" rx="2"/><rect x="361" y="138" width="14" height="20" rx="2"/><rect x="377" y="138" width="42" height="20" rx="2"/><rect x="421" y="138" width="42" height="20" rx="2"/><rect x="465" y="138" width="50" height="20" rx="2"/><rect x="517" y="138" width="42" height="20" rx="2"/><rect x="561" y="138" width="18" height="20" rx="2"/><rect x="581" y="138" width="14" height="20" rx="2"/><rect x="597" y="138" width="42" height="20" rx="2"/><rect x="-7" y="164" width="34" height="20" rx="2"/><rect x="29" y="164" width="22" height="20" rx="2"/><rect x="53" y="164" width="14" height="20" rx="2"/><rect x="111" y="164" width="22" height="20" rx="2"/><rect x="149" y="164" width="50" height="20" rx="2"/><rect x="201" y="164" width="14" height="20" rx="2" class="is-hot"/><rect x="217" y="164" width="50" height="20" rx="2"/><rect x="269" y="164" width="50" height="20" rx="2"/><rect x="321" y="164" width="50" height="20" rx="2"/><rect x="373" y="164" width="34" height="20" rx="2"/><rect x="409" y="164" width="42" height="20" rx="2"/><rect x="453" y="164" width="50" height="20" rx="2"/><rect x="505" y="164" width="14" height="20" rx="2" class="is-hot"/><rect x="521" y="164" width="14" height="20" rx="2"/><rect x="537" y="164" width="50" height="20" rx="2"/><rect x="589" y="164" width="14" height="20" rx="2"/><rect x="605" y="164" width="34" height="20" rx="2"/><rect x="17" y="190" width="42" height="20" rx="2"/><rect x="61" y="190" width="18" height="20" rx="2"/><rect x="81" y="190" width="22" height="20" rx="2"/><rect x="105" y="190" width="18" height="20" rx="2"/><rect x="125" y="190" width="18" height="20" rx="2"/><rect x="167" y="190" width="14" height="20" rx="2"/><rect x="183" y="190" width="18" height="20" rx="2"/><rect x="229" y="190" width="50" height="20" rx="2"/><rect x="281" y="190" width="34" height="20" rx="2"/><rect x="317" y="190" width="34" height="20" rx="2"/><rect x="353" y="190" width="18" height="20" rx="2"/><rect x="373" y="190" width="42" height="20" rx="2"/><rect x="417" y="190" width="22" height="20" rx="2"/><rect x="455" y="190" width="42" height="20" rx="2"/><rect x="513" y="190" width="50" height="20" rx="2"/><rect x="565" y="190" width="22" height="20" rx="2"/><rect x="589" y="190" width="14" height="20" rx="2"/><rect x="631" y="190" width="22" height="20" rx="2"/><rect x="-3" y="216" width="22" height="20" rx="2"/><rect x="21" y="216" width="22" height="20" rx="2"/><rect x="45" y="216" width="22" height="20" rx="2"/><rect x="69" y="216" width="34" height="20" rx="2"/><rect x="155" y="216" width="22" height="20" rx="2"/><rect x="213" y="216" width="14" height="20" rx="2"/><rect x="229" y="216" width="14" height="20" rx="2"/><rect x="245" y="216" width="50" height="20" rx="2"/><rect x="297" y="216" width="50" height="20" rx="2"/><rect x="349" y="216" width="22" height="20" rx="2"/><rect x="373" y="216" width="22" height="20" rx="2"/><rect x="397" y="216" width="14" height="20" rx="2"/><rect x="413" y="216" width="34" height="20" rx="2"/><rect x="449" y="216" width="50" height="20" rx="2"/><rect x="501" y="216" width="50" height="20" rx="2"/><rect x="603" y="216" width="42" height="20" rx="2"/><rect x="1" y="242" width="42" height="20" rx="2"/><rect x="45" y="242" width="14" height="20" rx="2"/><rect x="61" y="242" width="14" height="20" rx="2"/><rect x="77" y="242" width="14" height="20" rx="2"/><rect x="93" y="242" width="42" height="20" rx="2"/><rect x="137" y="242" width="26" height="20" rx="2"/><rect x="165" y="242" width="34" height="20" rx="2"/><rect x="235" y="242" width="42" height="20" rx="2"/><rect x="279" y="242" width="50" height="20" rx="2"/><rect x="331" y="242" width="18" height="20" rx="2"/><rect x="351" y="242" width="26" height="20" rx="2"/><rect x="379" y="242" width="26" height="20" rx="2"/><rect x="407" y="242" width="14" height="20" rx="2"/><rect x="423" y="242" width="14" height="20" rx="2"/><rect x="439" y="242" width="42" height="20" rx="2"/><rect x="483" y="242" width="34" height="20" rx="2"/><rect x="519" y="242" width="26" height="20" rx="2"/><rect x="547" y="242" width="42" height="20" rx="2"/><rect x="591" y="242" width="42" height="20" rx="2"/><rect x="635" y="242" width="26" height="20" rx="2"/><rect x="-3" y="268" width="18" height="20" rx="2"/><rect x="69" y="268" width="34" height="20" rx="2"/><rect x="105" y="268" width="22" height="20" rx="2"/><rect x="147" y="268" width="14" height="20" rx="2"/><rect x="163" y="268" width="22" height="20" rx="2"/><rect x="187" y="268" width="34" height="20" rx="2"/><rect x="223" y="268" width="22" height="20" rx="2"/><rect x="247" y="268" width="26" height="20" rx="2"/><rect x="275" y="268" width="26" height="20" rx="2"/><rect x="303" y="268" width="42" height="20" rx="2"/><rect x="347" y="268" width="22" height="20" rx="2"/><rect x="371" y="268" width="22" height="20" rx="2"/><rect x="395" y="268" width="14" height="20" rx="2"/><rect x="411" y="268" width="14" height="20" rx="2"/><rect x="449" y="268" width="26" height="20" rx="2"/><rect x="477" y="268" width="22" height="20" rx="2"/><rect x="565" y="268" width="42" height="20" rx="2"/><rect x="609" y="268" width="18" height="20" rx="2"/><rect x="629" y="268" width="22" height="20" rx="2"/><rect x="10" y="294" width="26" height="20" rx="2"/><rect x="38" y="294" width="42" height="20" rx="2"/><rect x="82" y="294" width="34" height="20" rx="2"/><rect x="118" y="294" width="14" height="20" rx="2"/><rect x="134" y="294" width="34" height="20" rx="2"/><rect x="170" y="294" width="22" height="20" rx="2"/><rect x="194" y="294" width="34" height="20" rx="2"/><rect x="230" y="294" width="22" height="20" rx="2"/><rect x="254" y="294" width="42" height="20" rx="2"/><rect x="298" y="294" width="42" height="20" rx="2"/><rect x="342" y="294" width="42" height="20" rx="2"/><rect x="404" y="294" width="34" height="20" rx="2"/><rect x="440" y="294" width="18" height="20" rx="2"/><rect x="460" y="294" width="50" height="20" rx="2"/><rect x="512" y="294" width="18" height="20" rx="2"/><rect x="566" y="294" width="18" height="20" rx="2"/><rect x="586" y="294" width="18" height="20" rx="2"/><rect x="606" y="294" width="26" height="20" rx="2"/><rect x="634" y="294" width="18" height="20" rx="2"/><rect x="-19" y="320" width="26" height="20" rx="2"/><rect x="9" y="320" width="18" height="20" rx="2"/><rect x="29" y="320" width="50" height="20" rx="2"/><rect x="81" y="320" width="22" height="20" rx="2"/><rect x="105" y="320" width="42" height="20" rx="2"/><rect x="149" y="320" width="50" height="20" rx="2"/><rect x="219" y="320" width="42" height="20" rx="2"/><rect x="263" y="320" width="34" height="20" rx="2"/><rect x="299" y="320" width="50" height="20" rx="2"/><rect x="351" y="320" width="26" height="20" rx="2"/><rect x="379" y="320" width="18" height="20" rx="2"/><rect x="399" y="320" width="14" height="20" rx="2"/><rect x="415" y="320" width="42" height="20" rx="2"/><rect x="459" y="320" width="14" height="20" rx="2" class="is-hot"/><rect x="475" y="320" width="50" height="20" rx="2"/><rect x="527" y="320" width="14" height="20" rx="2"/><rect x="543" y="320" width="18" height="20" rx="2"/><rect x="563" y="320" width="26" height="20" rx="2"/><rect x="591" y="320" width="14" height="20" rx="2"/><rect x="607" y="320" width="18" height="20" rx="2"/><rect x="-3" y="346" width="22" height="20" rx="2"/><rect x="21" y="346" width="22" height="20" rx="2"/><rect x="45" y="346" width="26" height="20" rx="2"/><rect x="73" y="346" width="14" height="20" rx="2"/><rect x="111" y="346" width="18" height="20" rx="2"/><rect x="157" y="346" width="18" height="20" rx="2"/><rect x="177" y="346" width="18" height="20" rx="2"/><rect x="197" y="346" width="42" height="20" rx="2"/><rect x="259" y="346" width="22" height="20" rx="2"/><rect x="283" y="346" width="18" height="20" rx="2"/><rect x="303" y="346" width="50" height="20" rx="2"/><rect x="355" y="346" width="18" height="20" rx="2"/><rect x="375" y="346" width="14" height="20" rx="2"/><rect x="391" y="346" width="18" height="20" rx="2"/><rect x="453" y="346" width="34" height="20" rx="2"/><rect x="507" y="346" width="34" height="20" rx="2" class="is-hot"/><rect x="543" y="346" width="14" height="20" rx="2"/><rect x="559" y="346" width="42" height="20" rx="2"/><rect x="603" y="346" width="14" height="20" rx="2"/><rect x="619" y="346" width="18" height="20" rx="2"/></g><g class="hc-art-rails"><line x1="0" y1="5" x2="640" y2="5"/><line x1="0" y1="31" x2="640" y2="31"/><line x1="0" y1="57" x2="640" y2="57"/><line x1="0" y1="83" x2="640" y2="83"/><line x1="0" y1="109" x2="640" y2="109"/><line x1="0" y1="135" x2="640" y2="135"/><line x1="0" y1="161" x2="640" y2="161"/><line x1="0" y1="187" x2="640" y2="187"/><line x1="0" y1="213" x2="640" y2="213"/><line x1="0" y1="239" x2="640" y2="239"/><line x1="0" y1="265" x2="640" y2="265"/><line x1="0" y1="291" x2="640" y2="291"/><line x1="0" y1="317" x2="640" y2="317"/><line x1="0" y1="343" x2="640" y2="343"/><line x1="0" y1="369" x2="640" y2="369"/></g><g class="hc-art-nets"><path d="M324 278 H293 V278 H260"/><rect class="hc-art-via" x="291" y="276" width="5" height="5"/><rect class="hc-art-via" x="291" y="276" width="5" height="5"/><circle cx="324" cy="278" r="2.6"/><circle cx="260" cy="278" r="2.6"/><path d="M126 330 H216 V122 H335"/><rect class="hc-art-via" x="214" y="328" width="5" height="5"/><rect class="hc-art-via" x="214" y="120" width="5" height="5"/><circle cx="126" cy="330" r="2.6"/><circle cx="335" cy="122" r="2.6"/><path d="M476 200 H277 V70 H75"/><rect class="hc-art-via" x="275" y="198" width="5" height="5"/><rect class="hc-art-via" x="275" y="68" width="5" height="5"/><circle cx="476" cy="200" r="2.6"/><circle cx="75" cy="70" r="2.6"/><path d="M449 304 H360 V96 H241"/><rect class="hc-art-via" x="358" y="302" width="5" height="5"/><rect class="hc-art-via" x="358" y="94" width="5" height="5"/><circle cx="449" cy="304" r="2.6"/><circle cx="241" cy="96" r="2.6"/><path d="M612 252 H505 V226 H384"/><rect class="hc-art-via" x="503" y="250" width="5" height="5"/><rect class="hc-art-via" x="503" y="224" width="5" height="5"/><circle cx="612" cy="252" r="2.6"/><circle cx="384" cy="226" r="2.6"/></g></svg>
+  <div class="band-inner hc-hero">
+    <h1>Learn chip physical design <span class="hc-mark">by doing</span></h1>
+    <p class="home-hero-sub hc-hero-sub">
+      Complete the design challenge, solve graded problems, drill the tools,
+      and take a real processor from netlist to finished layout right here in
+      your browser. Everything is built from real runs of the
+      open-source OpenROAD flow.
+    </p>
+    <div class="home-cta-row">
+      <a class="cc-btn cc-btn-primary" href="#try">Harden a chip in your browser</a>
+      <a class="cc-btn cc-btn-ghost" href="#everything">Browse everything</a>
+    </div>
+    <div class="hc-built">
+      <span class="hc-built-label">Built on</span>
+      {% for b in catalog.built_on %}
+      <a class="hc-built-item" href="{{ b.url }}" target="_blank" rel="noopener" title="{{ b.name }}">
+        {% if b.img %}<img src="/static/img/{{ b.img }}?v={{ asset_v }}" alt="{{ b.name }} logo" loading="lazy">{% else %}<span class="hc-built-mark">{{ b.mark }}</span>{% endif %}
+        <span class="hc-built-name">{{ b.name }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if catalog.challenge %}
+<!-- the open challenge, as its own banner -->
+<section class="band band-ink hc-challenge" id="challenge">
+  <div class="band-inner hc-ch-inner">
+    <div class="hc-ch-text">
+      <div class="eyebrow eyebrow-light"><span class="hc-ch-word">Challenge</span> <span class="hc-ch-status">{{ catalog.challenge.status }}</span></div>
+      <h2 class="hc-ch-title">{{ catalog.challenge.title }}</h2>
+      <p class="hc-ch-blurb">{{ catalog.challenge.blurb }}</p>
+      <a class="cc-btn cc-btn-light hc-ch-btn" href="{{ catalog.challenge.href }}">See the challenge</a>
+    </div>
+    {% include "_gemmini_fig.html" %}
+    <div class="hc-lb">
+      <div class="hc-lb-head">Leaderboard</div>
+      {% for e in catalog.challenge.podium %}
+      <div class="hc-lb-row{% if not e %} is-open{% endif %}">
+        <span class="hc-lb-place hc-medal hc-medal-{{ loop.index }}" aria-label="place {{ loop.index }}">{{ loop.index }}</span>
+        {% if e %}<span class="hc-lb-name">{{ e.handle }}</span><span class="hc-lb-fom">{{ "%.3f" | format(e.fom) }}</span>
+        {% else %}<span class="hc-lb-name">{% if loop.first %}Open: be the first entry{% else %}Open{% endif %}</span><span class="hc-lb-fom">&nbsp;</span>{% endif %}
+      </div>
+      {% endfor %}
+      <div class="hc-lb-row is-base">
+        <span class="hc-lb-place">&nbsp;</span><span class="hc-lb-name">Reference flow, the score to beat</span><span class="hc-lb-fom">{{ catalog.challenge.baseline_fom }}</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- a whole design, run in the browser from the front page -->
+<section class="band hc-try" id="try">
+  <div class="band-inner band-split hc-try-inner">
+    <div>
+      <div class="eyebrow">Try it in your browser</div>
+      <h2 class="band-title">Take a real processor through the flow</h2>
+      <p class="band-sub hc-try-sub">
+        riscv32i, a small RISC-V (Reduced Instruction Set Computer, fifth
+        generation) processor: 8,636 cells and four memories. Set it up, press
+        Run, and watch the whole flow in a few seconds.
+      </p>
+      <div id="hc-try-ctl"></div>
+      <ol class="hc-try-stages" aria-label="The stages of the flow">
+        <li data-stage="floorplan"><button type="button" disabled aria-pressed="false">Floorplan</button></li>
+        <li data-stage="placement"><button type="button" disabled aria-pressed="false">Place</button></li>
+        <li data-stage="cts"><button type="button" disabled aria-pressed="false">Clock tree</button></li>
+        <li data-stage="routing"><button type="button" disabled aria-pressed="false">Route</button></li>
+        <li data-stage="timing"><button type="button" disabled aria-pressed="false">Timing</button></li>
+        <li data-stage="finish"><button type="button" disabled aria-pressed="false">Finish</button></li>
+      </ol>
+      <table class="hc-try-table" id="hc-try-table"></table>
+      <p class="hc-try-note">
+        A simplified engine in your browser, <strong>not OpenROAD</strong>, on the design's real netlist and
+        library. The real run used the flow's settings (1,138 ps, 62% full). <a href="/explore/designs/riscv32i#dz-how">How the engine works</a>
+      </p>
+    </div>
+    <div class="hc-try-view">
+      <img id="hc-try-still" src="/static/explore/designs/riscv32i-layout.png?v={{ asset_v }}" loading="lazy"
+           alt="The finished riscv32i layout from a real OpenROAD run">
+      <canvas id="hc-try-canvas" width="460" height="460" hidden aria-label="The layout your run produced"></canvas>
+      <div class="hc-try-label" id="hc-try-label">The real OpenROAD layout. Press Run to make your own.</div>
+      <div class="hc-try-legend" id="hc-try-legend"></div>
+      <a class="cc-btn cc-btn-ghost hc-try-more" href="/sandboxes#sb-sec-designs">Try out designs like this in the sandbox &rarr;</a>
+    </div>
+  </div>
+  <div class="band-inner hc-try-3d">
+    <h3>Your run in three dimensions</h3>
+    <p>The chip your run made, as it would stand in silicon: the cells on the bottom, then each metal layer
+      of routed wire above the one before, joined by vias. Drag to turn it, and switch layers on and off.</p>
+    <div id="hc-try-3dhost">
+      {# until the first run: a still of this view from a run at the flow's own settings #}
+      <div class="hc-try-3dstill">
+        <img src="/static/explore/designs/riscv32i-3d.webp?v={{ asset_v }}" loading="lazy"
+             alt="riscv32i in three dimensions: the cells on the die, and the routed metal layers above them">
+        <div class="hc-try-3dside">
+          <span class="hc-try-tag">Sample run</span>
+          <p>riscv32i at the flow's own settings, as the engine draws it. Press Run, and the chip you make
+            replaces it here, ready to turn, zoom and take apart layer by layer.</p>
+          <button class="cc-btn cc-btn-primary" type="button" id="hc-try-run3d">Run the flow</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<script defer src="/static/explore/designs/riscv32i.js?v={{ asset_v }}"></script>
+<script defer src="/static/explore/home-try.js?v={{ asset_v }}"></script>
+
+<!-- everything, by section -->
+{% for group in catalog.groups %}
+<section class="band {% if loop.index is odd %}band-paper{% endif %}"{% if loop.first %} id="everything"{% endif %}>
+  <div class="band-inner">
+    <div class="hc-group-head">
+      <div>
+        <div class="eyebrow">{{ group.title }}</div>
+      </div>
+    </div>
+    {# every card in a band shows as many rows as the band's shortest list, so
+       the cards line up; each card's own count and link give the rest #}
+    {% set rows = group.sections | map(attribute="items") | map("length") | min %}
+    <div class="hc-grid">
+      {% for s in group.sections %}
+      <div class="hc-card" id="sec-{{ s.title | lower | replace(' ', '-') }}">
+        <div class="hc-top">
+          <h2 class="hc-title"><a href="{{ s.href }}">{{ s.title }}</a></h2>
+          <div style="text-align:right"><div class="hc-count">{{ s.count }}</div><div class="hc-unit">{{ s.unit }}</div></div>
+        </div>
+        <p class="hc-blurb">{{ s.blurb }}</p>
+        <ul class="hc-list">
+          {% for it in s["items"][:rows] %}
+          <li><a href="{{ it.href }}">{{ it.title }}</a>{% if it.note %}<span class="hc-note">{{ it.note }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% if s["items"] | length > rows %}<div class="hc-more">+{{ s["items"] | length - rows }} more</div>{% endif %}
+        <div class="hc-foot">
+          <a href="{{ s.href }}">Open {{ s.title | lower }} &rarr;</a>
+          {% if s.progress_of %}<span class="hc-prog" data-progress-of="{{ s.progress_of | join(' ') }}" hidden></span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endfor %}
+
+<!-- band: the tutor (games session owns /tutor and the tutor/ folder) -->
+<section class="band band-paper">
+  <div class="band-inner band-split">
+    <div>
+      <div class="eyebrow">Tutor</div>
+      <h2 class="band-title">Stuck on a passage? Ask&nbsp;your&nbsp;own&nbsp;model</h2>
+      <p class="band-sub">
+        Highlight any sentence on the site and copy it as a reference. Paste
+        it into Claude, or any assistant that speaks MCP (Model Context
+        Protocol), and the free Chipbase tutor looks up the page you were
+        reading, so the explanation starts from exactly where you got stuck.
+        It runs on your machine, with the model you already use.
+      </p>
+      <a class="cc-btn cc-btn-primary" href="/tutor">Get the tutor</a>
+    </div>
+    <div class="hc-demo" aria-label="How the tutor works: highlight a passage, copy it, paste it into your model, and the tutor looks it up">
+      <ol class="hc-demo-steps">
+        <li data-step="1">Highlight</li><li data-step="2">Copy</li><li data-step="3">Paste and ask</li><li data-step="4">Tutor looks up</li>
+      </ol>
+      <div class="hc-demo-stage">
+        <!-- scene 1 and 2: a Chipbase page -->
+        <div class="hc-demo-page">
+          <div class="hc-demo-crumb">Education &rsaquo; Static Timing Analysis</div>
+          <div class="hc-demo-h">Setup and hold: the two checks</div>
+          <p>A flip-flop captures its data input only if that input is stable across a small window around the clock edge:
+            <span class="hc-demo-sel">the setup time before the edge and the hold time after it</span>. On a path from a
+            launch flip-flop through logic to a capture flip-flop, those two library numbers become two checks.</p>
+          <div class="hc-demo-page-eq">setup slack = (T &minus; t<sub>su</sub>) &minus; arrival<sub>max</sub><br>hold slack = arrival<sub>min</sub> &minus; t<sub>hold</sub></div>
+          <p class="hc-demo-more">The asymmetry drives everything downstream. Setup is the late check: it uses the maximum path delay
+            and measures data against the next clock edge, so a longer period buys margin. Hold is the early check: it uses the
+            minimum path delay and measures data against the same edge, so the period cancels and no clock setting can fix a hold violation.</p>
+          <span class="hc-demo-copy">Copy reference</span>
+          <svg class="hc-demo-cursor" viewBox="0 0 16 22" aria-hidden="true"><path d="M1 1 L1 17 L5 13 L8 20 L11 19 L8 12 L14 12 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </div>
+        <!-- scene 3 and 4: your own model, with the tutor connected -->
+        <div class="hc-demo-chat">
+          <div class="hc-demo-bar"><span class="hc-demo-dot"></span>your model <span class="hc-demo-tag">chipbase-tutor connected</span></div>
+          <div class="hc-demo-msgs">
+            <div class="hc-demo-user">
+              <div class="hc-demo-ask"></div>
+              <div class="hc-demo-q">&gt; "the setup time before the edge and the hold time after it"<br>&gt; (Chipbase: Static Timing Analysis &gt; Setup and hold: the two checks)</div>
+            </div>
+            <div class="hc-demo-tool"><span class="hc-demo-spin"></span><b>resolve_reference</b> <span class="hc-demo-looking">looking up the page</span><span class="hc-demo-found">&rarr; found, exact match</span></div>
+            <div class="hc-demo-pulled">
+              <div class="hc-demo-path">Static Timing Analysis &rsaquo; Setup and hold: the two checks</div>
+              <div>&hellip; stable across a small window around the clock edge: <mark>the setup time before the edge and the hold time after it</mark>. &hellip;</div>
+              <div class="hc-demo-eq">setup slack = (T &minus; t<sub>su</sub>) &minus; arrival<sub>max</sub><br>hold slack = <mark>arrival<sub>min</sub></mark> &minus; t<sub>hold</sub><br>arrival<sub>min</sub>: earliest data arrival, <mark>from the fastest path</mark></div>
+            </div>
+            <div class="hc-demo-answer">Because hold is the early check. The page defines hold slack as arrival<sub>min</sub> &minus; t<sub>hold</sub>, and arrival<sub>min</sub> comes from the fastest path: if new data gets there too soon, it overwrites the value the flip-flop is still holding.</div>
+          </div>
+          <div class="hc-demo-input"><span class="hc-demo-typed"></span><span class="hc-demo-pasted"></span><span class="hc-demo-caret"></span></div>
+          <ul class="hc-demo-menu" aria-hidden="true"><li>Cut</li><li>Copy</li><li class="hc-demo-paste">Paste</li></ul>
+          <svg class="hc-demo-cursor hc-demo-cursor2" viewBox="0 0 16 22" aria-hidden="true"><path d="M1 1 L1 17 L5 13 L8 20 L11 19 L8 12 L14 12 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  /* solved problems are recorded in this browser (static/app.js); show the
+     count on the Problems card once there is one (after app.js has run) */
+  document.addEventListener("DOMContentLoaded", function () {
+    var el = document.querySelector("[data-progress-of]");
+    if (!el || !window.ChipbaseProblems) return;
+    var ids = el.getAttribute("data-progress-of").split(" "), all = window.ChipbaseProblems.all();
+    var solved = ids.filter(function (id) { return all[id] && all[id].status === "solved"; }).length;
+    if (solved) { el.textContent = solved + " of " + ids.length + " solved"; el.hidden = false; }
+  });
+</script>
+<script>
+  /* the tutor demo's timeline: each step adds a class or changes the scene, then it
+     loops. It pauses while scrolled out of view and does not run for reduced motion. */
+  (function () {
+    var demo = document.querySelector(".hc-demo");
+    if (!demo) return;
+    var ask = "why does hold care about the fastest path?";
+    var typed = demo.querySelector(".hc-demo-typed"), askEl = demo.querySelector(".hc-demo-ask"), pasted = demo.querySelector(".hc-demo-pasted");
+    var REF = '> "the setup time before the edge and the hold time after it"\n> (Chipbase: Static Timing Analysis > Setup and hold: the two checks)';
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      demo.setAttribute("data-scene", "5"); askEl.textContent = ask; return;
+    }
+    var FLAGS = ["is-selected", "is-button", "is-pointing", "is-copied", "is-chatcursor", "is-menu", "is-pastehover", "is-pasted",
+                 "is-sent", "is-looking", "is-found", "is-answered"];
+    var timers = [], visible = true, running = false;
+    function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+    function flag(name) { demo.classList.add(name); }
+    function reset() {
+      FLAGS.forEach(function (f) { demo.classList.remove(f); });
+      typed.textContent = ""; askEl.textContent = ""; pasted.textContent = "";
+      demo.setAttribute("data-scene", "1");
+    }
+    function typeOut(start) {
+      for (var i = 1; i <= ask.length; i++) (function (n) { at(start + n * 38, function () { typed.textContent = ask.slice(0, n); }); })(i);
+      return start + ask.length * 38;
+    }
+    function run() {
+      running = true; reset();
+      at(500, function () { flag("is-selected"); });
+      at(1900, function () { flag("is-button"); demo.setAttribute("data-scene", "2"); });
+      at(2300, function () { flag("is-pointing"); });
+      at(3400, function () { flag("is-copied"); demo.querySelector(".hc-demo-copy").textContent = "Copied"; });
+      at(4400, function () { demo.setAttribute("data-scene", "3"); });
+      var typedAt = typeOut(4900);
+      at(typedAt + 300, function () { flag("is-chatcursor"); });            /* the cursor moves into the box */
+      at(typedAt + 1300, function () { flag("is-menu"); });                 /* right-click: the menu opens */
+      at(typedAt + 2000, function () { flag("is-pastehover"); });           /* onto Paste */
+      at(typedAt + 2600, function () { flag("is-pasted"); pasted.textContent = REF; });  /* click: pasted */
+      var done = typedAt + 3300;
+      at(done + 500, function () { typed.textContent = ""; pasted.textContent = ""; askEl.textContent = ask; flag("is-sent"); });
+      at(done + 1100, function () { flag("is-looking"); demo.setAttribute("data-scene", "4"); });
+      at(done + 2300, function () { flag("is-found"); });
+      at(done + 3500, function () { flag("is-answered"); demo.setAttribute("data-scene", "5"); });
+      at(done + 8500, function () { demo.querySelector(".hc-demo-copy").textContent = "Copy reference"; timers = []; running = false; if (visible) run(); });
+    }
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        visible = entries[0].isIntersecting;
+        if (visible && !running) run();
+      }).observe(demo);
+    } else { run(); }
+  })();
+</script>
+{% endblock %}

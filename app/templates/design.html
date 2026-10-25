@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{#
+  A whole design you can take through the flow in the browser. The route
+  passes `design`, the key of a data file under static/explore/designs/.
+#}
+{% set DESIGNS = {
+  'riscv32i': { 'title': 'riscv32i', 'short': 'riscv32i',
+    'lead': 'riscv32i, a small processor for the RISC-V (Reduced Instruction Set Computer, fifth generation) instruction set, taken through the OpenROAD flow with settings you choose.' },
+  'gcd': { 'title': 'gcd', 'short': 'gcd',
+    'lead': 'gcd, a tiny unit that finds the greatest common divisor of two numbers, and the design the OpenROAD flow uses to check itself, taken through the flow with settings you choose.' },
+  'aes': { 'title': 'aes', 'short': 'aes',
+    'lead': 'aes, an encryption core for the Advanced Encryption Standard, dense with logic and with no memories, taken through the OpenROAD flow with settings you choose.' }
+} %}
+{% set S = DESIGNS[design] %}
+{% block title %}{{ S.title }} - Chipbase{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/explore/sandbox-theme.css?v={{ asset_v }}">
+<link rel="stylesheet" href="/static/explore/flow.css?v={{ asset_v }}">
+<link rel="stylesheet" href="/static/explore/design.css?v={{ asset_v }}">
+<link rel="stylesheet" href="/static/explore/layout3d.css?v={{ asset_v }}">
+{% endblock %}
+{% block main_class %}sb-theme{% endblock %}
+{% block content %}
+<div class="sb-page">
+  <div class="crumb">
+    <a href="/sandboxes">Sandboxes</a> / Designs you can do in the browser / {{ S.short }}
+  </div>
+  <div class="sb-head" style="margin-bottom:18px">
+    <h1 style="font-size:26px">{{ S.title }}</h1>
+    <p>{{ S.lead }}</p>
+  </div>
+  <div id="design-root" class="dz-root"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/explore/designs/{{ design }}.js?v={{ asset_v }}"></script>
+<script src="/static/explore/design-engine.js?v={{ asset_v }}"></script>
+<script src="/static/explore/design-page.js?v={{ asset_v }}"></script>
+{% endblock %}

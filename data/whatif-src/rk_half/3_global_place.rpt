@@ -1,0 +1,263 @@
+
+==========================================================================
+global place report_tns
+--------------------------------------------------------------------------
+tns max -36.23
+
+==========================================================================
+global place report_wns
+--------------------------------------------------------------------------
+wns max -0.14
+
+==========================================================================
+global place report_worst_slack
+--------------------------------------------------------------------------
+worst slack max -0.14
+
+==========================================================================
+global place report_clock_min_period
+--------------------------------------------------------------------------
+core_clock period_min = 1.34 fmax = 746.18
+
+==========================================================================
+global place report_checks -path_delay min
+--------------------------------------------------------------------------
+Startpoint: frontend/icache.invalidated$_SDFFE_PN0P_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: frontend/icache.data_arrays_0.data_arrays_0_0_ext.mem
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: min
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.00    0.00   clock network delay (ideal)
+                  0.00    0.00    0.00 ^ frontend/icache.invalidated$_SDFFE_PN0P_/CK (DFF_X1)
+     2    3.73    0.01    0.07    0.07 v frontend/icache.invalidated$_SDFFE_PN0P_/QN (DFF_X1)
+                                         frontend/icache._T_45 (net)
+                  0.01    0.00    0.07 v frontend/_6076_/A (INV_X1)
+     2    3.70    0.01    0.02    0.09 ^ frontend/_6076_/ZN (INV_X1)
+                                         frontend/_2826_ (net)
+                  0.01    0.00    0.09 ^ frontend/_6077_/A1 (NOR2_X1)
+     1    9.96    0.01    0.02    0.11 v frontend/_6077_/ZN (NOR2_X1)
+                                         frontend/icache._T_94 (net)
+                  0.02    0.00    0.11 v frontend/icache.data_arrays_0.data_arrays_0_0_ext.mem/we_in (fakeram45_64x32)
+                                  0.11   data arrival time
+
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.00    0.00   clock network delay (ideal)
+                          0.00    0.00   clock reconvergence pessimism
+                                  0.00 ^ frontend/icache.data_arrays_0.data_arrays_0_0_ext.mem/clk (fakeram45_64x32)
+                          0.05    0.05   library hold time
+                                  0.05   data required time
+-----------------------------------------------------------------------------
+                                  0.05   data required time
+                                 -0.11   data arrival time
+-----------------------------------------------------------------------------
+                                  0.06   slack (MET)
+
+
+
+==========================================================================
+global place report_checks -path_delay max
+--------------------------------------------------------------------------
+Startpoint: core/div/remainder[7]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: core/div/remainder[64]$_SDFFE_PP0P_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: max
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.00    0.00   clock network delay (ideal)
+                  0.00    0.00    0.00 ^ core/div/remainder[7]$_DFFE_PP_/CK (DFF_X1)
+     7   12.26    0.03    0.11    0.11 ^ core/div/remainder[7]$_DFFE_PP_/Q (DFF_X1)
+                                         core/div/_GEN_35[7] (net)
+                  0.03    0.00    0.11 ^ core/div/place4636/A (BUF_X1)
+     3    3.50    0.01    0.03    0.14 ^ core/div/place4636/Z (BUF_X1)
+                                         core/div/net4635 (net)
+                  0.01    0.00    0.14 ^ core/div/_2823_/A2 (AND2_X1)
+     1    4.05    0.01    0.04    0.18 ^ core/div/_2823_/ZN (AND2_X1)
+                                         core/div/_0100_ (net)
+                  0.01    0.00    0.18 ^ core/div/_4137_/B (FA_X1)
+     1    3.97    0.02    0.10    0.28 v core/div/_4137_/S (FA_X1)
+                                         core/div/_2162_ (net)
+                  0.02    0.00    0.28 v core/div/_4105_/B (FA_X1)
+     1    4.42    0.02    0.13    0.41 ^ core/div/_4105_/S (FA_X1)
+                                         core/div/_2066_ (net)
+                  0.02    0.00    0.41 ^ core/div/_4072_/B (FA_X1)
+     1    2.90    0.02    0.10    0.50 v core/div/_4072_/S (FA_X1)
+                                         core/div/_1948_ (net)
+                  0.02    0.00    0.50 v core/div/_4036_/CI (FA_X1)
+     1    3.70    0.02    0.12    0.62 ^ core/div/_4036_/S (FA_X1)
+                                         core/div/_1951_ (net)
+                  0.02    0.00    0.62 ^ core/div/_4270_/B (FA_X1)
+     1    3.24    0.02    0.10    0.72 v core/div/_4270_/S (FA_X1)
+                                         core/div/_2397_ (net)
+                  0.02    0.00    0.72 v core/div/_4359_/A (HA_X1)
+     2    5.07    0.01    0.06    0.78 v core/div/_4359_/S (HA_X1)
+                                         core/div/_0395_ (net)
+                  0.01    0.00    0.78 v core/div/_3369_/A4 (NAND4_X2)
+     2    5.58    0.02    0.03    0.80 ^ core/div/_3369_/ZN (NAND4_X2)
+                                         core/div/_1108_ (net)
+                  0.02    0.00    0.80 ^ core/div/_3370_/C2 (OAI221_X1)
+     1    3.31    0.02    0.03    0.84 v core/div/_3370_/ZN (OAI221_X1)
+                                         core/div/_1109_ (net)
+                  0.02    0.00    0.84 v core/div/_3378_/A (AOI21_X2)
+     3    9.30    0.03    0.06    0.90 ^ core/div/_3378_/ZN (AOI21_X2)
+                                         core/div/_1117_ (net)
+                  0.03    0.00    0.90 ^ core/div/_3382_/B2 (OAI221_X2)
+     2    4.32    0.02    0.04    0.94 v core/div/_3382_/ZN (OAI221_X2)
+                                         core/div/_1121_ (net)
+                  0.02    0.00    0.94 v core/div/_3383_/A2 (AND2_X2)
+     2    6.45    0.01    0.04    0.97 v core/div/_3383_/ZN (AND2_X2)
+                                         core/div/_1122_ (net)
+                  0.01    0.00    0.98 v core/div/_3395_/B2 (AOI221_X2)
+     2    5.92    0.05    0.09    1.06 ^ core/div/_3395_/ZN (AOI221_X2)
+                                         core/div/_1134_ (net)
+                  0.05    0.00    1.06 ^ core/div/_3400_/A1 (AOI22_X2)
+     2    4.94    0.02    0.02    1.09 v core/div/_3400_/ZN (AOI22_X2)
+                                         core/div/_1139_ (net)
+                  0.02    0.00    1.09 v core/div/_3402_/B2 (AOI221_X2)
+     2    2.57    0.04    0.08    1.16 ^ core/div/_3402_/ZN (AOI221_X2)
+                                         core/div/_1141_ (net)
+                  0.04    0.00    1.16 ^ core/div/place2867/A (BUF_X1)
+     2    4.74    0.01    0.04    1.20 ^ core/div/place2867/Z (BUF_X1)
+                                         core/div/net2866 (net)
+                  0.01    0.00    1.20 ^ core/div/_3921_/B1 (OAI21_X1)
+     1    1.11    0.01    0.01    1.22 v core/div/_3921_/ZN (OAI21_X1)
+                                         core/div/_1586_ (net)
+                  0.01    0.00    1.22 v core/div/_3922_/B (MUX2_X1)
+     1    1.94    0.01    0.06    1.27 v core/div/_3922_/Z (MUX2_X1)
+                                         core/div/_1587_ (net)
+                  0.01    0.00    1.27 v core/div/_3923_/C1 (OAI221_X1)
+     1    1.23    0.03    0.03    1.30 ^ core/div/_3923_/ZN (OAI221_X1)
+                                         core/div/_0601_ (net)
+                  0.03    0.00    1.30 ^ core/div/remainder[64]$_SDFFE_PP0P_/D (DFF_X1)
+                                  1.30   data arrival time
+
+                  0.00    1.20    1.20   clock core_clock (rise edge)
+                          0.00    1.20   clock network delay (ideal)
+                          0.00    1.20   clock reconvergence pessimism
+                                  1.20 ^ core/div/remainder[64]$_SDFFE_PP0P_/CK (DFF_X1)
+                         -0.04    1.16   library setup time
+                                  1.16   data required time
+-----------------------------------------------------------------------------
+                                  1.16   data required time
+                                 -1.30   data arrival time
+-----------------------------------------------------------------------------
+                                 -0.14   slack (VIOLATED)
+
+
+
+==========================================================================
+global place report_checks -unconstrained
+--------------------------------------------------------------------------
+Startpoint: core/div/remainder[7]$_DFFE_PP_
+            (rising edge-triggered flip-flop clocked by core_clock)
+Endpoint: core/div/remainder[64]$_SDFFE_PP0P_
+          (rising edge-triggered flip-flop clocked by core_clock)
+Path Group: core_clock
+Path Type: max
+
+Fanout     Cap    Slew   Delay    Time   Description
+-----------------------------------------------------------------------------
+                  0.00    0.00    0.00   clock core_clock (rise edge)
+                          0.00    0.00   clock network delay (ideal)
+                  0.00    0.00    0.00 ^ core/div/remainder[7]$_DFFE_PP_/CK (DFF_X1)
+     7   12.26    0.03    0.11    0.11 ^ core/div/remainder[7]$_DFFE_PP_/Q (DFF_X1)
+                                         core/div/_GEN_35[7] (net)
+                  0.03    0.00    0.11 ^ core/div/place4636/A (BUF_X1)
+     3    3.50    0.01    0.03    0.14 ^ core/div/place4636/Z (BUF_X1)
+                                         core/div/net4635 (net)
+                  0.01    0.00    0.14 ^ core/div/_2823_/A2 (AND2_X1)
+     1    4.05    0.01    0.04    0.18 ^ core/div/_2823_/ZN (AND2_X1)
+                                         core/div/_0100_ (net)
+                  0.01    0.00    0.18 ^ core/div/_4137_/B (FA_X1)
+     1    3.97    0.02    0.10    0.28 v core/div/_4137_/S (FA_X1)
+                                         core/div/_2162_ (net)
+                  0.02    0.00    0.28 v core/div/_4105_/B (FA_X1)
+     1    4.42    0.02    0.13    0.41 ^ core/div/_4105_/S (FA_X1)
+                                         core/div/_2066_ (net)
+                  0.02    0.00    0.41 ^ core/div/_4072_/B (FA_X1)
+     1    2.90    0.02    0.10    0.50 v core/div/_4072_/S (FA_X1)
+                                         core/div/_1948_ (net)
+                  0.02    0.00    0.50 v core/div/_4036_/CI (FA_X1)
+     1    3.70    0.02    0.12    0.62 ^ core/div/_4036_/S (FA_X1)
+                                         core/div/_1951_ (net)
+                  0.02    0.00    0.62 ^ core/div/_4270_/B (FA_X1)
+     1    3.24    0.02    0.10    0.72 v core/div/_4270_/S (FA_X1)
+                                         core/div/_2397_ (net)
+                  0.02    0.00    0.72 v core/div/_4359_/A (HA_X1)
+     2    5.07    0.01    0.06    0.78 v core/div/_4359_/S (HA_X1)
+                                         core/div/_0395_ (net)
+                  0.01    0.00    0.78 v core/div/_3369_/A4 (NAND4_X2)
+     2    5.58    0.02    0.03    0.80 ^ core/div/_3369_/ZN (NAND4_X2)
+                                         core/div/_1108_ (net)
+                  0.02    0.00    0.80 ^ core/div/_3370_/C2 (OAI221_X1)
+     1    3.31    0.02    0.03    0.84 v core/div/_3370_/ZN (OAI221_X1)
+                                         core/div/_1109_ (net)
+                  0.02    0.00    0.84 v core/div/_3378_/A (AOI21_X2)
+     3    9.30    0.03    0.06    0.90 ^ core/div/_3378_/ZN (AOI21_X2)
+                                         core/div/_1117_ (net)
+                  0.03    0.00    0.90 ^ core/div/_3382_/B2 (OAI221_X2)
+     2    4.32    0.02    0.04    0.94 v core/div/_3382_/ZN (OAI221_X2)
+                                         core/div/_1121_ (net)
+                  0.02    0.00    0.94 v core/div/_3383_/A2 (AND2_X2)
+     2    6.45    0.01    0.04    0.97 v core/div/_3383_/ZN (AND2_X2)
+                                         core/div/_1122_ (net)
+                  0.01    0.00    0.98 v core/div/_3395_/B2 (AOI221_X2)
+     2    5.92    0.05    0.09    1.06 ^ core/div/_3395_/ZN (AOI221_X2)
+                                         core/div/_1134_ (net)
+                  0.05    0.00    1.06 ^ core/div/_3400_/A1 (AOI22_X2)
+     2    4.94    0.02    0.02    1.09 v core/div/_3400_/ZN (AOI22_X2)
+                                         core/div/_1139_ (net)
+                  0.02    0.00    1.09 v core/div/_3402_/B2 (AOI221_X2)
+     2    2.57    0.04    0.08    1.16 ^ core/div/_3402_/ZN (AOI221_X2)
+                                         core/div/_1141_ (net)
+                  0.04    0.00    1.16 ^ core/div/place2867/A (BUF_X1)
+     2    4.74    0.01    0.04    1.20 ^ core/div/place2867/Z (BUF_X1)
+                                         core/div/net2866 (net)
+                  0.01    0.00    1.20 ^ core/div/_3921_/B1 (OAI21_X1)
+     1    1.11    0.01    0.01    1.22 v core/div/_3921_/ZN (OAI21_X1)
+                                         core/div/_1586_ (net)
+                  0.01    0.00    1.22 v core/div/_3922_/B (MUX2_X1)
+     1    1.94    0.01    0.06    1.27 v core/div/_3922_/Z (MUX2_X1)
+                                         core/div/_1587_ (net)
+                  0.01    0.00    1.27 v core/div/_3923_/C1 (OAI221_X1)
+     1    1.23    0.03    0.03    1.30 ^ core/div/_3923_/ZN (OAI221_X1)
+                                         core/div/_0601_ (net)
+                  0.03    0.00    1.30 ^ core/div/remainder[64]$_SDFFE_PP0P_/D (DFF_X1)
+                                  1.30   data arrival time
+
+                  0.00    1.20    1.20   clock core_clock (rise edge)
+                          0.00    1.20   clock network delay (ideal)
+                          0.00    1.20   clock reconvergence pessimism
+                                  1.20 ^ core/div/remainder[64]$_SDFFE_PP0P_/CK (DFF_X1)
+                         -0.04    1.16   library setup time
+                                  1.16   data required time
+-----------------------------------------------------------------------------
+                                  1.16   data required time
+                                 -1.30   data arrival time
+-----------------------------------------------------------------------------
+                                 -0.14   slack (VIOLATED)
+
+
+
+==========================================================================
+global place report_power
+--------------------------------------------------------------------------
+Group                  Internal  Switching    Leakage      Total
+                          Power      Power      Power      Power (Watts)
+----------------------------------------------------------------
+Sequential             2.86e-02   3.53e-03   3.02e-04   3.24e-02  44.4%
+Combinational          1.78e-02   1.92e-02   7.22e-04   3.77e-02  51.7%
+Clock                  0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.0%
+Macro                  2.69e-03   0.00e+00   1.63e-04   2.85e-03   3.9%
+Pad                    0.00e+00   0.00e+00   0.00e+00   0.00e+00   0.0%
+----------------------------------------------------------------
+Total                  4.91e-02   2.27e-02   1.19e-03   7.30e-02 100.0%
+                          67.3%      31.1%       1.6%

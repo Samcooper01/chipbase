@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.name }} - Chipbase Education{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div class="page-head-inner">
+    <div class="crumb"><a href="/education">Education</a> / {{ topic.name }}</div>
+    <h1>{{ topic.name }}</h1>
+    {% if topic.tagline %}<p>{{ topic.tagline }}</p>{% endif %}
+  </div>
+</header>
+
+<div class="guide-layout">
+  <aside class="guide-toc" aria-label="On this page">
+    <div class="guide-toc-label">On this page</div>
+    <nav id="guide-toc-nav"></nav>
+  </aside>
+  <article class="guide-body desc-body" id="guide-body">
+    {{ body_html | safe }}
+  </article>
+</div>
+{% endblock %}
+{% block scripts %}
+{% for src in topic.get("extra_scripts", []) %}
+<script src="{{ src }}?v={{ asset_v }}"></script>
+{% endfor %}
+<script>
+/* Build the table of contents from the page's h2 headings, and
+   highlight the section currently in view (scrollspy). */
+(function () {
+  var body = document.getElementById("guide-body");
+  var nav = document.getElementById("guide-toc-nav");
+  if (!body || !nav) return;
+  var heads = body.querySelectorAll("h2");
+  if (!heads.length) return;
+  var links = [];
+  heads.forEach(function (h, i) {
+    if (!h.id) {
+      h.id = "sec-" + (h.textContent || ("s" + i)).toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    }
+    var a = document.createElement("a");
+    a.href = "#" + h.id;
+    a.textContent = h.textContent;
+    a.className = "guide-toc-link";
+    a.addEventListener("click", function (e) {
+      e.preventDefault();
+      document.getElementById(h.id).scrollIntoView({ behavior: "smooth", block: "start" });
+      history.replaceState(null, "", "#" + h.id);
+    });
+    nav.appendChild(a);
+    links.push(a);
+  });
+  /* a link that names a section (a book on the Education shelves) lands on it:
+     the ids only exist once this script has run, so scroll to it now */
+  if (location.hash) {
+    var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (target) target.scrollIntoView({ block: "start" });
+  }
+  var spy = function () {
+    var y = window.scrollY + 120, active = 0;
+    heads.forEach(function (h, i) { if (h.offsetTop <= y) active = i; });
+    links.forEach(function (a, i) { a.classList.toggle("active", i === active); });
+  };
+  window.addEventListener("scroll", spy, { passive: true });
+  spy();
+})();
+</script>
+{% endblock %}

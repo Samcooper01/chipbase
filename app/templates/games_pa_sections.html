@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / {{ game.title }}</div>
+  <h1 class="lab-title">{{ game.title }} <span class="gm-basis-tag">{{ data.basis.tag }}</span></h1>
+  <p class="gm-intro">
+    Every image is a map the flow drew at the end of a real run. Some of those
+    runs were broken on purpose and some were not, so the question is what the
+    picture says, not whether something must be wrong with it. Three kinds of
+    question: name what you are looking at, say which of two is healthy, or
+    click the region being asked about.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}
+    Reference: <a href="{{ data.reference }}" target="_blank" rel="noopener">{{ data.basis.tool }} documentation</a>
+    (<a href="{{ data.basis.tool_url }}" target="_blank" rel="noopener">{{ data.basis.tool }} on GitHub</a>).</span></div>
+  <div class="gm-grid gm-grid-auto">
+    <a class="gm-tile is-mixed" href="/games/spot-the-pathology/all"><div class="gm-tile-body">
+      <h2 class="gm-title">Every map</h2>
+      <p class="gm-blurb">A mixed round across all three kinds of map, with no clue which is coming.</p>
+      <div class="gm-mixed-num">{{ total }}<small>maps across {{ data.sections | length }} families</small></div>
+      <div class="gm-tile-foot"><span class="gm-count">mixed round</span><span class="chip diff-easy">play</span></div>
+    </div></a>
+    {% for s in data.sections %}
+    {% if s.count %}<a class="gm-tile" href="/games/spot-the-pathology/{{ s.id }}">{% else %}<div class="gm-tile is-off">{% endif %}<div class="gm-tile-body">
+      <h2 class="gm-title">{{ s.title }}</h2>
+      <p class="gm-blurb">{{ s.blurb }}</p>
+      <div class="gm-cmds">{% for k in s.kinds %}<code>{{ k }}</code>{% endfor %}</div>
+      <div class="gm-tile-foot">
+        <span class="gm-count">{{ s.count }} map{% if s.count != 1 %}s{% endif %}</span>
+        {% if s.count %}<span class="chip diff-easy">play</span>{% else %}<span class="chip chip-soon">none yet</span>{% endif %}
+      </div>
+    </div>{% if s.count %}</a>{% else %}</div>{% endif %}
+    {% endfor %}
+  </div>
+</article>
+{% endblock %}

@@ -1,0 +1,1076 @@
+# Standard-cell library flash-card deck.
+#
+# Grounded in the open libraries shipped with OpenROAD-flow-scripts: Nangate45,
+# sky130 high density, and ASAP7, plus the cell-related variables in each
+# platform's config.mk and the OpenROAD modules that insert physical cells.
+# See cells_scope.md. A card's `command` is a cell name or a small example, and
+# `source` is the OpenROAD module whose documentation backs the card.
+
+deck: cells
+title: Standard-cell library
+reference: https://github.com/The-OpenROAD-Project/OpenROAD/tree/master/src
+default_question: "What does this tell you?"
+source_link: path
+basis:
+  tool: the open libraries
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/master/flow/platforms
+  tag: checked against the open libraries
+  doc_title: OpenROAD module documentation
+  note: >-
+    These cards describe standard-cell libraries in general, checked against
+    the open libraries that OpenROAD-flow-scripts ships: Nangate45, sky130
+    high density, and ASAP7. Cell names and conventions differ between
+    libraries, so each card says which library its example comes from. The
+    answers link to the OpenROAD module that handles the cell in question.
+
+sections:
+  - id: naming
+    title: Naming and drive strength
+    blurb: "Reading a cell name: function, drive strength, threshold flavour, and library variant."
+    commands: [INV_X1, sky130_fd_sc_hd__inv_1, BUFx2_ASAP7_75t_R, ASAP7_USE_VT, sky130hd, sky130hs]
+  - id: combinational
+    title: Combinational cells
+    blurb: Why inverting gates are the cheap ones, and what the compound gates compute.
+    commands: [NAND2_X1, AND2_X1, AOI21_X1, OAI21_X1, XOR2_X1, MUX2_X1, HA_X1, FA_X1, BUF_X1]
+  - id: sequential
+    title: Sequential cells
+    blurb: Flip-flop variants, scan flops, latches, and clock gating cells.
+    commands: [DFF_X1, DFFR_X1, DFFS_X1, DFFRS_X1, SDFF_X1, dlxtp_1, CLKGATE_X1, CLKGATETST_X1]
+  - id: clock
+    title: Clock cells
+    blurb: The cells built for the clock network, and why they are separate.
+    commands: [CLKBUF_X1, clkinv_1, clkinvlp_2, dlygate4sd1_1, CTS_LIB_NAME]
+  - id: physical
+    title: Physical-only cells
+    blurb: "Cells with no logic function: taps, endcaps, fillers, decap, diodes, and ties."
+    commands: [TAPCELL_X1, FILLCELL_X1, decap_8, ANTENNA_X1, diode_2, LOGIC0_X1, LOGIC1_X1, conb_1]
+  - id: using
+    title: Using the library
+    blurb: The choices a flow makes among the cells, and when each one helps.
+    commands: [threshold voltage, upsizing, buffering, logical effort, dont-use]
+  - id: views
+    title: Views and characterization
+    blurb: What each library view carries, what a corner is, and the limits a cell declares.
+    commands: [liberty, lef, gds, max_transition, max_capacitance, operating_conditions]
+
+cards:
+
+  # ---------------------------------------------------------------- Naming and drive strength
+
+  - id: cell-drive-suffix
+    section: naming
+    command: INV_X1   INV_X2   INV_X4   INV_X8
+    hint: "Same function four times. Ask what differs, and what it costs."
+    answer: The same inverter at four drive strengths, each stronger and larger.
+    wrong:
+      - The same inverter at four threshold voltages, each faster and leakier.
+      - Four inverters with one, two, four, and eight inputs.
+      - The same inverter characterized at four different corners.
+    explain: >-
+      The suffix scales the transistor widths, so a higher number drives more
+      load in less time while using more area, more input capacitance, and
+      more leakage. Sizing during repair mostly means moving along this
+      series. These names are Nangate45; sky130 writes the same idea as
+      `inv_1`, `inv_2`, `inv_4`.
+    source: rsz
+
+  - id: cell-naming-schemes
+    section: naming
+    command: |-
+      INV_X1                       # Nangate45
+      sky130_fd_sc_hd__inv_1       # sky130 high density
+      BUFx2_ASAP7_75t_R            # ASAP7
+    hint: "Read the parts around the function: who made it, for what, and how tall."
+    answer: "Three libraries' conventions for the same idea: function, then drive strength."
+    wrong:
+      - "Three different cells: an inverter, a high-density buffer, and a repeater."
+      - The same cell at three process nodes, with the node in the name.
+      - "Three views of one cell: its timing, its layout, and its abstract."
+    explain: >-
+      A long name usually encodes the foundry, the library family, and the row
+      height as well as the function. In `sky130_fd_sc_hd`, `sc` is standard
+      cell and `hd` high density. In ASAP7, `75t` is the row height in tracks
+      and the trailing letter is the threshold-voltage flavour.
+    source: odb
+
+  - id: cell-vt-flavours
+    section: naming
+    command: export ASAP7_USE_VT = RVT LVT
+    hint: "Two flavours of the same transistor. Ask what is traded between them."
+    answer: Allows regular and low threshold-voltage cells to be mixed.
+    wrong:
+      - Allows two supply voltages, so the design can run in two modes.
+      - Allows two row heights, so tall and short cells can be mixed.
+      - Allows two drive strengths per cell, a weak and a strong one.
+    explain: >-
+      Leakage is traded for speed. A lower threshold voltage switches faster
+      and leaks more, at the same
+      supply and area. A flow offers several flavours so optimization can
+      spend leakage only on the paths that need the speed. ASAP7 ships
+      regular, low, and super-low.
+    source: rsz
+
+  - id: cell-library-variant
+    section: naming
+    command: sky130hd   versus   sky130hs
+    hint: "Two libraries, one process. Ask what differs physically between them."
+    answer: "The same cells drawn at two row heights: dense, or tall and fast."
+    wrong:
+      - The same cells at two threshold voltages, regular and low.
+      - Two process variants, one for digital and one for analog.
+      - The same library characterized at two different corners.
+    explain: >-
+      The tall variant is the fast one: a taller row gives wider transistors,
+      so a high-speed library is faster
+      and larger than a high-density one at the same drive strength. A design
+      picks one as its main library. Mixing them is possible only if the row
+      heights are compatible.
+    source: dpl
+
+  # ---------------------------------------------------------------- Combinational cells
+
+  - id: cell-nand-vs-and
+    section: combinational
+    command: NAND2_X1   versus   AND2_X1
+    hint: "Ask what a CMOS (Complementary Metal-Oxide-Semiconductor) gate does naturally."
+    answer: The AND is a NAND with an inverter after it, so it is larger and slower.
+    wrong:
+      - The AND is a single stage, and the NAND adds an inverter to it.
+      - They are the same size; the AND only inverts the output logically.
+      - The AND is faster, since its output drives without inversion.
+    explain: >-
+      Static CMOS (Complementary Metal-Oxide-Semiconductor) logic naturally builds
+      inverting gates: a pull-up network of p-type transistors and a pull-down
+      of n-type. Every non-inverting gate is an inverting one plus an
+      inverter. This is why synthesis prefers NAND, NOR, and the compound
+      inverting gates.
+    source: rsz
+
+  - id: cell-aoi21
+    section: combinational
+    command: AOI21_X1
+    hint: "Read the name as the operations in order, and the digits as input counts."
+    answer: "And-Or-Invert: it computes not of (A1 and A2) or B."
+    wrong:
+      - "And-Or-Invert: it computes (A1 and A2) or not B."
+      - "And-Or-Inverter: an AND gate, an OR gate, and an inverter in one cell."
+      - "And-Or-Invert: it computes not of A1 and (A2 or B)."
+    explain: >-
+      The digits give the input counts of each group, here a two-input AND
+      feeding an OR with one more input, all inverted. Such a compound gate is
+      one CMOS (Complementary Metal-Oxide-Semiconductor) stage, so it is smaller and faster than the gates it replaces.
+      `OAI21` is the same shape with the operations swapped.
+    source: rsz
+
+  - id: cell-buf-vs-inv
+    section: combinational
+    command: BUF_X4   versus   two INV_X4 in series
+    hint: "Both are non-inverting. Ask what the library can do that the netlist cannot."
+    answer: One characterized cell, usually smaller and faster than the pair.
+    wrong:
+      - "They are identical: a buffer is drawn as two inverters internally."
+      - Two inverters are faster, since each stage drives a smaller load.
+      - The buffer inverts at its internal node, so its timing is unrelated.
+    explain: >-
+      Two inverters in series do the same job. A buffer is drawn as two
+      stages, but its internal stage is sized for the
+      output stage rather than being a general-purpose cell, and the pair is
+      characterized as one. Repair and clock tree synthesis use buffers where
+      polarity must be preserved and inverter pairs where it must not.
+    source: rsz
+
+  - id: cell-mux
+    section: combinational
+    command: MUX2_X1
+    hint: "Ask why a library would provide it when AND, OR, and NOT already exist."
+    answer: A two-input multiplexer as one cell rather than three gates.
+    wrong:
+      - A two-input multiplexer built from two AND gates and an OR gate.
+      - A cell that multiplexes two clocks, for clock switching.
+      - A two-bit multiplexer, selecting between two pairs of bits.
+    explain: >-
+      It is smaller than the gates that would build it. Selection is so
+      common (enables, bypasses, scan) that libraries provide
+      it as a transmission-gate or compound cell, which is smaller and faster
+      than the three gates it replaces. Clock multiplexing uses a dedicated
+      glitch-free cell, not this one.
+    source: rsz
+
+  - id: cell-adders
+    section: combinational
+    command: HA_X1   and   FA_X1
+    hint: "Two adder cells. Ask what the second has that the first does not."
+    answer: A half adder, with no carry in, and a full adder, which takes one.
+    wrong:
+      - A half-width and a full-width adder for the design's data path.
+      - A fast adder and a small adder, with the same function.
+      - An adder without carry out and one with carry out.
+    explain: >-
+      Adders are built from these cells in a chain or a tree, so libraries
+      provide them drawn compactly rather than leaving synthesis to assemble
+      them from gates. The architecture of the chain is what
+      `SWAP_ARITH_OPERATORS` changes in the flow.
+    source: rsz
+
+  # ---------------------------------------------------------------- Sequential cells
+
+  - id: cell-dff-variants
+    section: sequential
+    command: DFF_X1  DFFR_X1  DFFS_X1  DFFRS_X1   # Nangate45 flip-flops
+    hint: "Read the letters after the flip-flop name as the extra pins."
+    answer: A plain flip-flop, then ones with asynchronous reset, set, and both.
+    wrong:
+      - A flip-flop, then ones with synchronous reset, set, and both.
+      - A flip-flop, then ones with a reset, a scan input, and both.
+      - Four drive strengths of a flip-flop with a reset pin.
+    explain: >-
+      The letters are R for reset, S for set, and RS for both, all
+      asynchronous. Such a pin acts without waiting for a clock edge, which is why
+      it needs its own timing checks, recovery and removal, rather than setup
+      and hold. Synchronous resets need no extra pin; they are logic in front
+      of D.
+    source: rsz
+
+  - id: cell-scan-flop
+    section: sequential
+    command: SDFF_X1   versus   DFF_X1
+    hint: "The extra pins exist for manufacturing test, not for the design's function."
+    answer: "A scan flop: the same flip-flop plus a test input and a select."
+    wrong:
+      - A slower flip-flop used only on non-critical paths.
+      - A flip-flop with a synchronous reset instead of an asynchronous one.
+      - A flip-flop with two data inputs, for dual-rail logic.
+    explain: >-
+      In test mode the select switches the flop to its scan input, and the
+      flops form a shift register through which patterns are loaded and
+      results read out. `scan_replace` swaps plain flops for these before
+      placement, since they are larger.
+    source: dft
+
+  - id: cell-latch
+    section: sequential
+    command: sky130_fd_sc_hd__dlxtp_1
+    hint: "Compare it with a flip-flop: one samples at an instant, the other over a window."
+    answer: "A latch: transparent while the clock is at its active level."
+    wrong:
+      - A flip-flop that captures on both edges of the clock.
+      - A flip-flop with a longer hold time and a shorter setup time.
+      - A delay cell that holds its output for one clock phase.
+    explain: >-
+      It is level-sensitive, not edge-triggered: it passes data through while
+      open, so a late signal can borrow time
+      from the next stage instead of failing. That flexibility costs a harder
+      timing analysis, so latches are used deliberately rather than inferred.
+    source: rsz
+
+  - id: cell-icg
+    section: sequential
+    command: CLKGATE_X1
+    hint: "Ask what would happen if the enable changed while the clock was high."
+    answer: "An integrated clock gate, which latches the enable first."
+    wrong:
+      - An AND gate dedicated to gating a clock with an enable signal.
+      - A buffer that switches the clock off when it is not needed.
+      - A cell that gates the clock and divides it by two when disabled.
+    explain: >-
+      Latching the enable is what stops the gated clock glitching. Gating with
+      a plain AND lets a late enable chop a pulse in half,
+      which can clock a register on a runt edge. The integrated cell latches
+      the enable while the clock is low, so the gated output only ever has
+      whole pulses. `CLKGATETST_X1` adds a test enable that forces the clock
+      on during scan.
+    source: cts
+
+  # ---------------------------------------------------------------- Clock cells
+
+  - id: cell-clkbuf
+    section: clock
+    command: CLKBUF_X1   versus   BUF_X1
+    hint: "The clock cares about something the data path mostly does not."
+    answer: A clock buffer, drawn so its rise and fall delays match closely.
+    wrong:
+      - A buffer that is only allowed on clock nets by the design rules.
+      - A stronger buffer, since a clock drives more load than data.
+      - A buffer with a guaranteed fixed delay, whatever its load.
+    explain: >-
+      A chain of unbalanced buffers slowly distorts the duty cycle, which eats
+      the high or low pulse width the registers need. Clock cells are drawn to
+      keep the two edges symmetric, and clock tree synthesis is given only
+      those cells to build with.
+    source: cts
+
+  - id: cell-clkinv-lp
+    section: clock
+    command: sky130_fd_sc_hd__clkinvlp_2
+    hint: "The letters before the drive strength say what it is optimized for."
+    answer: A low-power clock inverter, traded against speed.
+    wrong:
+      - A low-pin-count clock inverter with a single input.
+      - A clock inverter for the lowest metal layers only.
+      - A clock inverter with a low-threshold transistor, so it is faster.
+    explain: >-
+      The clock switches every cycle and reaches every register, so it is
+      often the largest single consumer of dynamic power. A library that
+      offers lower-power clock cells lets the tree use them where the extra
+      delay is affordable.
+    source: cts
+
+  - id: cell-delay-cells
+    section: clock
+    command: sky130_fd_sc_hd__dlygate4sd1_1
+    hint: "Its function is the identity. Ask what it is bought for."
+    answer: "A delay cell: it passes the signal through and adds a controlled delay."
+    wrong:
+      - A gate that delays the clock by exactly one cycle.
+      - A buffer that is only used when the library runs out of buffers.
+      - A cell that slows a signal by weakening its drive strength.
+    explain: >-
+      Hold repair needs delay without drive, and a buffer adds too little for
+      its area. Delay cells give a predictable amount per cell. The `dlymetal`
+      family in the same library gets its delay from long internal wires
+      instead of gates.
+    source: rsz
+
+  # ---------------------------------------------------------------- Physical-only cells
+
+  - id: cell-tap
+    section: physical
+    command: TAPCELL_X1
+    hint: "It has no logic pins. Ask what part of the transistor it is connecting."
+    answer: "A well tap: it ties the wells and substrate to the supplies."
+    wrong:
+      - A cell that taps the clock into a row of standard cells.
+      - A cell that connects the power rails of two neighbouring rows.
+      - A probe point that lets the wells be measured after manufacture.
+    explain: >-
+      An untied well floats, which can let the parasitic structures in CMOS
+      (Complementary Metal-Oxide-Semiconductor) latch up. Foundry rules
+      therefore limit how far any transistor may be from a tap, and taps are
+      inserted on a checkerboard at that pitch before placement.
+    source: tap
+
+  - id: cell-endcap
+    section: physical
+    command: place_endcaps -endcap TAPCELL_X1
+    hint: "Ask what is special about the first and last cell of a row."
+    answer: Endcaps terminate each row so its wells and implants end legally.
+    wrong:
+      - Endcaps fill the unused space at the two ends of each row.
+      - Endcaps connect the power rails of a row to the core ring.
+      - Endcaps mark the row ends so the legalizer knows where to stop.
+    explain: >-
+      A row that simply stops leaves its well and implant layers ending in
+      mid-air, which breaks the rules about how those layers may end. The
+      endcap provides a legal ending. It is inserted with the taps, before
+      placement.
+    source: tap
+
+  - id: cell-filler
+    section: physical
+    command: FILLCELL_X1  FILLCELL_X2  FILLCELL_X4  FILLCELL_X8  FILLCELL_X16
+    hint: "Several widths of the same thing. Ask what has to be continuous along a row."
+    answer: Fillers close the gaps so the rails and wells run unbroken.
+    wrong:
+      - Fillers hold space for cells that a later engineering change may add.
+      - Fillers add capacitance between the supplies to steady the voltage.
+      - Fillers pad the rows so that every row ends at the same width.
+    explain: >-
+      Several widths exist so any gap is filled exactly, widest first. A
+      filler carries the power and ground rails and the well and implant
+      layers across the gap, without which the row is not manufacturable. They
+      go in after routing-affecting steps, and `remove_fillers` clears them if
+      something must change.
+    source: dpl
+
+  - id: cell-decap
+    section: physical
+    command: sky130_fd_sc_hd__decap_8
+    hint: "It also fills a gap, but it does something electrical as well."
+    answer: "A decoupling capacitor, which stores charge across the supplies."
+    wrong:
+      - A capacitor that decouples the clock from the supply noise.
+      - A filler that separates two cells that must not sit together.
+      - A capacitor inserted on a signal net to slow its transition.
+    explain: >-
+      It fills a gap like a filler, and adds capacitance. When many cells
+      switch at once, the grid cannot deliver current fast
+      enough and the local supply dips. A decap sits beside them holding
+      charge to supply that moment. It costs leakage, so flows place them
+      where switching is heaviest rather than everywhere.
+    source: pdn
+
+  - id: cell-antenna-diode
+    section: physical
+    command: ANTENNA_X1
+    hint: "The damage it prevents happens during manufacturing, not in use."
+    answer: A diode that bleeds off charge collected by long metal during etching.
+    wrong:
+      - A diode that protects the chip from static discharge at its pins.
+      - A cell that shortens long wires by breaking them into segments.
+      - A diode that clamps a floating input to a known logic level.
+    explain: >-
+      While a layer is etched, metal connected to a gate accumulates charge
+      that can break the thin oxide. A diode gives that charge a path to the
+      substrate. `repair_antennas` inserts them after routing, where the check
+      finds violations. Protection at the pins is a different cell, in the
+      pad library.
+    source: ant
+
+  - id: cell-tie
+    section: physical
+    command: LOGIC0_X1   and   LOGIC1_X1
+    hint: "Ask why an input that needs a constant is not simply wired to a rail."
+    answer: Tie cells, which drive a constant 0 or 1 through a transistor.
+    wrong:
+      - Cells that report the constant value of a net to the tools.
+      - Cells that tie unused outputs to a constant to save power.
+      - Cells that hold their output at a constant during power-down.
+    explain: >-
+      Wiring a gate input straight to a rail exposes its thin oxide to the
+      full supply and to any damage the rail collects. A tie cell drives the
+      constant through a transistor instead. `repair_tie_fanout` gives each
+      load its own copy so the constant nets stay short. sky130 combines both
+      polarities in one cell, `conb_1`.
+    source: rsz
+
+  # ---------------------------------------------------------------- Views and characterization
+
+  - id: cell-views
+    section: views
+    command: |-
+      NangateOpenCellLibrary_typical.lib
+      NangateOpenCellLibrary.macro.lef
+      NangateOpenCellLibrary.gds
+    hint: "Three files for one library. Ask which stage of the flow needs each."
+    answer: Timing and power, then geometry, then the real layout.
+    wrong:
+      - Timing, then the netlist of each cell, then its layout.
+      - Geometry, then timing and power, then the extracted parasitics.
+      - Timing at one corner, at another corner, and the layout.
+    explain: >-
+      The three views are timing and power, geometry, and layout. A flow reads
+      the Liberty file to time, the LEF (Library Exchange Format)
+      file to place and route, and merges the layout only at the end. The
+      three must agree: a cell missing from one of them fails in whichever
+      stage needs it.
+    source: odb
+
+  - id: cell-corners
+    section: views
+    command: NangateOpenCellLibrary_typical.lib   versus   ..._slow.lib   versus   ..._fast.lib
+    hint: "One library, three files. Ask what differs, and why one is not enough."
+    answer: The same cells characterized at different operating conditions.
+    wrong:
+      - The same cells drawn with different transistor sizes per corner.
+      - Three libraries for slow, typical, and fast parts of the design.
+      - The same cells with their delays scaled by a fixed factor each.
+    explain: >-
+      The conditions are process, voltage, and temperature. Silicon varies, so
+      a cell's delay is measured at several of them and
+      the design must work at all of them. Setup is usually worst in the slow
+      corner and hold in the fast one, which is why sign-off analyses several
+      corners rather than picking one.
+    source: est
+
+  - id: cell-limits
+    section: views
+    command: |-
+      max_transition  : 0.2;
+      max_capacitance : 0.1;
+    hint: "These are not measurements. Ask who has to obey them."
+    answer: Limits the cell declares, which the design-rule repair must respect.
+    wrong:
+      - The worst transition and capacitance measured during characterization.
+      - The transition and capacitance assumed when the cell was characterized.
+      - The limits the tool applies to nets, not to the cell's own pins.
+    explain: >-
+      Beyond these values a cell's delay tables are extrapolated and its
+      behaviour is not guaranteed. `repair_design` fixes violations by
+      buffering or upsizing, and the SDC (Synopsys Design Constraints)
+      commands `set_max_transition` and `set_max_capacitance` can tighten the
+      limits further, never relax them.
+    source: rsz
+
+  - id: cell-site-rows
+    section: views
+    command: SITE FreePDK45_38x28_10R_NP_162NW_34O
+    hint: "It is the unit that rows and cell widths are built from."
+    answer: "The site: the smallest legal cell footprint, whose height sets the row height."
+    wrong:
+      - The placement grid that cells are snapped to during legalization.
+      - The smallest cell in the library, which all others are multiples of.
+      - The area reserved for one standard cell plus its padding.
+    explain: >-
+      Every standard cell is one site high (or a whole multiple, for
+      multi-height cells) and a whole number of sites wide. That is what makes
+      rows and legalization possible, and it is why a library belongs to a
+      site rather than to a process alone.
+    source: ifp
+
+  - id: cell-multibit-flop
+    section: sequential
+    command: export CLUSTER_FLOPS = 1
+    hint: "One cell, several bits. Ask which network benefits."
+    answer: Uses multi-bit flops, where several bits share one clock pin.
+    wrong:
+      - Places the design's flip-flops in clusters across the core.
+      - Uses flip-flops with several data inputs, selected by an enable.
+      - Groups flip-flops so each clock domain is built separately.
+    explain: >-
+      Each clock pin is a sink the clock tree must drive, so folding four
+      flops into one cell removes three sinks and the wire to them. The saving
+      is in clock power and tree size; the cost is that the four bits must sit
+      together. The library has to provide such cells.
+    source: dpl
+
+  - id: cell-retention-flop
+    section: sequential
+    command: set_isolation and a retention flop in a switchable domain
+    hint: "Ask what has to survive when a domain's supply is switched off."
+    answer: A flop that keeps its state while its domain's supply is off.
+    wrong:
+      - A flop that holds its output constant while its clock is gated.
+      - A flop whose state is copied to memory before power-down.
+      - A flop that resets to a known state when power returns.
+    explain: >-
+      An always-on supply feeds the small latch that holds it. Restoring state
+      is faster and cheaper than recomputing it, so the flops
+      worth keeping are given a small always-on latch inside. The isolation
+      cells at the domain boundary are a different cell: they hold the
+      domain's outputs at a defined value while it is off.
+    source: upf
+
+  - id: cell-tristate
+    section: combinational
+    command: sky130_fd_sc_hd__ebufn_2
+    hint: "Its output has a third state besides 0 and 1."
+    answer: A tristate buffer, whose output can be released to high impedance.
+    wrong:
+      - A buffer with an enable that holds its output at 0 when disabled.
+      - A buffer with two outputs, one inverted and one not.
+      - A buffer that can be bypassed by an enable signal.
+    explain: >-
+      Releasing the output lets several drivers share one net, one at a time.
+      Timing tools treat such a net carefully, since it has no driver at all
+      in some states, and physical verification checks that two drivers can
+      never be enabled together.
+    source: rsz
+
+  - id: cell-level-shifter
+    section: physical
+    command: set_level_shifter -domain PD_CORE
+    hint: "It sits between two domains, and what differs between them is not the clock."
+    answer: A cell that passes a signal between domains at different supply voltages.
+    wrong:
+      - A cell that shifts a signal's timing to meet the receiving domain.
+      - A cell that converts between two threshold-voltage flavours.
+      - A cell that steps the supply voltage down for a smaller domain.
+    explain: >-
+      A signal driven at a low supply may not register fully at a higher one,
+      and can leave the receiving gate partly on, burning current. A shifter
+      re-drives it at the receiving domain's supply. It needs both supplies,
+      so it is placed at the boundary.
+    source: upf
+
+  - id: cell-dont-use-library
+    section: views
+    command: set_dont_use {AOI211_X1 OAI211_X1}
+    hint: "The cells exist and work. Ask what else makes a cell a poor choice."
+    answer: Excludes cells that are legal but troublesome, often for pin access.
+    wrong:
+      - Excludes cells that are missing from the timing library.
+      - Excludes cells whose timing has not been characterized.
+      - Excludes cells that the design's netlist does not instantiate.
+    explain: >-
+      A tall compound gate can have pins that the router struggles to reach,
+      and a weak cell can be chosen too readily by sizing. Flows exclude such
+      cells outright rather than repair the results. Nangate45's flow
+      configuration excludes `AOI211_X1` and `OAI211_X1` for exactly this.
+    source: rsz
+
+  - id: cell-drive-cost
+    section: naming
+    command: INV_X1  ->  INV_X8
+    hint: "Three things get worse when you take the stronger cell. Name the one that is not area."
+    answer: More drive costs area, leakage, and load on whatever drives it.
+    wrong:
+      - More drive costs area and leakage, but presents the same input load.
+      - More drive costs area only; leakage depends on the threshold voltage.
+      - More drive costs leakage only; the cell's area is set by its row.
+    explain: >-
+      Wider transistors switch more current, but they also have larger gates,
+      so the previous stage sees a bigger load. Upsizing a cell can therefore
+      push the problem one stage back, which is why repair sizes along a path
+      rather than one cell at a time.
+    source: rsz
+
+  - id: cell-multi-height
+    section: views
+    command: a double-height cell in a single-height row
+    hint: "Rows are one site high. Ask what a cell twice that height needs."
+    answer: It spans two rows, so the two rows must have compatible orientation.
+    wrong:
+      - It is placed in its own row, which the floorplan must provide.
+      - It is split into two cells, one placed in each row.
+      - It is rejected, since a cell must fit inside one row.
+    explain: >-
+      Rows alternate orientation so that neighbouring rows share their power
+      and ground rails. A cell spanning two rows has to match that pattern,
+      which is why legalizers list mixed-height support as a feature, and why
+      `initialize_floorplan` takes extra sites for cells that appear later.
+    source: dpl
+
+  - id: cell-characterization-tables
+    section: views
+    command: |-
+      cell_rise (delay_template_5x5) {
+        index_1 ("0.01, 0.02, 0.04, 0.08, 0.16");   /* input transition */
+        index_2 ("0.5, 1.0, 2.0, 4.0, 8.0");        /* output load */
+      }
+    hint: "Two axes. Ask what the tool does when a real value lands between them."
+    answer: A delay table against input transition and output load.
+    wrong:
+      - A delay table against supply voltage and temperature, per corner.
+      - A list of measured delays, one per instance of the cell.
+      - A table of the largest transition and load the cell allows.
+    explain: >-
+      Values between the grid points are interpolated. A cell's delay depends
+      mostly on how fast its input arrives and how much
+      it has to drive, so it is characterized on that grid and interpolated in
+      between. `report_dcalc` prints the lookup for one arc, which is the way
+      to see it happen.
+    source: est
+
+  # ---------------------------------------------------------------- Naming additions
+
+  - id: cell-track-height
+    section: naming
+    command: |-
+      asap7sc7p5t_...     # ASAP7 (Arizona State University 7nm predictive kit)
+      FreePDK45 cell height 1.4 um, metal1 pitch 0.14 um
+    hint: "Divide the cell height by the routing pitch and see what the name says."
+    answer: How many routing tracks tall the cells are.
+    wrong:
+      - How many metal layers the cells use internally.
+      - How many rows of transistors each cell contains.
+      - How many tracks are left free for routing over the cell.
+    explain: >-
+      Nangate45 cells are ten tracks tall and the ASAP7 library says 7.5 in its
+      name. A shorter cell packs more logic into the same area but has less
+      room for wide transistors, so it is slower and harder to route inside. A
+      library is chosen partly on this number.
+    source: dpl
+
+  - id: cell-pin-naming
+    section: naming
+    command: |-
+      NAND2_X1  pins A1 A2 ZN          # Nangate45
+      nand2_1   pins A B Y             # another library
+    hint: "The cells do the same thing. Ask what does not carry across."
+    answer: Nothing about pin names is standard, so scripts must not assume them.
+    wrong:
+      - Pin names differ only between inverting and non-inverting outputs.
+      - Pin names follow the library's naming scheme for its cells.
+      - Pin names differ because the two cells have different functions.
+    explain: >-
+      An output may be Z, ZN, Y, or X, and inputs may be A and B or A1 and A2.
+      A script that hardcodes a pin name works on one library and fails on the
+      next, which is why flows query the library instead, with commands such
+      as `get_pins` or the library cell reports.
+    source: sta
+
+  - id: cell-library-size
+    section: naming
+    command: |-
+      134 macros in NangateOpenCellLibrary.macro.lef
+    hint: "One function appears many times over. Ask along which axes."
+    answer: Each function repeated at several drive strengths.
+    wrong:
+      - Each function repeated once for every metal stack it supports.
+      - One cell for every function the synthesis tool can map to.
+      - Each function repeated for every corner it was characterized at.
+    explain: >-
+      A library is a grid of choices: function by drive strength, and in a
+      modern library by threshold voltage as well. Corners do not multiply the
+      cell count, since they are separate Liberty files over the same cells. A
+      production library runs to a thousand cells or more.
+    source: sta
+
+  # ---------------------------------------------------------------- Combinational additions
+
+  - id: cell-nand-vs-nor
+    section: combinational
+    command: |-
+      NAND2_X1   versus   NOR2_X1
+    hint: "Think about which transistors end up in series in each one."
+    answer: The first is preferred, since stacking the slower transistors hurts more.
+    wrong:
+      - The first is preferred, since it needs fewer transistors than the second.
+      - Neither is preferred; the choice follows the logic being built.
+      - The second is preferred, since its pull-up path is a single transistor.
+    explain: >-
+      In a not-and gate the parallel transistors are the pull-up ones, which
+      are the weaker type and benefit most from being in parallel. In a not-or
+      gate they are stacked, so the gate must be made wide to match. Libraries
+      therefore offer stronger and cheaper not-and cells, and synthesis maps
+      toward them.
+    source: sta
+
+  - id: cell-stack-limit
+    section: combinational
+    command: |-
+      NAND2_X1  NAND3_X1  NAND4_X1   ... and no NAND8
+    hint: "Ask what happens to the transistors in series as the input count grows."
+    answer: A deeper stack is slower, so wide gates are built from smaller ones.
+    wrong:
+      - A wider gate needs more area than the row height allows.
+      - A wider gate has too many pins to route to in one cell.
+      - A wider gate cannot be characterized for every input combination.
+    explain: >-
+      Each transistor added in series adds resistance and adds its own
+      capacitance to the internal nodes, so delay grows faster than linearly.
+      Beyond about four the tool is better off building a tree of smaller
+      gates, which is why libraries stop there.
+    source: sta
+
+  - id: cell-complex-gate
+    section: combinational
+    command: |-
+      AOI21_X1   instead of   AND2_X1 + NOR2_X1
+    hint: "Count the gates the signal passes through in each version."
+    answer: One inverting cell does the job of two, with less delay and area.
+    wrong:
+      - One cell replaces two, at the cost of a slower path through it.
+      - One cell is used because the library has no matching pair.
+      - One cell replaces two, giving the same logic with the same delay.
+    explain: >-
+      Inverting logic is what the transistors naturally build, so an
+      and-or-invert cell is a single stage rather than two. Synthesis leans on
+      these heavily, and the inversions it introduces are absorbed by the
+      cells around them or by swapping a cell for its complement.
+    source: sta
+
+  # ---------------------------------------------------------------- Sequential additions
+
+  - id: cell-flop-vs-latch-cost
+    section: sequential
+    command: |-
+      DFF_X1   area 4.52      versus      DLH_X1   area 2.66
+    hint: "One of the two contains the other, twice over."
+    answer: A flip-flop is two latches, so it costs about twice the area and power.
+    wrong:
+      - A flip-flop is a latch with a clock buffer, so it costs a little more.
+      - A flip-flop is larger because it must hold its value for a full cycle.
+      - A flip-flop is larger because it drives both a true and an inverted output.
+    explain: >-
+      A master latch takes the data while the clock is low and a slave passes
+      it on when the clock rises, which is what makes the cell edge-triggered.
+      Latch-based designs trade that area and power saving for timing that is
+      much harder to reason about.
+    source: sta
+
+  - id: cell-enable-flop
+    section: sequential
+    command: |-
+      a flop with a feedback multiplexer, against a clock gate driving plain flops
+    hint: "Both keep a value. Ask what the clock is doing in each case."
+    answer: The multiplexer still clocks the flop; the gate stops the clock entirely.
+    wrong:
+      - The multiplexer is smaller, but both stop the flop from clocking.
+      - The multiplexer is faster, since the clock gate adds a stage.
+      - The multiplexer keeps the data, while the gate keeps the clock.
+    explain: >-
+      Recirculating the output through a multiplexer holds the value but the
+      register still toggles internally and still draws clock power. A clock
+      gate shared across a bank of registers removes that power, which is why
+      tools convert the one into the other during synthesis.
+    source: sta
+
+  # ---------------------------------------------------------------- Clock cell additions
+
+  - id: cell-clock-balanced
+    section: clock
+    command: |-
+      CLKBUF_X1 characterized with matched rise and fall delays
+    hint: "Ask what happens to a pulse after twenty unmatched stages."
+    answer: Matched edges keep the duty cycle from drifting along the tree.
+    wrong:
+      - Matched edges keep the insertion delay the same on every branch.
+      - Matched edges make the buffer's delay independent of its load.
+      - Matched edges reduce the buffer's contribution to clock jitter.
+    explain: >-
+      If a cell's rising delay differs from its falling one, every stage shifts
+      one edge relative to the other and the high phase shrinks. After a deep
+      tree the pulse can be too narrow for the registers at the leaves, which
+      is what the minimum pulse width check catches.
+    source: cts
+
+  - id: cell-inverter-tree
+    section: clock
+    command: |-
+      a tree of clock inverters, against a tree of clock buffers
+    hint: "A buffer is two inverters. Ask what that costs at every level."
+    answer: Inverters give the same tree with half the stages, so sharper edges.
+    wrong:
+      - Inverters give the same tree with less area but more skew.
+      - Inverters are used because buffers cannot drive a clock net.
+      - Inverters halve the delay of the tree, so latency is lower.
+    explain: >-
+      Since a buffer is a pair of inverters, building with inverters halves the
+      number of stages for the same drive, which means less accumulated
+      variation and a cleaner edge. The tree must then have an even number of
+      levels to every leaf, or the registers see opposite phases.
+    source: cts
+
+  # ---------------------------------------------------------------- Physical additions
+
+  - id: cell-tap-spacing
+    section: physical
+    command: |-
+      place_tapcells -distance 20
+    hint: "The rule behind this number is about the wells, not about timing."
+    answer: How far any transistor may be from a tie to its well, to prevent latch-up.
+    wrong:
+      - How far apart the tap cells may be before the rows lose their supply.
+      - How far apart the cells may be before filler must be inserted.
+      - How far the power grid straps may be from each other.
+    explain: >-
+      Wells and substrate must be held at a fixed voltage. If they float, the
+      parasitic structures between them can turn on and short the supply, which
+      destroys the chip. The foundry gives a maximum distance, and tap cells
+      are placed in rows at that spacing before anything else.
+    source: tap
+
+  - id: cell-spare-cells
+    section: physical
+    command: |-
+      a scattering of unused gates and flops, placed before tapeout
+    hint: "Ask what a late fix can do if the transistor masks are already made."
+    answer: Cells left in the layout so a late fix can be made in metal alone.
+    wrong:
+      - Cells left in the layout in case a cell fails to yield.
+      - Cells kept aside to replace any cell that fails a check.
+      - Cells placed to keep the row density even across the die.
+    explain: >-
+      Rewiring existing gates changes only the metal masks, which is far
+      cheaper than a new mask set. Teams therefore scatter a mix of gates and
+      registers across the die in advance, accepting the wasted area and
+      leakage as insurance. What is left unused is tied off.
+    source: dpl
+
+  - id: cell-filler-vs-decap
+    section: physical
+    command: |-
+      FILLCELL_X4   versus   a decoupling capacitor cell
+    hint: "Both fill a gap in a row. Ask what one of them adds."
+    answer: Both continue the rows, but one also adds capacitance across the supply.
+    wrong:
+      - Both continue the rows, but one also adds a tie to the well.
+      - One fills gaps in a row and the other fills gaps in the power grid.
+      - One is inserted before routing and the other after.
+    explain: >-
+      A gap in a row breaks the continuity of the wells and implant layers, so
+      something must fill it. A decoupling cell fills the same gap with a
+      transistor wired as a capacitor, which supplies charge locally when
+      nearby cells switch. It leaks, so it is used where the supply needs it.
+    source: dpl
+
+  # ---------------------------------------------------------------- Using the library
+
+  - id: cell-vt-choice
+    section: using
+    command: |-
+      swap a cell on a path with plenty of slack for a higher threshold version
+    hint: "Ask what a higher threshold does to speed, and what it does to leakage."
+    answer: It leaks far less and switches more slowly, which spare slack pays for.
+    wrong:
+      - It leaks far less and switches at the same speed, at the cost of area.
+      - It switches faster and leaks more, which the spare slack allows.
+      - It leaks far less but needs a higher supply voltage to work.
+    explain: >-
+      Leakage falls roughly exponentially with threshold voltage while delay
+      rises gently, so swapping the cells off the critical path is close to
+      free. Flows do this as a late pass, and the reverse swap is a way to
+      recover a small amount of timing.
+    source: rsz
+
+  - id: cell-upsize-limit
+    section: using
+    command: |-
+      INV_X1  ->  INV_X8   on a slow stage
+    hint: "The bigger cell drives more. Ask what it does to whatever drives it."
+    answer: It drives the load faster but presents a bigger load to the stage before.
+    wrong:
+      - It drives the load faster, at the cost of area and leakage only.
+      - It drives the load faster, but only if the net is short.
+      - It has the same input capacitance, so only the output improves.
+    explain: >-
+      Input capacitance grows with drive strength, so the delay moves upstream
+      rather than disappearing. Sizing helps when the cell is genuinely
+      overloaded and stops helping once the load is mostly the gate that drives
+      it, which is why repair sizes a whole path rather than one cell.
+    source: rsz
+
+  - id: cell-logical-effort
+    section: using
+    command: |-
+      a chain of buffers sized so each drives about four times its own input
+    hint: "There is an optimum, and it is not the biggest possible step."
+    answer: A ratio near four per stage gives the least delay over the chain.
+    wrong:
+      - A ratio near four per stage gives the least area over the chain.
+      - A ratio as large as the library allows gives the least delay.
+      - The ratio does not matter, only the number of stages.
+    explain: >-
+      A larger step per stage needs fewer stages but each is slower; a smaller
+      step is quick per stage but needs more of them. The total is flat near a
+      ratio of about four, which is why buffer trees are built that way and why
+      driving a huge load from one cell is always wrong.
+    source: rsz
+
+  - id: cell-buffer-vs-upsize
+    section: using
+    command: |-
+      insert a buffer halfway along a long net, or upsize the driver
+    hint: "Wire delay grows with the square of the length."
+    answer: Splitting the wire beats sizing, since each half is a quarter.
+    wrong:
+      - Sizing beats splitting, since a buffer adds a stage of delay.
+      - The two are equivalent, so the cheaper one is chosen.
+      - Splitting is used only when the driver is already at maximum size.
+    explain: >-
+      The resistance and the capacitance of a wire both scale with its length,
+      so its delay scales with the square. Two halves cost two quarters plus
+      the buffer. Sizing the driver fights the resistance of the whole wire and
+      runs out of benefit quickly, which is why repair buffers long nets.
+    source: rsz
+
+  # ---------------------------------------------------------------- View additions
+
+  - id: cell-footprint-swap
+    section: views
+    command: |-
+      two cells of the same width and the same pin positions
+    hint: "Ask what could be changed without moving anything else."
+    answer: Either can replace the other in place.
+    wrong:
+      - Either can replace the other, but the net must be rerouted.
+      - The two are the same cell characterized at two corners.
+      - The two may be swapped only before detailed placement.
+    explain: >-
+      A threshold voltage swap is the clearest case: the cells are drawn to the
+      same footprint on purpose, so the change touches no metal at all. Where
+      the replacement is wider, everything to the right of it has to move,
+      which is why late sizing is constrained to what fits.
+    source: dpl
+
+  - id: cell-char-range
+    section: views
+    command: |-
+      index_1 ("0.00117 ... 0.19854")   /* input transition */
+      index_2 ("0.36562 ... 23.4000")   /* output load */
+    hint: "Ask what happens to a cell asked to work outside these numbers."
+    answer: The range the cell was measured over.
+    wrong:
+      - The range of conditions the cell is guaranteed to work at.
+      - The range the design rule limits are derived from.
+      - The range of loads the cell may legally drive.
+    explain: >-
+      Inside the grid the values are interpolated between measured points.
+      Outside it, they are extrapolated, and the further out the worse. This is
+      the real reason behind the maximum transition and maximum capacitance
+      limits: past them, nobody knows the delay.
+    source: sta
+
+  - id: cell-library-qa
+    section: views
+    command: |-
+      a new library arrives: .lib, .lef, .gds, .cdl, .v
+    hint: "The views are built by different teams and different tools."
+    answer: "Check the views agree: same cells, same pins, same sizes."
+    wrong:
+      - Check the timing against the foundry's reference characterization.
+      - Check that every cell has been placed in a test design.
+      - Check the library reads without a warning in every tool.
+    explain: >-
+      A pin present in the timing view and missing in the abstract, or an
+      abstract whose size disagrees with the layout, breaks the flow far
+      downstream and in confusing ways. This is why a library is checked view
+      against view before any design uses it.
+    source: sta
+
+  # ---------------------------------------------------------------- Name the cell
+
+  - id: cell-rev-filler
+    section: physical
+    style: reverse
+    prompt: >-
+      Placement has left gaps between cells in a row. The wells and implant
+      layers must run unbroken from one end of the row to the other.
+    hint: "The gap needs occupying, not connecting."
+    answer: FILLCELL_X4
+    wrong:
+      - TAPCELL_X1
+      - ANTENNA_X1
+      - LOGIC0_X1
+    explain: >-
+      Filler cells carry no logic and no pins beyond the rails; they exist to
+      keep the row continuous. A well tap ties the wells to a voltage and is
+      placed on a spacing rule instead, and a diode and a tie cell both connect
+      to something.
+    source: dpl
+
+  - id: cell-rev-tie
+    section: physical
+    style: reverse
+    prompt: >-
+      An unused input must sit permanently at logic one, and the rules forbid
+      wiring a gate input straight to the supply rail.
+    hint: "Something has to stand between the rail and the gate."
+    answer: LOGIC1_X1
+    wrong:
+      - FILLCELL_X1
+      - ANTENNA_X1
+      - BUF_X1
+    explain: >-
+      A tie cell drives a constant through a transistor, which protects the
+      gate from the rail during manufacturing and gives the net a real driver
+      for the checks. A buffer would work electrically but costs more and needs
+      an input of its own.
+    source: dpl
+
+  - id: cell-rev-diode
+    section: physical
+    style: reverse
+    prompt: >-
+      A long metal wire collected charge during etch, and the gate at the end
+      of it needs somewhere for that charge to go.
+    hint: "The fix is a device that conducts to the substrate."
+    answer: ANTENNA_X1
+    wrong:
+      - sky130_fd_sc_hd__decap_8
+      - TAPCELL_X1
+      - CLKBUF_X1
+    explain: >-
+      A diode bleeds the accumulated charge away before it can damage the thin
+      gate oxide. The alternative fix is to break the long wire with a jump to
+      another layer. A decoupling cell is also a capacitor to the rails, but it
+      protects the supply, not a gate.
+    source: ant
+
+  - id: cell-order-physical
+    section: physical
+    style: order
+    question: Put these steps in the order a flow performs them.
+    hint: "One of them can only be judged once the wires exist."
+    items:
+      - place well taps and endcaps
+      - place the standard cells
+      - insert antenna diodes
+      - insert filler
+    explain: >-
+      Taps and endcaps are placed on the empty floorplan, since everything else
+      has to fit around them. Diodes come after routing, because only then is
+      it known which wires are too long. Filler is last, once nothing else will
+      move.
+    source: tap

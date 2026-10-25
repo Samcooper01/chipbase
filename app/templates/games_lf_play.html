@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} - {{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="fc-page">
+  <div class="crumb"><a href="/games">Games</a> / <a href="/games/log-forensics">{{ game.title }}</a> / {{ section.title }}</div>
+  <h1 class="lab-title">{{ section.title }}</h1>
+  <p class="fc-intro">
+    Each case shows the tail of a real run, ending where the tool stopped or
+    warned. Say what caused it, or what to do about it. A case you miss returns
+    later in the round and starts its schedule over; one you get right returns
+    after 1, 3, 7, then 21 days. Keys <b>1</b> to <b>4</b> choose an option,
+    <b>h</b> shows a hint, and <b>Enter</b> moves on. Progress is stored in this
+    browser.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}
+    Reference: <a href="{{ data.reference }}" target="_blank" rel="noopener">{{ data.basis.doc_title }}</a>
+    (<a href="{{ data.basis.tool_url }}" target="_blank" rel="noopener">{{ data.basis.tool }} on GitHub</a>).</span></div>
+  <div id="fc-root"></div>
+  <div id="fg-root"></div>
+
+  <details class="fc-deck">
+    <summary>All {{ play.cards | length }} cases {% if mixed %}in this drill{% else %}in this stage{% endif %}, with answers</summary>
+    <ul class="fc-list">
+      {% for c in play.cards %}
+      <li>
+        <div class="fc-list-cmd">{{ c.question }}</div>
+        {% if c.excerpt %}<details class="fc-list-excerpt"><summary>{{ c.stage }} log</summary><pre class="fc-excerpt">{{ c.excerpt }}</pre></details>{% endif %}
+        {% if c.style == "order" %}<ol class="fc-list-order">{% for it in c["items"] %}<li>{{ it }}</li>{% endfor %}</ol>
+        {% else %}<div class="fc-list-ans">{{ c.answer }}</div>{% endif %}
+        {% if c.hint %}<p class="fc-list-hint">Hint: {{ c.hint }}</p>{% endif %}
+        <p class="fc-list-exp">{{ c.explain_html | safe }}</p>
+        {% if c.fix %}<pre class="fc-excerpt">{{ c.fix }}</pre>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+</article>
+{% endblock %}
+{% block scripts %}
+<script src="/static/games/flag.js?v={{ asset_v }}"></script>
+<script src="/static/games/flashcards.js?v={{ asset_v }}"></script>
+<script id="fc-deck" type="application/json">{{ deck_json | safe }}</script>
+<script>
+  (function () {
+    var deck = JSON.parse(document.getElementById("fc-deck").textContent);
+    FlashCards.mount(document.getElementById("fc-root"), deck, {
+      keyTarget: document, mixed: {{ "true" if mixed else "false" }},
+      confirm: function (m) { return window.confirm(m); }
+    });
+  })();
+</script>
+<script>Flag.mount(document.getElementById("fg-root"), "log-forensics");</script>
+{% endblock %}

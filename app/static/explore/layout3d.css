@@ -1,0 +1,28 @@
+/* The three-dimensional layout view (layout3d.js), shared by the design
+   pages and the front page's try-it band. */
+.dz3 { display: grid; grid-template-columns: minmax(0, 1fr) 270px; border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12); background: #fff; }
+.dz3-stage { position: relative; height: 580px; }
+.dz3-stage canvas { width: 100%; height: 100%; display: block; }
+.dz3-hint { position: absolute; left: 10px; bottom: 8px; margin: 0; font-size: 12px; color: var(--muted);
+  background: rgba(255, 255, 255, 0.85); padding: 3px 8px; border-radius: 4px; }
+.dz3-panel { border-left: 1px solid var(--border); padding: 4px 14px 14px; overflow-y: auto; max-height: 580px; }
+.dz3-panel h3 { margin: 12px 0 6px; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--copper, #b8692e); }
+.dz3-toggle { display: flex; align-items: center; gap: 8px; padding: 2px 0; font-size: 13px; cursor: pointer; }
+.dz3-toggle i { width: 14px; height: 10px; border-radius: 2px; flex: none; }
+.dz3-toggle span { flex: 1; }
+.dz3-toggle em { font-style: normal; font: 11.5px var(--mono, monospace); color: var(--muted); }
+.dz3-range { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 13px; }
+.dz3-range input { grid-column: 1; width: 100%; }
+.dz3-range output { font: 12px var(--mono, monospace); color: var(--copper, #b8692e); }
+.dz3-note { font-size: 12.5px; color: var(--muted); margin: 6px 0; line-height: 1.5; }
+.dz3-what { margin-top: 10px; max-width: 900px; }
+.dz3-cams { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.dz3-cams button { font: 600 12px inherit; padding: 4px 9px; border: 1px solid var(--border); border-radius: 5px;
+  background: #f4f6f8; color: var(--text); cursor: pointer; }
+.dz3-cams button:hover { border-color: var(--copper, #b8692e); }
+@media (max-width: 800px) {
+  .dz3 { grid-template-columns: 1fr; }
+  .dz3-stage { height: 62vh; }
+  .dz3-panel { border-left: 0; border-top: 1px solid var(--border); max-height: none; }
+}

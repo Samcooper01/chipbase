@@ -1,0 +1,37 @@
+id: or-gcd-floorplan
+title: "Floorplan a real design in OpenROAD (gcd, sky130hd)"
+topic: Floorplanning
+difficulty: medium
+points: 200
+engine: openroad
+kind: files
+order: 2
+platform: sky130hd
+editable:
+  - path: floorplan.tcl
+    language: tcl
+checks:
+  - id: util
+    label: "Measured core utilization between 0.55 and 0.70"
+    metric: utilization
+    op: between
+    min: 0.55
+    max: 0.70
+  - id: aspect
+    label: "Core aspect ratio between 0.75 and 1.34"
+    metric: aspect_ratio
+    op: between
+    min: 0.75
+    max: 1.34
+  - id: tracks
+    label: "Routing tracks created (make_tracks)"
+    metric: tracks_ok
+    op: "~="
+    value: 1
+    tolerance: 0.1
+  - id: pins
+    label: "All block pins placed on met2 (vertical) / met3 (horizontal)"
+    metric: pins_ok
+    op: "~="
+    value: 1
+    tolerance: 0.1

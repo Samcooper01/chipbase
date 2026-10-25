@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} - PD-Leet{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / {{ game.title }}</div>
+  <h1 class="lab-title">{{ game.title }} <span class="gm-basis-tag">{{ data.basis.tag }}</span></h1>
+  <p class="gm-intro">
+    A design is in a particular state and something has to change. Pick the
+    change you would make, and see what each of them actually did, because
+    every option here was run. Nothing is anybody's opinion: the best answer
+    is whichever run came out best on the stated measure.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}</span></div>
+  <div class="gm-grid gm-grid-auto">
+    <a class="gm-tile is-mixed" href="/games/what-if/all"><div class="gm-tile-body">
+      <h2 class="gm-title">Every situation</h2>
+      <p class="gm-blurb">A mixed round across all of them.</p>
+      <div class="gm-mixed-num">{{ total }}<small>situations across {{ data.sections | length }} kinds</small></div>
+      <div class="gm-tile-foot"><span class="gm-count">mixed round</span><span class="chip diff-easy">play</span></div>
+    </div></a>
+    {% for s in data.sections %}
+    {% if s.count %}<a class="gm-tile" href="/games/what-if/{{ s.id }}">{% else %}<div class="gm-tile is-off">{% endif %}<div class="gm-tile-body">
+      <h2 class="gm-title">{{ s.title }}</h2>
+      <p class="gm-blurb">{{ s.blurb }}</p>
+      <div class="gm-cmds">{% for k in s.kinds %}<code>{{ k }}</code>{% endfor %}</div>
+      <div class="gm-tile-foot">
+        <span class="gm-count">{{ s.count }} situation{% if s.count != 1 %}s{% endif %}</span>
+        {% if s.count %}<span class="chip diff-easy">play</span>{% else %}<span class="chip chip-soon">none yet</span>{% endif %}
+      </div>
+    </div>{% if s.count %}</a>{% else %}</div>{% endif %}
+    {% endfor %}
+  </div>
+</article>
+{% endblock %}

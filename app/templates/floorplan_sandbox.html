@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}The Floorplan Sandbox - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/explore/sandbox-theme.css?v={{ asset_v }}">{% endblock %}
+{% block main_class %}sb-theme{% endblock %}
+{% block content %}
+<div class="sb-page">
+<style>
+  .fp-slider { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12.5px; }
+  .fp-slider output { min-width: 3.2em; color: var(--text); font-variant-numeric: tabular-nums; }
+  .fp-legend { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .fp-ramp { width: 180px; height: 10px; border-radius: 3px; border: 1px solid var(--border);
+             background: linear-gradient(90deg, rgba(22,163,74,0.15), rgba(217,119,6,0.42), rgba(220,38,38,0.7)); }
+  .fp-key { display: inline-block; width: 16px; height: 5px; vertical-align: middle; margin-right: 4px; }
+  #fp-canvas { display: block; touch-action: none; }
+</style>
+<div class="split">
+
+  <section class="pane pane-desc">
+    <div class="desc-head">
+      <div class="crumb"><a href="/sandboxes">Sandboxes</a> / <a href="/explore/algorithms/floorplanning">Floorplanning</a></div>
+      <h1>The Floorplan Sandbox</h1>
+      <div class="chip-row">
+        <span class="chip topic-chip">Floorplanning</span>
+        <span class="chip eng-openroad">interactive</span>
+      </div>
+    </div>
+    <article class="desc-body">
+      <h2>What you are looking at</h2>
+      <p>
+        A block with four memory macros (think SRAM (Static Random-Access
+        Memory) arrays), about 130,000 square micrometers of standard-cell
+        logic, and three groups of input/output pins on the die edge. Each
+        macro has a colored <em>pin edge</em>: its 64-bit data bus leaves
+        from there to a small controller (the matching colored dot), and
+        every controller talks to the central <strong>hub</strong>, which
+        also talks to the input/output pins.
+      </p>
+      <p>
+        <strong>Drag</strong> a macro to move it. <strong>Click</strong> it
+        to turn it a quarter turn, which moves its pin edge. The dashed ring
+        around each macro is its <em>halo</em>: a keep-out band where no
+        standard cell may sit, so the cells never crowd the macro's pins.
+        The dots move on their own: each controller settles at the
+        bit-weighted average of what it connects to, the same pull a real
+        placer will exert later.
+      </p>
+
+      <h2>Utilization and aspect ratio</h2>
+      <p>
+        <em>Core utilization</em> is (cell area + macro area) ÷ core area.
+        It is the first number every floorplan script sets, and it sizes
+        the die: at 70% the core is 30% whitespace. Push it toward 90% and
+        the die shrinks, so wires get shorter, but the cells pack tighter
+        and their local wiring eats the tracks that longer wires need.
+        That is the core trade of floorplanning: area and wirelength
+        against routability. <em>Aspect ratio</em> (height ÷ width)
+        reshapes the die; macros keep their relative position, which can
+        make them collide, so watch for red outlines.
+      </p>
+
+      <h2>Two congestion forecasts</h2>
+      <p>
+        Nothing is routed yet at floorplan time, so the heat map is a
+        forecast of <em>routing demand ÷ routing supply</em> in each 20
+        micrometer bin. Supply drops above a macro, because the macro owns
+        the lower metal layers and only the upper layers pass over it.
+        Two forecasts are offered, and the gap between them is itself a
+        lesson.
+      </p>
+      <p>
+        <a href="https://www.date-conference.com/proceedings-archive/PAPERS/2007/DATE07/PDFFILES/08.7_1.PDF">RUDY
+        (Rectangular Uniform wire DensitY)</a>, from Spindler and Johannes
+        at DATE (Design, Automation and Test in Europe) 2007, smears each
+        connection's wire evenly over its bounding box. It is nearly free
+        to compute, which is why placers use it inside their inner loops.
+        But it cannot see obstacles or direction: it does not know a wire
+        will have to squeeze through a gap.
+      </p>
+      <p>
+        The <strong>trial global route</strong> actually routes every
+        connection with L-shaped and Z-shaped patterns on the bin grid,
+        pricing each bin edge by how full it already is, then rips up
+        and reroutes twice. It detours around full regions and reports the
+        busier direction of each bin, so it sees a jammed channel that
+        RUDY (Rectangular Uniform wire DensitY) averages away. Load
+        <em>Tight channel</em> and flip between the two.
+      </p>
+
+      <h2>The rules of thumb, made visible</h2>
+      <ul>
+        <li><strong>Macros go to the edges.</strong> In the middle they
+            chop the core into pieces, and every wire between the pieces
+            has to cross them on the few tracks above. Notice that the
+            wirelength barely changes between <em>Macros in the middle</em>
+            and <em>Macros on the edges</em>: what the middle placement
+            costs is congestion, not length.</li>
+        <li><strong>Pins face the core.</strong> A pin edge against the
+            die wall leaves no room to reach it, and every bit of the bus
+            has to wrap around the macro. <em>Pins facing the wall</em>
+            costs about a quarter more wire.</li>
+        <li><strong>A channel is either wide or absent.</strong> Two macros
+            a halo-width or two apart leave a gap too narrow for useful
+            logic but still in the path of every wire that wants to cross.
+            Either abut the macros or open the gap properly.</li>
+        <li><strong>Leave whitespace.</strong> The same floorplan that
+            routes at 70% utilization can fail at 90%.</li>
+      </ul>
+
+      <h2>From this toy to a real flow</h2>
+      <p>
+        A real block has dozens to hundreds of macros, a netlist of
+        millions of cells, a power grid, timing constraints, and ten or
+        more metal layers. In
+        <a href="https://github.com/The-OpenROAD-Project/OpenROAD">OpenROAD</a>
+        the die comes from the utilization and aspect ratio you set here,
+        and the macros are placed by
+        <a href="https://openroad.readthedocs.io/en/latest/main/src/mpl/README.html">Hier-RTLMP
+        (Hierarchical Register Transfer Level Macro Placer)</a>, which has
+        commands for exactly the halos and channels on this page. The
+        congestion map that counts comes later, from global routing after
+        placement; both forecasts here are floorplan-time guesses at it.
+      </p>
+
+      <h2>Things to try</h2>
+      <ul>
+        <li>Start from <em>Macros in the middle</em> and drag the four
+            memories into the corners, pin edges facing in. Watch the red
+            bins disappear.</li>
+        <li>On <em>Macros on the edges</em>, raise utilization from 70% to
+            90% on the trial global route. Wirelength falls while
+            congestion climbs.</li>
+        <li>On <em>Tight channel</em>, compare the two forecasts. Then
+            click Memory A and Memory B so their pins point down into the
+            core, and drag them together until they touch: no channel, no
+            jam.</li>
+        <li>Turn on <em>Show wires</em> in trial-route mode to see where
+            the router actually sent each bus.</li>
+      </ul>
+    </article>
+  </section>
+
+  <section class="pane pane-work">
+    <div class="maze-toolbar">
+      <select id="fp-preset" title="load a starting floorplan">
+        <option value="middle" selected>Macros in the middle</option>
+        <option value="edges">Macros on the edges, pins facing in</option>
+        <option value="wall">Pins facing the wall</option>
+        <option value="channel">Tight channel</option>
+      </select>
+      <button class="btn btn-ghost" id="fp-reset" title="reload the preset at 70% utilization and a square die">Reset</button>
+      <span class="seg">
+        <label class="algo-opt"><input type="radio" name="fp-forecast" value="rudy" checked> RUDY (Rectangular Uniform wire DensitY)</label>
+        <label class="algo-opt"><input type="radio" name="fp-forecast" value="groute"> Trial global route</label>
+      </span>
+    </div>
+    <div class="maze-toolbar">
+      <label class="fp-slider">utilization
+        <input type="range" id="fp-util" min="50" max="90" value="70" step="1">
+        <output id="fp-util-val">70%</output>
+      </label>
+      <label class="fp-slider">aspect ratio (height ÷ width)
+        <input type="range" id="fp-ar" min="50" max="200" value="100" step="5">
+        <output id="fp-ar-val">1.00</output>
+      </label>
+      <label class="algo-opt"><input type="checkbox" id="fp-wires"> Show wires</label>
+    </div>
+    <div class="maze-canvas-wrap">
+      <canvas id="fp-canvas"></canvas>
+    </div>
+    <div class="fp-legend">
+      <span>routing demand ÷ supply:</span>
+      <span>50%</span><span class="fp-ramp"></span><span>130% or more</span>
+      <span><span class="fp-key" style="background:var(--cv-port, #7c3aed)"></span>input/output pins</span>
+      <span><span class="fp-key" style="background:linear-gradient(90deg,#16a34a,#2563eb,#d97706,#db2777)"></span>macro pin edges and their controllers</span>
+    </div>
+    <div class="run-status" id="fp-hint"></div>
+    <div class="maze-stats" id="fp-stats"></div>
+  </section>
+
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/explore/floorplan-core.js?v={{ asset_v }}"></script>
+<script src="/static/explore/floorplan-ui.js?v={{ asset_v }}"></script>
+{% endblock %}

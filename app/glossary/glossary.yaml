@@ -1,0 +1,723 @@
+# Glossary: every term and acronym the site uses, defined once.
+#
+# The rest of the site expands acronyms where they appear; this page is where
+# they are defined. Definitions are one or two sentences in textbook voice.
+# Any acronym used inside a definition is expanded there too, and the
+# validator in tests/games checks that against the acronyms listed here.
+# "Appears in" links are computed by searching the site's own content, so they
+# are never maintained by hand.
+
+categories:
+  - id: flow
+    title: The flow
+    blurb: The stages a design passes through, and the words for what comes in and out of each.
+  - id: timing
+    title: Timing
+    blurb: How a design is checked against its clock, and the numbers that report it.
+  - id: physical
+    title: Floorplan, placement and routing
+    blurb: Where things go on the die, and how they are connected.
+  - id: power
+    title: Power
+    blurb: How the supply reaches every cell, and what it costs when it does not.
+  - id: verification
+    title: Sign-off and manufacturing
+    blurb: The checks a layout has to pass, and the processing it will go through.
+  - id: formats
+    title: Files and formats
+    blurb: The files a design travels in between tools.
+  - id: devices
+    title: Devices and processes
+    blurb: The transistors underneath, and the technologies they are made in.
+  - id: tools
+    title: Tools and methods
+    blurb: The open tools the site is built on, and the algorithms named on its pages.
+
+terms:
+  # ---------------------------------------------------------------- the flow
+  - term: RTL
+    expansion: Register Transfer Level
+    category: flow
+    definition: >-
+      A description of a digital design in terms of registers and the logic
+      that moves data between them on each clock edge, written in a hardware
+      description language such as Verilog. It is the input to logic
+      synthesis.
+  - term: Logic synthesis
+    category: flow
+    definition: >-
+      The step that turns RTL (Register Transfer Level) into a netlist of
+      cells from a specific library, optimizing for area, delay or power
+      along the way.
+  - term: Netlist
+    category: flow
+    definition: >-
+      A list of cell instances and the nets that connect their pins. It
+      describes what is connected to what, but not where anything is.
+  - term: Standard cell
+    category: flow
+    definition: >-
+      A small, pre-designed logic gate or flip-flop of fixed height, built so
+      that cells can be placed side by side in rows and share supply rails.
+      A standard-cell library is the set of these a design is built from.
+  - term: Macro
+    category: flow
+    definition: >-
+      A large pre-built block placed as a single unit, such as a memory. It
+      occupies the lower metal layers across its footprint and exposes its
+      connections as pins on its edge.
+  - term: SRAM
+    match: ["SRAM", "SRAMs"]
+    expansion: Static Random-Access Memory
+    category: flow
+    definition: >-
+      Memory that holds each bit in a small cross-coupled latch and keeps it
+      as long as power is applied. On a chip it is usually a macro produced
+      by a memory compiler.
+  - term: Floorplanning
+    category: flow
+    definition: >-
+      Deciding the size and shape of the die and core, where the macros go,
+      where the pins are, and how the power grid is laid out, before any
+      standard cell is placed.
+  - term: Placement
+    category: flow
+    definition: >-
+      Deciding where every standard cell sits. Global placement spreads cells
+      to shorten wires within a density limit; legalization and detailed
+      placement then snap them onto legal sites without overlap.
+  - term: CTS
+    expansion: Clock Tree Synthesis
+    category: flow
+    definition: >-
+      Building the network of buffers and wires that delivers the clock to
+      every flip-flop, aiming to keep the arrival times close together.
+  - term: Routing
+    category: flow
+    definition: >-
+      Drawing the metal wires and vias that implement every net. Global
+      routing plans which regions each net passes through; detailed routing
+      draws the actual shapes on legal tracks.
+  - term: Sign-off
+    category: flow
+    definition: >-
+      The final set of checks, on timing, power and physical rules, that a
+      design must pass before it is released for manufacture.
+  - term: Tapeout
+    category: flow
+    definition: >-
+      Releasing the final layout to the foundry for mask making. The name
+      comes from the magnetic tape the data was once delivered on.
+  - term: ECO
+    expansion: Engineering Change Order
+    category: flow
+    definition: >-
+      A small, targeted change to a design late in the flow, made without
+      rerunning every stage. A metal-only change after tapeout reuses the
+      transistor masks and is far cheaper than a full respin.
+  - term: PPA
+    expansion: Power, Performance, Area
+    category: flow
+    definition: >-
+      The three measures a physical design is usually judged by, and the
+      trade-off between them.
+  - term: EDA
+    expansion: Electronic Design Automation
+    category: flow
+    definition: >-
+      The software used to design and verify chips, from synthesis through
+      placement, routing and sign-off.
+  - term: PDK
+    match: ["PDK", "PDKs"]
+    expansion: Process Design Kit
+    category: flow
+    definition: >-
+      The files a foundry provides to design in its process: device models,
+      design rules, layer definitions and usually standard-cell libraries.
+  - term: IP
+    expansion: Intellectual Property
+    category: flow
+    definition: >-
+      A reusable design block licensed or shared for use in other chips, such
+      as a processor core or an interface.
+
+  # ------------------------------------------------------------------ timing
+  - term: STA
+    expansion: Static Timing Analysis
+    category: timing
+    definition: >-
+      Checking every timing path in a design against its constraints by
+      adding up cell and wire delays, without simulating any input patterns.
+  - term: Slack
+    category: timing
+    definition: >-
+      The margin by which a path meets its timing requirement: required time
+      minus arrival time. Positive slack passes; negative slack fails by that
+      amount.
+  - term: WNS
+    expansion: Worst Negative Slack
+    category: timing
+    definition: >-
+      The slack of the single worst failing path. Many tools report it as zero
+      when nothing fails, so the margin of a passing design is read from the
+      worst slack instead.
+  - term: TNS
+    expansion: Total Negative Slack
+    category: timing
+    definition: >-
+      The sum of the negative slack over every failing endpoint. Where WNS
+      (Worst Negative Slack) gives the depth of the worst failure, TNS gives
+      the size of the problem.
+  - term: Setup check
+    category: timing
+    definition: >-
+      The requirement that data arrive at a flip-flop some time before the
+      capturing clock edge. It fails when the path is too slow.
+  - term: Hold check
+    category: timing
+    definition: >-
+      The requirement that data stay stable for some time after the clock
+      edge. It fails when a path is too fast, and is fixed by adding delay.
+  - term: Recovery check
+    match: ["recovery check", "recovery"]
+    category: timing
+    definition: >-
+      The requirement that an asynchronous reset or set be released some time
+      before the next clock edge, so the flip-flop leaves reset cleanly.
+  - term: Critical path
+    category: timing
+    definition: >-
+      The path with the least slack, which limits how fast the design can be
+      clocked.
+  - term: Smallest period
+    match: ["smallest period", "period_min"]
+    category: timing
+    definition: >-
+      The shortest clock period at which a finished design would meet setup
+      on its register-to-register paths. It depends on how hard the tools
+      were pushed, so it moves when the requested clock does.
+  - term: Clock skew
+    category: timing
+    definition: >-
+      The difference in clock arrival time between two flip-flops. It adds to
+      or subtracts from the time a path has, depending on its direction.
+  - term: Insertion delay
+    match: ["insertion delay", "clock latency"]
+    category: timing
+    definition: >-
+      The time the clock takes to travel from its source to a flip-flop
+      through the clock tree. It cancels between two flip-flops on the same
+      tree but not on paths to ports or across clock domains.
+  - term: Interface budget
+    match: ["interface budget", "input delay", "output delay"]
+    category: timing
+    definition: >-
+      The share of the clock period a block promises to whatever is on the
+      other side of its ports, expressed as input and output delays in its
+      constraints.
+  - term: OCV
+    expansion: On-Chip Variation
+    category: timing
+    definition: >-
+      Differences in delay between devices on the same die caused by local
+      variation in the process, voltage and temperature. Timing analysis
+      models it by making some paths slower than nominal.
+  - term: AOCV
+    expansion: Advanced On-Chip Variation
+    category: timing
+    definition: >-
+      A refinement of OCV (On-Chip Variation) that scales the derating with
+      path depth and distance, since random variation partly averages out
+      over many stages.
+  - term: POCV
+    expansion: Parametric On-Chip Variation
+    category: timing
+    definition: >-
+      A statistical form of OCV (On-Chip Variation) that gives each cell a
+      delay distribution rather than a fixed derate, and combines the
+      distributions along a path.
+  - term: CRPR
+    expansion: Clock Reconvergence Pessimism Removal
+    category: timing
+    definition: >-
+      Removing the pessimism added when the launch and capture clocks share
+      part of the same clock path, since that shared part cannot be both fast
+      and slow at once. Also called CPPR (Common Path Pessimism Removal).
+  - term: MCMM
+    expansion: Multi-Corner Multi-Mode
+    category: timing
+    definition: >-
+      Analysing and optimizing a design across several process corners and
+      operating modes at the same time, since each can have different
+      critical paths.
+  - term: PVT
+    expansion: Process, Voltage, Temperature
+    category: timing
+    definition: >-
+      The three conditions that set how fast a transistor switches. A corner
+      is one combination of them, such as slow process, low voltage and high
+      temperature.
+  - term: NLDM
+    expansion: Non-Linear Delay Model
+    category: timing
+    definition: >-
+      A cell timing model that stores delay and output slew in tables indexed
+      by input slew and output load.
+  - term: CCS
+    expansion: Composite Current Source
+    category: timing
+    definition: >-
+      A cell timing model that stores the output current waveform rather than
+      a single delay, giving more accurate results at advanced nodes than NLDM
+      (Non-Linear Delay Model).
+  - term: SSTA
+    expansion: Statistical Static Timing Analysis
+    category: timing
+    definition: >-
+      A form of STA (Static Timing Analysis) that propagates delay
+      distributions instead of single values, reporting the probability that
+      a path meets timing.
+
+  # ---------------------------------------------------------------- physical
+  - term: Utilization
+    category: physical
+    definition: >-
+      The fraction of the core area occupied by cells. A target set at
+      floorplanning sizes the core; repair then adds cells, so the finished
+      figure is usually higher than the target.
+  - term: Core and die
+    match: ["core area", "die area"]
+    category: physical
+    definition: >-
+      The die is the whole piece of silicon; the core is the area inside it
+      where cells may be placed, surrounded by a margin for pins and power
+      rings.
+  - term: Cell row and site
+    match: ["cell row", "placement row", "placement site"]
+    category: physical
+    definition: >-
+      Standard cells are placed in horizontal rows of fixed height, and each
+      row is divided into sites of the minimum cell width. Every cell must
+      start on a site.
+  - term: Filler cell
+    category: physical
+    definition: >-
+      A cell with no logic, inserted into the gaps between placed cells to
+      keep the supply rails and the wells continuous along each row.
+  - term: Tap cell
+    match: ["tap cell", "tapcell", "well tap"]
+    category: physical
+    definition: >-
+      A cell placed at regular intervals along each row to tie the wells and
+      substrate to the supply, preventing latch-up.
+  - term: Halo
+    category: physical
+    definition: >-
+      A keep-out margin around a macro in which no standard cell may be
+      placed, leaving room for routing to reach the macro's pins.
+  - term: Legalization
+    category: physical
+    definition: >-
+      Moving cells from the positions global placement found onto legal sites
+      in rows, without overlaps, while disturbing them as little as possible.
+  - term: HPWL
+    expansion: Half-Perimeter Wire Length
+    category: physical
+    definition: >-
+      Half the perimeter of the smallest rectangle enclosing a net's pins. It
+      is a fast estimate of wire length used by placers.
+  - term: Metal layer
+    match: ["metal layer", "metal layers"]
+    category: physical
+    definition: >-
+      One of the stacked levels of wiring above the transistors. Lower layers
+      are thin and fine-pitched for short connections; upper layers are thick
+      and wide for long nets and power.
+  - term: Via
+    category: physical
+    definition: >-
+      A vertical connection between two adjacent metal layers.
+  - term: Preferred direction
+    match: ["preferred direction"]
+    category: physical
+    definition: >-
+      The direction, horizontal or vertical, that wires run on a given metal
+      layer. Adjacent layers alternate, so a wire changes layer to turn a
+      corner.
+  - term: Congestion
+    category: physical
+    definition: >-
+      Routing demand in a region approaching or exceeding the tracks
+      available there. Overflow is demand beyond capacity, which the router
+      must resolve by detouring.
+  - term: Global routing
+    category: physical
+    definition: >-
+      Dividing the die into tiles and assigning each net a path through them,
+      balancing demand against each tile's capacity. It produces a plan, not
+      shapes.
+  - term: Detailed routing
+    category: physical
+    definition: >-
+      Drawing the exact wire and via shapes for every net on legal tracks,
+      then iterating to remove design-rule violations.
+  - term: RUDY
+    expansion: Rectangular Uniform wire DensitY
+    category: physical
+    definition: >-
+      A quick congestion estimate that spreads each net's expected wire
+      evenly over its bounding box and sums the result across the die.
+  - term: RSMT
+    expansion: Rectilinear Steiner Minimal Tree
+    category: physical
+    definition: >-
+      The shortest tree of horizontal and vertical segments connecting a set
+      of points, allowed to branch at extra points. Routers use it as the
+      target shape for a net.
+  - term: NDR
+    match: ["NDR", "NDRs", "non-default rule"]
+    expansion: Non-Default Rule
+    category: physical
+    definition: >-
+      A routing rule for specific nets, usually clocks, that uses wider wires
+      or extra spacing to reduce resistance and coupling.
+  - term: Pin access
+    category: physical
+    definition: >-
+      Reaching a cell's pins from the routing grid without violating the
+      rules. At small geometries it is often what limits routability.
+  - term: Timing repair
+    match: ["timing repair", "repair_timing", "repair"]
+    category: physical
+    definition: >-
+      Changes the tools make after placement to fix timing: resizing cells,
+      inserting buffers, cloning gates and swapping pins.
+  - term: Gate cloning
+    match: ["gate cloning", "cloning"]
+    category: physical
+    definition: >-
+      Duplicating a gate so that its load is split between two drivers,
+      speeding up the nets it drives at the cost of area.
+  - term: Pin swapping
+    match: ["pin swapping", "pin swap"]
+    category: physical
+    definition: >-
+      Exchanging the inputs of a gate whose inputs are logically equivalent,
+      so that the latest signal uses the faster input. It costs no area.
+
+  # ------------------------------------------------------------------- power
+  - term: IR drop
+    match: ["IR drop", "voltage drop"]
+    expansion: current times resistance drop
+    category: power
+    definition: >-
+      The fall in supply voltage between the power pads and a cell, caused by
+      current flowing through the resistance of the power grid. Reported as a
+      percentage of the supply.
+  - term: Ground bounce
+    match: ["ground bounce", "ground net"]
+    category: power
+    definition: >-
+      The rise of the ground net above zero volts under a cell, the mirror of
+      supply drop. A cell caught by both loses voltage from both ends.
+  - term: PDN
+    match: ["PDN", "power grid", "supply grid"]
+    expansion: Power Distribution Network
+    category: power
+    definition: >-
+      The grid of rings, straps, rails and vias that carries the supply and
+      ground to every cell.
+  - term: Power strap
+    category: power
+    definition: >-
+      A wide supply or ground wire on an upper metal layer, repeated at a
+      fixed pitch across the core and connected down to the rails.
+  - term: Supply rail
+    category: power
+    definition: >-
+      The supply and ground wires that run along the top and bottom of every
+      cell row, usually on the lowest metal layer.
+  - term: Dynamic power
+    category: power
+    definition: >-
+      Power spent charging and discharging capacitance when signals switch.
+      It scales with frequency, capacitance and the square of the supply.
+  - term: Leakage power
+    category: power
+    definition: >-
+      Power drawn by transistors that are nominally off. It depends on the
+      threshold voltage and temperature, not on activity.
+  - term: UPF
+    expansion: Unified Power Format
+    category: power
+    definition: >-
+      A standard file format describing a design's power intent: its voltage
+      domains, which blocks can be switched off, and the isolation and level
+      shifters between them.
+
+  # ------------------------------------------------------------ verification
+  - term: DRC
+    expansion: Design Rule Check
+    category: verification
+    definition: >-
+      Checking the layout against the foundry's geometric rules: minimum
+      widths, spacings, enclosures and densities. A violation is a shape the
+      foundry cannot reliably make.
+  - term: LVS
+    expansion: Layout Versus Schematic
+    category: verification
+    definition: >-
+      Extracting the circuit from the layout and comparing it with the
+      netlist, to confirm the layout implements what was designed.
+  - term: ERC
+    expansion: Electrical Rule Check
+    category: verification
+    definition: >-
+      Checking for electrically wrong connections such as floating inputs or
+      outputs driving each other.
+  - term: Antenna effect
+    category: verification
+    definition: >-
+      Charge collected on a long metal wire during manufacture that can
+      damage the gate it connects to before the rest of the circuit exists to
+      drain it. It is fixed with diodes or by breaking the wire across layers.
+  - term: DFM
+    expansion: Design For Manufacturability
+    category: verification
+    definition: >-
+      Design practices and checks that improve yield beyond the minimum
+      rules, such as doubling vias and spreading wires.
+  - term: CMP
+    expansion: Chemical-Mechanical Polishing
+    category: verification
+    definition: >-
+      The process that flattens each layer after deposition. It is why metal
+      density must stay within limits across the die.
+  - term: Parasitic extraction
+    match: ["parasitic extraction", "extraction"]
+    category: verification
+    definition: >-
+      Computing the resistance and capacitance of every wire from the layout,
+      so that timing and power can be analysed with real interconnect.
+  - term: BEOL
+    expansion: Back End Of Line
+    category: verification
+    definition: >-
+      The manufacturing steps that build the metal layers and vias above the
+      transistors.
+  - term: FEOL
+    expansion: Front End Of Line
+    category: verification
+    definition: >-
+      The manufacturing steps that build the transistors themselves, before
+      any metal.
+
+  # ----------------------------------------------------------------- formats
+  - term: LEF
+    expansion: Library Exchange Format
+    category: formats
+    definition: >-
+      A text format describing the physical view of cells and macros, their
+      size, pins and blockages, and the routing layers of the technology. It
+      carries no timing.
+  - term: DEF
+    expansion: Design Exchange Format
+    category: formats
+    definition: >-
+      A text format describing a specific design's layout: the die, rows,
+      placed components and routed nets.
+  - term: Liberty
+    category: formats
+    definition: >-
+      The standard text format for cell timing and power: delay and slew
+      tables, pin capacitances, and timing checks for each cell at one
+      corner.
+  - term: SDC
+    expansion: Synopsys Design Constraints
+    category: formats
+    definition: >-
+      The command format that states a design's timing intent: its clocks,
+      input and output delays, and the paths that are exceptions.
+  - term: SPEF
+    expansion: Standard Parasitic Exchange Format
+    category: formats
+    definition: >-
+      A text format carrying the resistance and capacitance of every net,
+      written by parasitic extraction and read by timing analysis.
+  - term: SDF
+    expansion: Standard Delay Format
+    category: formats
+    definition: >-
+      A text format carrying computed cell and wire delays, used to annotate
+      timing onto a gate-level simulation.
+  - term: GDSII
+    expansion: Graphic Design System II
+    category: formats
+    definition: >-
+      The binary format in which the final layout is delivered to the
+      foundry: every shape on every layer.
+  - term: OASIS
+    expansion: Open Artwork System Interchange Standard
+    category: formats
+    definition: >-
+      A more compact successor to GDSII (Graphic Design System II) for layout
+      data.
+  - term: SPICE
+    expansion: Simulation Program with Integrated Circuit Emphasis
+    category: formats
+    definition: >-
+      The circuit simulator family, and its netlist format, used to simulate
+      transistors and wires at the level of voltages and currents.
+  - term: CDL
+    expansion: Circuit Description Language
+    category: formats
+    definition: >-
+      A SPICE (Simulation Program with Integrated Circuit Emphasis) style
+      netlist format used as the reference circuit in LVS (Layout Versus
+      Schematic).
+  - term: TCL
+    match: ["TCL", "Tcl"]
+    expansion: Tool Command Language
+    category: formats
+    definition: >-
+      The scripting language most physical design tools are driven with,
+      including OpenROAD.
+
+  # ----------------------------------------------------------------- devices
+  - term: CMOS
+    expansion: Complementary Metal-Oxide-Semiconductor
+    category: devices
+    definition: >-
+      The logic style built from pairs of n-type and p-type transistors, so
+      that a gate draws current mainly when it switches.
+  - term: MOSFET
+    expansion: Metal-Oxide-Semiconductor Field-Effect Transistor
+    category: devices
+    definition: >-
+      The transistor digital chips are built from: a gate voltage controls the
+      current between source and drain.
+  - term: FinFET
+    expansion: Fin Field-Effect Transistor
+    category: devices
+    definition: >-
+      A transistor whose channel is a vertical fin wrapped by the gate on
+      three sides, giving better control than a flat channel at small sizes.
+  - term: CFET
+    expansion: Complementary Field-Effect Transistor
+    category: devices
+    definition: >-
+      A proposed transistor structure that stacks the n-type and p-type
+      devices on top of each other to shrink cell area.
+  - term: Threshold voltage
+    category: devices
+    definition: >-
+      The gate voltage at which a transistor turns on. Low-threshold cells are
+      faster and leak more; high-threshold cells are slower and leak less.
+  - term: EUV
+    expansion: Extreme Ultraviolet
+    category: devices
+    definition: >-
+      Lithography at a 13.5 nanometre wavelength, which prints the finest
+      layers at advanced nodes in a single exposure.
+  - term: SADP
+    expansion: Self-Aligned Double Patterning
+    category: devices
+    definition: >-
+      A technique that halves the pitch a lithography step can print by
+      forming spacers on both sides of a printed line.
+  - term: LELE
+    expansion: Litho-Etch-Litho-Etch
+    category: devices
+    definition: >-
+      Double patterning by splitting a layer between two masks, each printed
+      and etched in turn.
+  - term: OPC
+    expansion: Optical Proximity Correction
+    category: devices
+    definition: >-
+      Deliberately distorting mask shapes so that, after optical effects, the
+      printed shapes match the intended ones.
+  - term: CPP
+    expansion: Contacted Poly Pitch
+    category: devices
+    definition: >-
+      The spacing between neighbouring transistor gates. With the metal
+      pitch, it sets how small a standard cell can be.
+  - term: ASAP7
+    expansion: Arizona State University 7 nanometre predictive process design kit
+    category: devices
+    definition: >-
+      An open, predictive PDK (Process Design Kit) for a 7 nanometre FinFET
+      (Fin Field-Effect Transistor) process, built for research and teaching
+      rather than manufacture.
+    url: https://github.com/The-OpenROAD-Project/asap7
+  - term: Nangate45
+    category: devices
+    definition: >-
+      An open 45 nanometre standard-cell library, widely used for research
+      and as a teaching platform in the open flow.
+  - term: SKY130
+    match: ["SKY130", "sky130", "Skywater"]
+    expansion: SkyWater 130 nanometre
+    category: devices
+    definition: >-
+      An open PDK (Process Design Kit) for a real, manufacturable 130
+      nanometre process, released by SkyWater with Google in 2020.
+    url: https://github.com/google/skywater-pdk
+
+  # ------------------------------------------------------------------- tools
+  - term: OpenROAD
+    category: tools
+    definition: >-
+      An open-source tool that performs floorplanning, placement, clock tree
+      synthesis, routing and analysis in one application, driven by TCL (Tool
+      Command Language).
+    url: https://github.com/The-OpenROAD-Project/OpenROAD
+  - term: ORFS
+    match: ["ORFS", "OpenROAD-flow-scripts"]
+    expansion: OpenROAD-flow-scripts
+    category: tools
+    definition: >-
+      The reference flow around OpenROAD: makefiles, scripts and platform
+      configurations that take a design from RTL (Register Transfer Level) to
+      layout. Every run behind the drills on this site used it.
+    url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts
+  - term: Yosys
+    category: tools
+    definition: >-
+      The open-source logic synthesis tool the open flow uses to turn Verilog
+      into a netlist.
+    url: https://github.com/YosysHQ/yosys
+  - term: ABC
+    expansion: And-Inverter-Graph optimizer
+    category: tools
+    definition: >-
+      The logic optimization and technology mapping engine inside Yosys,
+      which represents logic as a graph of AND gates and inverters.
+    url: https://github.com/berkeley-abc/abc
+  - term: KLayout
+    category: tools
+    definition: >-
+      An open-source layout viewer and editor, also used to run design-rule
+      checks in the open flow.
+    url: https://www.klayout.de
+  - term: Maze routing
+    category: tools
+    definition: >-
+      Finding a path for a net by expanding a wavefront across a grid from the
+      source until it reaches the target, as in Lee's algorithm. It always
+      finds a path if one exists, at a high cost in memory and time.
+  - term: FLUTE
+    expansion: Fast Lookup Table Estimation
+    category: tools
+    definition: >-
+      A method that builds a near-optimal RSMT (Rectilinear Steiner Minimal
+      Tree) for small nets from precomputed tables, used inside global
+      routers.
+  - term: ILP
+    expansion: Integer Linear Programming
+    category: tools
+    definition: >-
+      Optimization over variables restricted to integers, with a linear
+      objective and linear constraints. Exact but expensive, so used on small
+      subproblems.

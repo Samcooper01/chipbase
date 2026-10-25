@@ -1,0 +1,1020 @@
+# Sign-off checks and violations flash-card deck.
+#
+# Grounded in the rule decks that OpenROAD-flow-scripts ships: the KLayout DRC
+# runsets for sky130 high density (918 lines) and ASAP7 (561 lines), and the
+# sky130 LVS runset, plus the checks OpenROAD itself runs. Rule names, values,
+# and wording in the cards come from those files. See signoff_scope.md.
+
+deck: signoff
+title: Sign-off checks and violations
+reference: https://skywater-pdk.readthedocs.io/en/main/rules.html
+default_question: "What does this mean?"
+basis:
+  tool: the open rule decks
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/master/flow/platforms
+  tag: checked against the open rule decks
+  doc_title: the sky130 design rule documentation
+  note: >-
+    These cards describe the checks a design must pass before tapeout, using
+    the rule decks that ship with OpenROAD-flow-scripts: the KLayout runsets
+    for sky130 and ASAP7 and the sky130 layout-versus-schematic runset. Rule
+    names and values are quoted from those files. Every process has its own
+    rules; the families and the reasons behind them are what carry across.
+
+sections:
+  - id: families
+    title: Rule families and naming
+    blurb: The kinds of geometric rule, and how two real processes name them.
+    commands: [width, spacing, area, enclosure, "m1.1", "GATE.S.1", "WELL.A.1A"]
+  - id: geometry
+    title: Geometry rules
+    blurb: Width, spacing, area, enclosure, and the rules that only appear at small nodes.
+    commands: ["m1.2", "m1.3ab", "m1.4", "m1.6", "m1.7", "FIN.S.1", "GATE.W.1", end-of-line]
+  - id: connectivity
+    title: Connectivity and LVS
+    blurb: "Proving the layout is the circuit: extraction, shorts, opens, and device mismatch."
+    commands: [extract_devices, connect, schematic, short, open, device-mismatch, property-check]
+  - id: electrical
+    title: Electrical and reliability checks
+    blurb: Antenna, floating nodes, electromigration, voltage drop, and latch-up.
+    commands: [check_antennas, repair_antennas, ERC, electromigration, analyze_power_grid, latch-up]
+  - id: density
+    title: Density and fill
+    blurb: Why layers must be evenly filled, and what the flow adds to achieve it.
+    commands: [metal-density, density_fill, USE_FILL, FILL_CONFIG, "vpp.5a"]
+  - id: dfm
+    title: "DFM (Design for Manufacturing)"
+    blurb: Checks that ask not whether a layout is legal, but whether it will yield.
+    commands: [critical area, lithography, hotspot, planarity, pattern matching]
+  - id: running
+    title: Running the checks
+    blurb: Which tool runs what, how results are counted, and what a waiver is.
+    commands: [klayout, magic, netgen, check_antennas, "6_drc_count.rpt", waiver]
+
+cards:
+
+  # ---------------------------------------------------------------- Rule families and naming
+
+  - id: sgn-rule-families
+    section: families
+    command: |-
+      m1.1 : min. m1 width : 0.14um
+      m1.2 : min. m1 spacing : 0.14um
+      m1.6 : min. m1 area : 0.083um2
+      m1.4 : min. m1 enclosure of mcon : 0.03um
+    hint: "Four rules on one layer. Ask what each one measures."
+    answer: "The four basic families: width, spacing, area, and enclosure."
+    wrong:
+      - Four checks of the same rule at four different corners.
+      - The four metal1 rules that this process happens to define.
+      - Width and spacing rules, each given a minimum and a maximum.
+    explain: >-
+      Nearly every geometric rule is one of these: how narrow a shape may be,
+      how close two shapes may come, how small a shape may be, and how far one
+      layer must extend past another. The names and values here are sky130's,
+      quoted from the rule deck the flow ships.
+    source: ""
+
+  - id: sgn-rule-naming
+    section: families
+    command: |-
+      GATE.S.1     # ASAP7
+      m1.2         # sky130
+    hint: "Both encode a layer and a check. Ask which one also encodes the kind of check."
+    answer: ASAP7 names the check type as well; sky130 names only the layer.
+    wrong:
+      - ASAP7 names the layer and a number; sky130 adds the check type.
+      - Both name the layer and a number, but count from different origins.
+      - ASAP7 numbers rules per layer, sky130 numbers them across the process.
+    explain: >-
+      Both give the layer and a number. In ASAP7 the middle letter also says
+      what is measured: `W` for width, `S` for
+      spacing, `A` for area, `EN` for enclosure, so `GATE.S.1` is a gate
+      spacing rule. sky130 puts the meaning in the description instead, as in
+      `m1.2 : min. m1 spacing`.
+    source: ""
+
+  - id: sgn-exact-rules
+    section: families
+    command: |-
+      FIN.W.1  : Exact vertical width of FIN : 7nm
+      GATE.S.1 : Exact horizontal GATE pitch : 54nm
+    hint: "Read the word before the dimension. It is not a minimum."
+    answer: Rules that fix a dimension exactly, not as a lower bound.
+    wrong:
+      - Rules that give the typical value a shape should have.
+      - Rules that hold at one corner but vary at the others.
+      - Minimum rules, written as exact values for convenience.
+    explain: >-
+      At small nodes lithography can only print one pitch for the critical
+      layers, so fins and gates are not drawn freely: they sit on a fixed grid
+      at a fixed width. This is why cells at such nodes are drawn to a
+      standard template rather than shaped by hand.
+    source: ""
+
+  # ---------------------------------------------------------------- Geometry rules
+
+  - id: sgn-wide-metal-spacing
+    section: geometry
+    command: |-
+      m1.2   : min. m1 spacing : 0.14um
+      m1.3ab : min. 3um.m1 spacing m1 : 0.28um
+    hint: "The second rule mentions a size as well as a spacing."
+    answer: A wide wire needs more spacing than a narrow one, here double.
+    wrong:
+      - A wire longer than 3 microns needs double the usual spacing.
+      - Wires closer than 3 microns must be at least 0.28 microns wide.
+      - The second rule applies only where three or more wires run together.
+    explain: >-
+      A wide conductor is more prone to the etch and lithography effects that
+      close a gap, so the rule deck keys the spacing to the width. Timing
+      tools see the same thing from the other side: a non-default rule that
+      widens a net must also widen its spacing.
+    source: ""
+
+  - id: sgn-enclosure
+    section: geometry
+    command: "m1.4 : min. m1 enclosure of mcon : 0.03um"
+    hint: "Two layers are named. Ask which one has to be bigger, and why."
+    answer: Metal must extend at least 0.03 microns past the contact it covers.
+    wrong:
+      - The contact must extend 0.03 microns past the metal above it.
+      - Metal and contact must overlap by at least 0.03 microns.
+      - Contacts must be at least 0.03 microns from the metal edge.
+    explain: >-
+      Layers are printed by separate masks that never align perfectly, so the
+      upper layer must overhang enough that the contact is still covered when
+      they shift. Too little enclosure gives a weak or open connection. This
+      is the same rule family as via enclosure higher in the stack.
+    source: ""
+
+  - id: sgn-min-area
+    section: geometry
+    command: |-
+      m1.6 : min. m1 area : 0.083um2
+      m1.7 : min. m1 holes area : 0.14um2
+    hint: "One is about the shape; the other is about the gap inside it."
+    answer: A shape must not be too small, and a hole in a shape must not be either.
+    wrong:
+      - A shape must not be too small, and the total metal must not be too large.
+      - The area rule applies to wires and the hole rule to pads.
+      - Both are density rules, measured over a window of the layout.
+    explain: >-
+      A tiny island of metal may not print or may lift off, and a tiny hole may
+      close up during etch. Minimum-area violations usually appear where a via
+      lands on a short stub, which is why routers extend such stubs.
+    source: ""
+
+  - id: sgn-eol
+    section: geometry
+    command: an end-of-line spacing rule
+    hint: "Ask how the end of a wire differs from its side."
+    answer: The end of a wire needs more clearance than its side does.
+    wrong:
+      - Two wire ends facing each other need less clearance than their sides.
+      - A wire's end must stop a fixed distance before the next track.
+      - The rule limits how long a wire may run before it must turn.
+    explain: >-
+      A line end rounds and pulls back as it prints, so its position is less
+      certain than a long edge. The rule keeps extra distance there, and it
+      commonly applies only below a width threshold and within a distance
+      window, which is why it has more parameters than plain spacing.
+    source: ""
+
+  - id: sgn-drc-vs-timing
+    section: geometry
+    command: a design-rule violation found after routing
+    hint: "Ask whether the chip is slow or unbuildable."
+    answer: The layout cannot be manufactured reliably, whatever its timing says.
+    wrong:
+      - The design is slower than intended, but still manufacturable.
+      - The layout is legal, but the tool cannot verify it.
+      - The design violates its constraints, not the foundry's rules.
+    explain: >-
+      Timing violations cost performance; geometric violations cost yield, and
+      a foundry will not accept the design at all. This is why detailed
+      routing iterates until the violation count is zero, and why a tapeout
+      gate treats any remaining violation as blocking unless it is waived.
+    source: ""
+
+  # ---------------------------------------------------------------- Connectivity and LVS
+
+  - id: sgn-lvs-extract
+    section: connectivity
+    command: extract_devices(mos4("nfet_01v8"), { "SD" => NSD, "G" => STD_NGATE, ... })
+    hint: "The layout is only shapes. Ask what this turns them into."
+    answer: Recognizes transistors in the layout from the layers that overlap.
+    wrong:
+      - Places transistors of that type into the layout being checked.
+      - Extracts the parasitic resistance and capacitance of each device.
+      - Compares the layout's transistors against the schematic's.
+    explain: >-
+      A gate is polysilicon crossing active area; the parts either side are
+      source and drain. Device recognition turns the drawing back into a
+      circuit, which is the first half of
+      LVS (Layout Versus Schematic). The `connect` statements that follow
+      build the nets between those devices.
+    source: ""
+
+  - id: sgn-lvs-compare
+    section: connectivity
+    command: schematic("sky130hd.cdl")
+    hint: "Two netlists exist by this point. Ask where the second one comes from."
+    answer: Gives the intended netlist that the extracted layout is compared against.
+    wrong:
+      - Gives the layout's own netlist, extracted from its shapes.
+      - Gives the cells' internal netlists so the layout can be flattened.
+      - Gives the schematic drawing that the layout was drawn from.
+    explain: >-
+      LVS (Layout Versus Schematic) compares two graphs: the one extracted
+      from the layout and the one the design intends, here a
+      CDL (Circuit Description Language) netlist written by the flow. A
+      mismatch means the layout is not the circuit that was verified.
+    source: ""
+
+  - id: sgn-short
+    section: connectivity
+    command: an LVS short
+    hint: "Two things in the netlist became one in the layout."
+    answer: Two nets that should be separate are connected in the layout.
+    wrong:
+      - One net is split into two pieces that are not connected.
+      - A net is connected to the supply instead of its driver.
+      - Two cells drive the same net, which should have one driver.
+    explain: >-
+      A short usually comes from overlapping metal or a misplaced via, and it
+      is reported as one extracted net matching two schematic nets. It is the
+      most common serious LVS (Layout Versus Schematic) error, and the extracted net's name usually
+      names both signals that were merged.
+    source: ""
+
+  - id: sgn-open
+    section: connectivity
+    command: an LVS open
+    hint: "The opposite failure to a short."
+    answer: One net appears as two disconnected pieces in the layout.
+    wrong:
+      - A net in the layout has no driver connected to it at all.
+      - A net exists in the layout but not in the schematic netlist.
+      - A pin of a cell is left unconnected in the layout.
+    explain: >-
+      The pieces belong to one net in the netlist. An open comes from a
+      missing via or a wire that does not quite reach.
+      Because each piece may still connect to real pins, the report shows one
+      schematic net matching two extracted nets, the mirror image of a short.
+    source: ""
+
+  - id: sgn-device-mismatch
+    section: connectivity
+    command: a device property mismatch in LVS
+    hint: "The connectivity matches. Ask what else the comparison checks."
+    answer: The devices connect correctly but their sizes or types differ.
+    wrong:
+      - The layout has more devices than the schematic netlist does.
+      - A device is connected to the wrong nets in the layout.
+      - The layout uses a device type the schematic does not define.
+    explain: >-
+      Comparison checks parameters as well as topology: transistor width and
+      length, and the device model (a regular against a high-threshold
+      transistor, for instance). A wrong size passes connectivity and changes
+      the circuit's behaviour, which is why properties are checked too.
+    source: ""
+
+  # ---------------------------------------------------------------- Electrical and reliability
+
+  - id: sgn-antenna
+    section: electrical
+    command: check_antennas -report_violating_nets
+    hint: "The rule is about a ratio, and the damage happens before the chip ever runs."
+    answer: The metal connected to a gate collects more charge than its oxide survives.
+    wrong:
+      - The metal connected to a gate picks up noise from its neighbours.
+      - A long wire acts as an antenna for radiation once the chip runs.
+      - A gate's input capacitance exceeds what its driver can charge.
+    explain: >-
+      During etch, a metal piece attached to a gate but not yet to a diffusion
+      collects charge, and the rule limits the ratio of that metal's area to
+      the gate's. Fixes are a diode to bleed the charge away, or jumping the
+      net to another layer so no single piece is large.
+    source: ""
+
+  - id: sgn-erc
+    section: electrical
+    command: an ERC floating-gate error
+    hint: "Ask what a gate input that connects to nothing actually does."
+    answer: A gate input is left unconnected, so its voltage is undefined.
+    wrong:
+      - A gate input is connected to two drivers at the same time.
+      - A gate output drives nothing, so the gate is wasted area.
+      - A gate is connected to a supply that is switched off.
+    explain: >-
+      A floating input sits at an undefined level, which can leave both
+      transistor stacks partly on and burn current. ERC (Electrical Rule
+      Check) finds them; the fix is a tie cell, never a direct connection to
+      the rail.
+    source: ""
+
+  - id: sgn-em
+    section: electrical
+    command: an electromigration violation on a power strap
+    hint: "It is a wear-out mechanism: the chip works at first."
+    answer: Current density is high enough that the metal will erode over time.
+    wrong:
+      - Current is high enough to melt the wire immediately.
+      - Voltage drop along the wire is too large for the cells to work.
+      - The wire heats enough to slow the cells around it.
+    explain: >-
+      Electrons moving through a conductor gradually displace its atoms, so a
+      wire carrying too much current per unit area eventually thins and opens.
+      The rule is a current density limit, which is why supply straps are
+      widened rather than lengthened. `analyze_power_grid -enable_em` reports
+      the current per segment.
+    source: ""
+
+  - id: sgn-ir-drop
+    section: electrical
+    command: analyze_power_grid -net VDD
+    hint: "The grid has resistance, and cells draw current through it."
+    answer: The voltage the cells receive is lower than the supply, which slows them.
+    wrong:
+      - The supply voltage is set too low for the library's characterization.
+      - The grid carries more current than its metal can survive long term.
+      - The supply voltage varies as cells switch, causing noise.
+    explain: >-
+      IR (current times resistance) drop is a static loss along the grid.
+      Timing is characterized at a supply voltage, so a cell seeing less is
+      slower than the analysis assumed. Fixes are a denser grid, wider straps,
+      more bumps, or spreading the current-hungry cells.
+    source: ""
+
+  - id: sgn-latchup
+    section: electrical
+    command: a latch-up rule violation
+    hint: "It concerns the well and the substrate, not the wires."
+    answer: A transistor sits too far from a well tap, risking a self-sustaining short.
+    wrong:
+      - A cell's output latches at a constant value after a glitch.
+      - Two supplies are shorted together through a missing level shifter.
+      - A latch is used where the design rules require a flip-flop.
+    explain: >-
+      The parasitic bipolar structures in CMOS (Complementary
+      Metal-Oxide-Semiconductor) can trigger and conduct until power is
+      removed, destroying the part. Tying the wells and substrate firmly and
+      often prevents it, which is the reason for the tap spacing rule and for
+      inserting taps before placement.
+    source: ""
+
+  # ---------------------------------------------------------------- Density and fill
+
+  - id: sgn-density
+    section: density
+    command: a metal density rule, checked in a window
+    hint: "Ask what the manufacturing step after deposition does to an uneven surface."
+    answer: Each window of the layout must be neither too empty nor too full.
+    wrong:
+      - Each layer must carry a similar number of wires across the die.
+      - Metal must not exceed a fraction of the die area in total.
+      - Routing must not exceed a density that the router can complete.
+    explain: >-
+      The limit applies to metal in each window, top and bottom. Chemical
+      mechanical polishing removes material faster where there is
+      less metal, so an uneven layer ends up dished or domed, which ruins the
+      layers above it. The rule is checked over a sliding window, so a design
+      can pass overall and still fail locally.
+    source: ""
+
+  - id: sgn-fill
+    section: density
+    command: density_fill -rules $(FILL_CONFIG)
+    hint: "The design cannot add real wires. Ask what it adds instead."
+    answer: Adds unconnected metal shapes where a layer is too empty.
+    wrong:
+      - Adds filler cells in the rows where placement left gaps.
+      - Adds extra power straps to raise the metal density.
+      - Adds shapes that connect to the nearest net on that layer.
+    explain: >-
+      Fill shapes are electrically inert; they exist to satisfy density. They
+      do add capacitance to nearby wires, which is why extraction runs after
+      fill in a careful flow, and why fill is kept away from sensitive nets.
+      The flow turns it on with `USE_FILL`.
+    source: ""
+
+  - id: sgn-density-max
+    section: density
+    command: "vpp.5a : max. m3 density in vpp : 0.25"
+    hint: "This one is an upper bound. Ask where a maximum would matter."
+    answer: A local region where metal density must stay below a limit.
+    wrong:
+      - A region where metal density must stay above a minimum limit.
+      - The maximum density the router may create on metal3 anywhere.
+      - The fraction of metal3 reserved for the power grid in that region.
+    explain: >-
+      Density rules run both ways: too little metal polishes unevenly, too
+      much can trap stress or interfere with a structure underneath. This rule
+      comes from the sky130 deck and applies inside a parallel-plate capacitor
+      structure, where extra metal3 would change the device.
+    source: ""
+
+  # ---------------------------------------------------------------- Running the checks
+
+  - id: sgn-who-runs-what
+    section: running
+    command: |-
+      klayout -r sky130hd.lydrc      # geometry
+      klayout -r sky130hd.lylvs      # layout versus schematic
+      openroad -exit check_antennas  # antenna
+    hint: "Ask which checks need the foundry's rule deck, and which the design tools can do alone."
+    answer: The rule decks cover geometry and connectivity; the tool does antennas.
+    wrong:
+      - All three checks run from the same foundry rule deck.
+      - The design tool runs all three; the rule decks only describe them.
+      - Geometry is checked by the design tool and connectivity by the deck.
+    explain: >-
+      Geometry and connectivity come from the runsets; antennas do not.
+      Extraction needs the foundry's own encoding of the
+      rules, which is what a runset is. OpenROAD checks antennas from the
+      routed database and the technology file, so that one can be run and
+      repaired inside the flow.
+    source: ""
+
+  - id: sgn-drc-count
+    section: running
+    command: 6_drc_count.rpt
+    hint: "Ask what a single number can and cannot tell you about a rule run."
+    answer: A count of violations per rule, the number a tapeout drives to zero.
+    wrong:
+      - The number of rules the deck checked against the layout.
+      - The number of shapes in the layout that each rule examined.
+      - A score of how close the layout is to passing every rule.
+    explain: >-
+      Per rule, per run. A count is how progress is tracked, but it hides what
+      matters: one violation can be a systematic problem repeated in a cell,
+      and another can be a single stray shape. The flow writes the report so
+      the results can be opened in the viewer.
+    source: ""
+
+  - id: sgn-waiver
+    section: running
+    command: a waived DRC violation
+    hint: "Ask who has the authority to accept a violation, and on what basis."
+    answer: A violation the foundry agrees to accept, recorded and justified.
+    wrong:
+      - A violation the tool decided is a false positive and hid.
+      - A violation deferred to a later revision of the design.
+      - A violation that falls below the severity threshold set by the flow.
+    explain: >-
+      Some rules are conservative or are met by construction in a macro the
+      foundry supplied. Those cases are agreed and documented rather than
+      fixed. A waiver is a decision with a name attached to it, not a way of
+      silencing a checker.
+    source: ""
+
+  - id: sgn-signoff-gate
+    section: running
+    command: the tapeout checklist
+    hint: "Ask what has to be true at once, and whether timing alone is enough."
+    answer: Geometry, connectivity, electrical rules, and timing must all pass together.
+    wrong:
+      - Timing must pass; the geometric checks are the foundry's concern.
+      - Each check must pass at some point during the flow, not all at once.
+      - Geometry and connectivity must pass; timing is signed off separately.
+    explain: >-
+      The checks constrain each other: fixing antennas adds diodes, fixing
+      density adds fill that changes parasitics, and fixing timing moves
+      cells. They must all hold on the same database, which is why sign-off is
+      a gate on one final version rather than a series of independent passes.
+    source: ""
+
+  # ---------------------------------------------------------------- Additions
+
+  - id: sgn-guard-ring
+    section: electrical
+    command: a guard ring around an analog block
+    hint: "Ask what travels through the substrate between neighbouring circuits."
+    answer: A tied ring that collects substrate current before it arrives.
+    wrong:
+      - A ring of metal that shields the block from capacitive coupling.
+      - A ring of filler cells that keeps digital cells away from the block.
+      - A ring of power straps that supplies the block from all four sides.
+    explain: >-
+      The ring is diffusion tied to a supply. Switching digital logic injects
+      current into the shared substrate, where
+      it becomes noise in a sensitive analog circuit. A guard ring tied to a
+      supply gives that current a path away. It is also the standard defence
+      against latch-up around large drivers.
+    source: ""
+
+  - id: sgn-esd
+    section: electrical
+    command: an ESD check on an I/O pad
+    hint: "The event happens before the chip is ever powered, in handling."
+    answer: Checks the pad's discharge path can carry a static event.
+    wrong:
+      - Checks that the pad can drive the capacitance of the package.
+      - Checks that the pad's voltage never exceeds the supply in use.
+      - Checks the pad's antenna ratio during manufacturing.
+    explain: >-
+      The energy comes from a static discharge: ESD (Electrostatic Discharge)
+      is a few amps for a few nanoseconds
+      arriving at a pin. The pad cell contains clamps to conduct it to the
+      rails, and the check confirms the metal between pad, clamp, and rail is
+      wide enough and the path short enough. It is a pad-level check, distinct
+      from the antenna rule.
+    source: ""
+
+  - id: sgn-redundant-vias
+    section: geometry
+    command: via doubling after routing
+    hint: "A single via can fail; ask what costs almost nothing to add."
+    answer: Replaces single vias with pairs wherever there is room.
+    wrong:
+      - Adds vias wherever the router left two layers unconnected.
+      - Doubles the via size so it carries more current.
+      - Adds vias to reduce the resistance of the power grid only.
+    explain: >-
+      Doubling raises yield. A via is one of the most failure-prone features
+      in manufacturing, and a
+      lone via in a signal path makes the whole net fail. Where the layout
+      allows it, a second via in parallel removes that single point of
+      failure. It is a recommended rule rather than a hard one.
+    source: ""
+
+  - id: sgn-soft-rules
+    section: geometry
+    command: a recommended rule against a required rule
+    hint: "Ask what happens at the foundry if you break each one."
+    answer: A required rule blocks the tapeout; a recommended one costs yield if broken.
+    wrong:
+      - A required rule is checked by the foundry and a recommended one by the tool.
+      - A recommended rule applies to macros and a required one to standard cells.
+      - A recommended rule becomes required once the process matures.
+    explain: >-
+      Decks carry both. Required rules define what can be manufactured at all;
+      recommended rules, such as via doubling and extra spacing, raise yield.
+      A team decides how many recommended violations it accepts, which is a
+      business decision, not a technical one.
+    source: ""
+
+  - id: sgn-slotting
+    section: geometry
+    command: a metal slotting rule on a wide strap
+    hint: "It is the opposite of a minimum-width rule: ask what being too wide causes."
+    answer: A wide piece of metal must have holes cut in it, to relieve stress.
+    wrong:
+      - A wide piece of metal must be split into several narrower wires.
+      - A wide piece of metal must be covered by vias at a fixed pitch.
+      - A wide piece of metal must not be longer than a fixed length.
+    explain: >-
+      Wide metal can lift or dish during polishing and can trap stress. The
+      rule forces slots in it, which is why power straps in a real layout have
+      holes. It constrains the power grid, since a strap must be wide for
+      current but then needs slotting.
+    source: ""
+
+  - id: sgn-lvs-tolerance
+    section: connectivity
+    command: a device parameter tolerance in LVS
+    hint: "Two numbers are compared. Ask whether they must be identical."
+    answer: How far an extracted device size may differ from the schematic.
+    wrong:
+      - How many devices may differ before the comparison fails overall.
+      - The precision with which the extractor measures a device's size.
+      - The range of sizes the process is allowed to manufacture.
+    explain: >-
+      The tolerance is what makes it not an error. Extraction measures a drawn
+      shape and computes a width and length, which
+      will not match the schematic's number to the last digit. The deck sets a
+      tolerance so that rounding does not become an error, while a real
+      size mistake still is.
+    source: ""
+
+  - id: sgn-erc-power
+    section: connectivity
+    command: an ERC check on a domain crossing
+    hint: "Two domains, two supplies. Ask what must sit between them."
+    answer: Reports a signal crossing between supplies without a level shifter or isolation.
+    wrong:
+      - Reports a signal crossing between clock domains without a synchronizer.
+      - Reports two supplies shorted together somewhere in the layout.
+      - Reports a domain whose supply is never switched on.
+    explain: >-
+      A crossing that skips its interface cell works in simulation and burns
+      current or fails on silicon. ERC (Electrical Rule Check) compares the
+      supplies of a net's driver and loads, which is why the power intent has
+      to be readable by the checker.
+    source: ""
+
+  - id: sgn-fill-order
+    section: density
+    command: |-
+      detailed_route
+      density_fill
+      extract_parasitics
+    hint: "Ask what fill does to the wires beside it, and which step must see that."
+    answer: Fill is added before extraction, so its capacitance is in the timing.
+    wrong:
+      - Fill is added after extraction, since inert shapes carry no timing.
+      - Fill is added before routing, so the router can avoid the shapes.
+      - The order does not matter, since fill is electrically inert.
+    explain: >-
+      Fill shapes are not connected, but they are metal next to signal wires,
+      so they add coupling capacitance. Extracting before fill gives an
+      optimistic answer. This is why the order in a finishing flow is fixed
+      rather than a matter of taste.
+    source: ""
+
+  - id: sgn-dummy-poly
+    section: density
+    command: dummy poly and diffusion fill
+    hint: "Same idea as metal fill, one layer group lower."
+    answer: Inert shapes on the transistor layers, added so their density is even.
+    wrong:
+      - Spare transistors added so late fixes have something to use.
+      - Shapes that protect the real transistors from etch damage.
+      - Shapes that mark where no transistor may be placed.
+    explain: >-
+      Lithography and etch depend on what surrounds a feature, so an isolated
+      transistor prints differently from one in a dense field. Dummy shapes
+      make the surroundings uniform. In standard-cell rows this is built into
+      the cells; it matters most at the edges of a block and around macros.
+    source: ""
+
+  - id: sgn-corners
+    section: running
+    command: sign-off across corners
+    hint: "Ask why passing at the typical condition is not enough."
+    answer: Every check must hold at every corner the part is guaranteed at.
+    wrong:
+      - Each corner may fail a different check, as long as none fails twice.
+      - Only the slow corner matters, since it is the worst for timing.
+      - Corners apply to timing; the geometric checks are corner-free.
+    explain: >-
+      Setup is usually worst slow and hot, hold worst fast and cold, and
+      voltage drop worst when the supply is low and activity high. A part sold
+      over a temperature and voltage range must meet all of them, which is
+      what multi-corner analysis is for. Geometry is indeed corner-free.
+    source: ""
+
+  - id: sgn-timing-ecos
+    section: running
+    command: a late fix after sign-off has started
+    hint: "Ask what has to be repeated after any change to the database."
+    answer: Every check must be rerun, since a fix in one can break another.
+    wrong:
+      - Only the check that failed needs rerunning, on the changed area.
+      - The checks are rerun only if the change moved cells or wires.
+      - Timing is rerun; the geometric checks hold if the fix was legal.
+    explain: >-
+      Adding a buffer moves cells, which moves wires, which changes
+      parasitics, density, and possibly antenna ratios. This coupling is why
+      late changes are made as small, local edits and why a full sign-off run
+      is expensive enough to be scheduled rather than casual.
+    source: ""
+
+  - id: sgn-drc-density-window
+    section: density
+    command: a density rule checked over a sliding window
+    hint: "Ask whether a design can pass on average and still fail."
+    answer: "Yes: each window is checked separately, so a local gap fails on its own."
+    wrong:
+      - "No: the rule is on the whole layer, so the average is what counts."
+      - Yes, but only if the window falls outside the core area.
+      - "No: windows overlap, so a local gap is averaged away."
+    explain: >-
+      The window is typically tens of microns square and steps across the die,
+      so an empty region next to a dense one fails even when the layer's
+      overall density is fine. Fill is therefore added per region, not
+      globally.
+    source: ""
+
+  - id: sgn-antenna-fixes
+    section: electrical
+    command: a diode against a layer jump
+    hint: "Two ways to fix the same violation. Ask what each one costs."
+    answer: A diode costs area and leakage; jumping layers costs routing resources.
+    wrong:
+      - A diode costs routing resources; jumping layers costs area.
+      - A diode fixes it permanently; jumping layers only reduces the ratio.
+      - A diode works during manufacture; jumping layers works in operation.
+    explain: >-
+      A diode drains the charge but is a cell that must be placed and
+      connected. Jumping to a higher layer breaks the long piece of metal into
+      parts, each small enough to pass, at the cost of vias and track space.
+      `repair_antennas -jumper_only` chooses the second.
+    source: ""
+
+  - id: sgn-check-order
+    section: running
+    command: the order the checks are run in
+    hint: "Ask which check needs the most complete database."
+    answer: Geometry and connectivity come last, on the final merged layout.
+    wrong:
+      - Geometry comes first, since a layout must be legal before timing.
+      - The order is free, since each check reads the same database.
+      - Timing comes last, since it depends on the extracted parasitics.
+    explain: >-
+      The geometric and connectivity checks need everything: fill, the macros'
+      real layouts, the seal ring. They therefore run on the merged layout at
+      the end, while timing and electrical checks run repeatedly through the
+      flow on the design database.
+    source: ""
+
+  - id: sgn-clean-means
+    section: running
+    command: a clean DRC run
+    hint: "Ask what a clean result actually proves, and what it does not."
+    answer: The layout obeys the rules in the deck that was run, nothing more.
+    wrong:
+      - The layout is manufacturable and will work at every corner.
+      - The layout obeys every rule the foundry has for the process.
+      - The layout obeys the rules and the recommended rules together.
+    explain: >-
+      A deck has a version, a set of enabled rule groups, and often waivers.
+      Running an old deck, or one missing the metal stack in use, gives a
+      clean result that means little. This is why sign-off records which deck
+      version was run, not only that it passed.
+    source: ""
+
+  # ---------------------------------------------------------------- Geometry additions
+
+  - id: sgn-min-cut
+    section: geometry
+    command: |-
+      a wide wire connected by a single via cut
+    hint: "The wire is wide because it carries a lot. Ask what the one cut carries."
+    answer: A wide wire must be connected by several cuts, not one.
+    wrong:
+      - A wide wire must be connected by a cut of matching width.
+      - A wide wire may not change layer at all without a strap.
+      - A wide wire needs a cut on every track it covers.
+    explain: >-
+      One cut is a bottleneck in both resistance and current density, and it is
+      a single point of failure if it is malformed. The rule states how many
+      cuts a wire of a given width needs, and routers satisfy it by dropping a
+      via array rather than a single via.
+    source: ""
+
+  - id: sgn-min-step
+    section: geometry
+    command: |-
+      a notch a few nanometres deep in the edge of a shape
+    hint: "Think about what the lithography can actually resolve on an edge."
+    answer: Edges may not have steps or notches below a minimum size.
+    wrong:
+      - Edges may not change direction more than a fixed number of times.
+      - Shapes may not have concave corners at all.
+      - Notches are allowed only where two shapes of the same net meet.
+    explain: >-
+      A tiny jog does not print as drawn: it rounds away or pinches the shape.
+      Minimum step and notch rules forbid features the process cannot hold,
+      and they are a common output of a script that merges shapes without
+      cleaning up what it produced.
+    source: ""
+
+  - id: sgn-coloring
+    section: geometry
+    command: |-
+      an odd cycle in the multiple-patterning colouring of a layer
+    hint: "Two shapes too close must go on different masks. Now make it three."
+    answer: Shapes too close to share a mask cannot be split into two masks.
+    wrong:
+      - Shapes have been assigned to the wrong mask and must be swapped.
+      - A shape is too close to another of the same colour and must move.
+      - The layer needs a third mask, which the process does not offer.
+    explain: >-
+      Below the resolution limit a layer is printed with two or more masks, and
+      neighbours must alternate. Three shapes each too close to the other two
+      form a cycle that cannot be two-coloured, so the layout must change. It
+      is a graph problem the router has to respect while it routes.
+    source: ""
+
+  - id: sgn-abutment-drc
+    section: geometry
+    command: |-
+      two legal cells, placed side by side, produce a violation
+    hint: "Each cell passed on its own. Ask what only exists once they touch."
+    answer: The shapes at the two boundaries interact and break a rule.
+    wrong:
+      - One of the cells was drawn to the wrong boundary and overlaps.
+      - The cells belong to different libraries and cannot be mixed.
+      - The row is full, so the cells have been placed overlapping.
+    explain: >-
+      A cell is drawn so that any neighbour is legal in most combinations, but
+      some pairs are not, and some need a gap. Flows handle it with placement
+      padding, with rules forbidding certain neighbours, or by inserting a
+      filler cell between them.
+    source: ""
+
+  # ---------------------------------------------------------------- Connectivity additions
+
+  - id: sgn-lvs-blackbox
+    section: connectivity
+    command: |-
+      a hard macro treated as a black box in layout versus schematic
+    hint: "The macro was already checked once, by whoever built it."
+    answer: Its pins are compared but its contents are not descended into.
+    wrong:
+      - Its contents are compared against the netlist of the block that uses it.
+      - It is skipped entirely, and its pins are not checked either.
+      - It is replaced by a stand-in cell with the same outline.
+    explain: >-
+      Checking a memory's transistors again at every level would be enormous
+      and pointless, so the macro is verified once and then trusted. The risk
+      is a macro whose layout and netlist were never checked together, which
+      nothing above will catch.
+    source: ""
+
+  - id: sgn-lvs-pg
+    section: connectivity
+    command: |-
+      the supply pins that no netlist line ever mentions
+    hint: "The layout has rails everywhere. Ask what the gate-level netlist says about them."
+    answer: Supplies are implicit in the netlist and must be made explicit.
+    wrong:
+      - Supplies are never checked, since they carry no logic.
+      - Supplies are checked only where a cell declares a supply pin.
+      - Supplies are checked against the power grid definition instead.
+    explain: >-
+      A gate-level netlist usually leaves the rails out, while the layout is
+      full of them. Verification either adds the connections by rule or reads a
+      netlist that declares them, and multiple-supply designs must be checked
+      this way or a cell tied to the wrong rail will pass.
+    source: ""
+
+  # ---------------------------------------------------------------- Electrical additions
+
+  - id: sgn-ir-dynamic
+    section: electrical
+    command: |-
+      a static voltage drop analysis, against a dynamic one
+    hint: "One assumes an average current, the other a moment in time."
+    answer: Average currents against the worst instant, when many cells switch together.
+    wrong:
+      - The drop at rest against the drop under load.
+      - The drop across the grid against the drop inside a cell.
+      - The drop computed by a solver against the drop measured in silicon.
+    explain: >-
+      Static analysis finds a weak grid. Dynamic analysis finds the moment when
+      a clock edge switches a region at once and the local supply sags, which
+      the average never shows. It needs switching activity, either from a
+      simulation or generated by the tool.
+    source: ""
+
+  - id: sgn-signal-em
+    section: electrical
+    command: |-
+      electromigration on a signal net, not a power net
+    hint: "A signal carries current in both directions. Ask what that changes."
+    answer: The alternating current partly heals the metal, so the limits differ.
+    wrong:
+      - The alternating current doubles the damage, so limits are tighter.
+      - Signal nets are too narrow to be checked for it at all.
+      - Signal nets carry too little current for the effect to exist.
+    explain: >-
+      Current that reverses pushes atoms back, so the effective damage is much
+      lower than for the one-way current in a supply. What remains is checked
+      as an average and a peak, and the nets at risk are the fast, heavily
+      loaded ones, above all the clock.
+    source: ""
+
+  - id: sgn-ir-timing
+    section: electrical
+    command: |-
+      timing analysed at the voltage each cell actually sees
+    hint: "A cell's delay came from a library characterized at a fixed voltage."
+    answer: Cells in a sagging region are slower than the library corner says.
+    wrong:
+      - Cells in a sagging region draw more current, worsening the sag.
+      - The analysis reports a voltage violation rather than a timing one.
+      - The timing is unchanged, since the drop applies to every cell equally.
+    explain: >-
+      A flat margin for supply droop over-margins most of the die and can still
+      miss a hotspot. Passing the per-instance voltage into timing catches the
+      paths that run through the weak region, which is the point of a
+      voltage-aware analysis.
+    source: ""
+
+  # ---------------------------------------------------------------- Density additions
+
+  - id: sgn-fill-timing
+    section: density
+    command: |-
+      metal fill added after routing
+    hint: "The fill shapes sit next to the signal wires."
+    answer: It adds capacitance to nearby nets, so extraction must be run after it.
+    wrong:
+      - It adds resistance to nearby nets, so they must be re-routed.
+      - It has no electrical effect, since the shapes are not connected.
+      - It shields nearby nets, so their coupling falls.
+    explain: >-
+      Fill is electrically present whether or not it is connected, and a wire
+      running beside a field of it sees more capacitance than the pre-fill
+      extraction assumed. That is why the order is route, fill, extract, then
+      time, and why a late fill change means timing again.
+    source: ""
+
+  - id: sgn-fill-grounded
+    section: density
+    command: |-
+      floating fill, against fill tied to a supply
+    hint: "Ask which one has a defined voltage, and what that does to coupling."
+    answer: Tied fill shields, while floating fill couples through.
+    wrong:
+      - Tied fill adds no capacitance, while floating fill does.
+      - Floating fill is illegal, so all fill must be tied.
+      - Tied fill is easier to insert, since it needs no connection.
+    explain: >-
+      A floating shape between two wires passes coupling from one to the other
+      and its own voltage is unpredictable. Tying fill to a rail makes it a
+      shield and makes extraction straightforward, at the cost of connecting
+      every piece and of the capacitance it adds to the supply.
+    source: ""
+
+  # ---------------------------------------------------------------- DFM
+
+  - id: sgn-critical-area
+    section: dfm
+    command: |-
+      the area where a particle of a given size would cause a failure
+    hint: "Two layouts can both be legal and still not yield the same."
+    answer: "A yield estimate: how much of the layout is vulnerable to random defects."
+    wrong:
+      - A check that finds the areas where the rules are only just met.
+      - The area of the die that carries no redundancy.
+      - The fraction of the die covered by the most defect-prone layer.
+    explain: >-
+      Two wires at minimum spacing over a long run are more likely to be
+      bridged by a particle than the same wires spread apart. The analysis
+      turns layout into a predicted defect rate, and it is why spreading wires
+      and widening them where there is room is worth doing.
+    source: ""
+
+  - id: sgn-litho-hotspot
+    section: dfm
+    command: |-
+      a pattern that passes every rule but does not print correctly
+    hint: "The rules are a simplification of what the lithography really does."
+    answer: A shape the process cannot resolve, found by simulating the printing.
+    wrong:
+      - A shape that violates a recommended rather than a required rule.
+      - A shape that prints correctly but is too hot in operation.
+      - A shape whose colour assignment cannot be resolved.
+    explain: >-
+      Rules are a conservative summary of a physical process, and some
+      combinations slip through. Simulating the optics, or matching the layout
+      against a library of known bad patterns, catches those. The fix is
+      usually a small local change to the routing.
+    source: ""
+
+  - id: sgn-planarity
+    section: dfm
+    command: |-
+      why a density rule has a minimum as well as a maximum
+    hint: "The wafer is polished flat after each layer."
+    answer: Polishing dishes a sparse area and leaves a dense one proud.
+    wrong:
+      - Polishing removes a sparse area entirely, so metal must remain.
+      - A sparse area traps charge during etch, damaging the transistors.
+      - A sparse area cools differently, so the layer cracks.
+    explain: >-
+      The surface has to be flat before the next layer is printed, or that
+      layer is out of focus. Chemical and mechanical polishing removes more
+      where there is less metal to resist it, so the rule forces an even
+      spread. Fill exists to satisfy it.
+    source: ""
+
+  # ---------------------------------------------------------------- Running additions
+
+  - id: sgn-hierarchical-drc
+    section: running
+    command: |-
+      checking each block, then the assembled chip
+    hint: "A full chip flat is enormous. Ask what can be checked only once."
+    answer: Blocks are checked once, and the top level checks only what crosses them.
+    wrong:
+      - Blocks are checked once, and the top level repeats the checks flat.
+      - Blocks are checked at the top level only, once they are placed.
+      - Each block is checked again for each place it is used.
+    explain: >-
+      A block used many times is verified once, and assembly checks the
+      boundaries, the routing over the blocks, and the space between them.
+      What this can miss is an interaction between a block's internals and
+      something routed over it, so a final flat run is usually still done.
+    source: ""
+
+  - id: sgn-deck-version
+    section: running
+    command: |-
+      a rule deck for process revision 1.3, run on a design targeting 1.4
+    hint: "The rules are a document with a version, like anything else."
+    answer: "The result is meaningless: it checks rules the process no longer has."
+    wrong:
+      - The result is conservative, since older rules are always stricter.
+      - The result is valid, since revisions only add rules.
+      - The result is valid for the layers the revision did not change.
+    explain: >-
+      A revision can loosen a rule, tighten one, or replace it with a
+      differently shaped one. Sign-off therefore records the exact deck
+      version alongside the result, and a change of revision means running
+      everything again.
+    source: ""

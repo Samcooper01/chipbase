@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Tutor{% endblock %}
+{% block head %}
+<style>
+  /* Tutor setup: page-local styles, in the same language as the games and data pages. */
+  .tu-head { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel);
+    box-shadow: 5px 5px 0 var(--shadow-hard); padding: 22px 26px 22px; margin-bottom: 26px; }
+  .tu-kicker, .tu-k { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted); }
+  .tu-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 7px 0 10px; }
+  .tu-lede { font-size: 15px; line-height: 1.55; margin: 0; max-width: 780px; }
+  .tu-get { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .tu-get .btn { text-decoration: none; }
+  .tu-meta { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .tu-steps { display: grid; gap: 16px; counter-reset: step; margin: 0 0 26px; }
+  .tu-step { border: 2px solid var(--navy); border-radius: 12px; background: var(--panel); padding: 16px 18px 18px; }
+  .tu-step h2 { font-size: 17px; margin: 0 0 6px; }
+  .tu-step h2::before { counter-increment: step; content: "Step " counter(step) ": "; color: var(--green-deep); }
+  .tu-step p { font-size: 14px; line-height: 1.55; margin: 0 0 10px; max-width: 800px; }
+  .tu-code { position: relative; margin: 8px 0 4px; }
+  .tu-code pre { margin: 0; padding: 12px 14px; padding-right: 74px; background: var(--navy); color: #e8efe9; border-radius: 10px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.55; overflow-x: auto; white-space: pre; }
+  .tu-copy { position: absolute; top: 8px; right: 8px; font: 600 11px var(--mono); padding: 4px 9px; border-radius: 6px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.08); color: #fff; }
+  .tu-copy.is-done { border-color: #34d399; color: #34d399; }
+  .tu-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+  .tu-tabs button { font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid var(--navy); background: var(--panel); color: var(--text); }
+  .tu-tabs button.is-on { background: var(--navy); color: #fff; }
+  .tu-pane { display: none; }
+  .tu-pane.is-on { display: block; }
+  .tu-note { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
+  .tu-try { border: 2px dashed var(--green); border-radius: 12px; background: rgba(22, 163, 74, 0.05); padding: 14px 16px; margin: 10px 0 0; }
+  .tu-try p { margin: 0; font-size: 14px; }
+  .tu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 0 0 26px; }
+  .tu-card { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); padding: 13px 15px; font-size: 13.5px; line-height: 1.5; }
+  .tu-card code { font-family: var(--mono); font-size: 12px; font-weight: 700; }
+  .tu-h { font-size: 19px; margin: 6px 0 12px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="tu-head">
+  <div class="tu-kicker">Tutor</div>
+  <h1>Ask your own model about any page</h1>
+  <p class="tu-lede">
+    Highlight a passage you are stuck on, click <b>Copy reference</b>, and
+    paste it into your prompt. The Chipbase tutor is a small MCP (Model Context
+    Protocol) server you run yourself: it looks up the page you were reading,
+    finds the passage, and hands your model the section around it and the
+    site's own definitions, so the explanation starts from exactly what you
+    were reading. It uses whichever model you already use, and nothing here
+    runs a model or needs an account.
+  </p>
+  <div class="tu-get">
+    <a class="btn btn-submit" href="/tutor/{{ filename }}" download>Download the tutor</a>
+    <span class="tu-meta">chipbase-tutor {{ version }}, Python 3.10 or later, about {{ size_kb }} kilobytes</span>
+  </div>
+</div>
+
+<div class="tu-steps">
+  <section class="tu-step">
+    <h2>Download and unpack</h2>
+    <p>The download is a zip of the server's source. Unpack it anywhere.</p>
+    <div class="tu-code"><pre>unzip chipbase-tutor-{{ version }}.zip
+cd chipbase-tutor</pre></div>
+  </section>
+
+  <section class="tu-step">
+    <h2>Install it</h2>
+    <p>Into its own virtual environment, so it touches nothing else on your machine.</p>
+    <div class="tu-code"><pre>python3 -m venv .venv
+.venv/bin/pip install .</pre></div>
+    <p class="tu-note">On Windows the second line is <code>.venv\Scripts\pip install .</code></p>
+  </section>
+
+  <section class="tu-step">
+    <h2>Add it to your model</h2>
+    <p>
+      Register it with the client you already use. The commands are filled in
+      for this site, <code>{{ site }}</code>; run them from inside the
+      <code>chipbase-tutor</code> folder.
+    </p>
+    <div class="tu-tabs" role="tablist">
+      <button type="button" class="is-on" data-pane="code">Claude Code</button>
+      <button type="button" data-pane="desktop">Claude Desktop</button>
+      <button type="button" data-pane="other">Other clients</button>
+    </div>
+    <div class="tu-pane is-on" data-pane="code">
+      <div class="tu-code"><pre>claude mcp add chipbase-tutor -e CHIPBASE_URL={{ site }} -- "$PWD/.venv/bin/chipbase-tutor"</pre></div>
+    </div>
+    <div class="tu-pane" data-pane="desktop">
+      <p>Add this to <code>claude_desktop_config.json</code>, with the full path to the folder you unpacked, then restart the app.</p>
+      <div class="tu-code"><pre>{
+  "mcpServers": {
+    "chipbase-tutor": {
+      "command": "/full/path/to/chipbase-tutor/.venv/bin/chipbase-tutor",
+      "env": { "CHIPBASE_URL": "{{ site }}" }
+    }
+  }
+}</pre></div>
+    </div>
+    <div class="tu-pane" data-pane="other">
+      <p>
+        Any client that speaks MCP can run it: the command is
+        <code>.venv/bin/chipbase-tutor</code>, the transport is standard input
+        and output, and the one setting is the environment variable
+        <code>CHIPBASE_URL={{ site }}</code>.
+      </p>
+    </div>
+  </section>
+
+  <section class="tu-step">
+    <h2>Use it</h2>
+    <p>
+      On any page, highlight what you do not understand. A <b>Copy reference</b>
+      button appears under it. Paste the result into your prompt and ask your
+      question. A reference looks like this:
+    </p>
+    <div class="tu-code"><pre>&gt; "Static timing analysis is how the flow proves that a synchronous design meets its clock"
+&gt; (Chipbase: Static Timing Analysis &gt; What static timing analysis is, {{ site }}/education/static-timing-analysis)
+what does "proves" mean here if nothing is simulated?</pre></div>
+    <div class="tu-try"><p>
+      Try the button now: highlight any sentence on this page and a
+      <b>Copy reference</b> button appears under it.
+    </p></div>
+  </section>
+</div>
+
+<h2 class="tu-h">What your model gets</h2>
+<div class="tu-grid">
+  <div class="tu-card"><code>resolve_reference</code><br>The section around the quoted passage, the paragraphs either side, the page outline, and the glossary definitions of the terms in it. The quote still resolves after small edits to the page.</div>
+  <div class="tu-card"><code>read_section</code> and <code>page_outline</code><br>Another section of the same page by its heading, or the page's headings in order, for follow-up questions.</div>
+  <div class="tu-card"><code>define</code><br>The <a href="/glossary">Chipbase glossary</a> entry for a term or acronym, so the explanation uses the same meaning the site does.</div>
+  <div class="tu-card"><code>explain</code> prompt<br>Give it a copied reference and it asks for an explanation in the page's own terms, with a small worked case, ending with one question that checks you have it.</div>
+</div>
+
+<h2 class="tu-h">What it reads, and what it does not</h2>
+<div class="tu-grid">
+  <div class="tu-card">It only fetches pages on the Chipbase site it is configured for. Any other address is refused, with a message saying why.</div>
+  <div class="tu-card">It sends nothing anywhere except requests for the pages you reference. What you ask your model stays between you and your model.</div>
+  <div class="tu-card">The worked examples under Sandboxes draw their steps in the browser, so only their introductions can be looked up. For a passage from a step, your model works from the quote and heading in the reference.</div>
+</div>
+
+<script>
+  (function () {
+    document.querySelectorAll(".tu-code").forEach(function (box) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "tu-copy"; b.textContent = "copy";
+      b.addEventListener("click", function () {
+        var text = box.querySelector("pre").textContent;
+        var done = function () { b.textContent = "copied"; b.classList.add("is-done");
+          setTimeout(function () { b.textContent = "copy"; b.classList.remove("is-done"); }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+        else done();
+      });
+      box.appendChild(b);
+    });
+    var tabs = document.querySelectorAll(".tu-tabs button"), panes = document.querySelectorAll(".tu-pane");
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () {
+        var name = t.getAttribute("data-pane");
+        tabs.forEach(function (x) { x.classList.toggle("is-on", x === t); });
+        panes.forEach(function (p) { p.classList.toggle("is-on", p.getAttribute("data-pane") === name); });
+      });
+    });
+  })();
+</script>
+{% endblock %}

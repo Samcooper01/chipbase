@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Glossary{% endblock %}
+{% block head %}
+<style>
+  /* Glossary: page-local styles, in the same language as the games and data pages. */
+  .gl-head { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel);
+    box-shadow: 5px 5px 0 var(--shadow-hard); padding: 22px 26px 20px; margin-bottom: 22px; }
+  .gl-kicker, .gl-cat-kinds { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted); }
+  .gl-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 7px 0 10px; }
+  .gl-lede { font-size: 15px; line-height: 1.55; margin: 0; max-width: 760px; }
+  .gl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .gl-search { flex: 1 1 260px; font: inherit; font-size: 14px; padding: 8px 11px; border: 2px solid var(--navy); border-radius: 10px; background: var(--panel); color: var(--text); }
+  .gl-search:focus { outline: none; border-color: var(--green); box-shadow: 3px 3px 0 var(--shadow-hard); }
+  .gl-count { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .gl-cats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+  .gl-cats button { font: inherit; font-size: 12.5px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    border: 1.5px solid var(--navy); background: var(--panel); color: var(--text); }
+  .gl-cats button.is-on { background: var(--navy); color: #fff; }
+  .gl-cat { margin: 0 0 28px; }
+  .gl-cat-title { font-size: 19px; margin: 0 0 2px; }
+  .gl-cat-blurb { font-size: 13.5px; color: var(--muted); margin: 0 0 12px; }
+  .gl-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
+  .gl-term { border: 2px solid var(--navy); border-radius: 12px; background: var(--panel); padding: 13px 15px; scroll-margin-top: 80px; }
+  .gl-term:target { box-shadow: 4px 4px 0 var(--green); border-color: var(--green-deep); }
+  .gl-name { font-size: 16px; font-weight: 800; margin: 0; }
+  .gl-name a { color: inherit; text-decoration: none; }
+  .gl-exp { font-family: var(--mono); font-size: 11.5px; color: var(--green-deep); margin: 2px 0 6px; }
+  .gl-def { font-size: 13.5px; line-height: 1.55; margin: 0; }
+  .gl-seen { margin-top: 9px; font-size: 12px; color: var(--muted); }
+  .gl-seen a { margin-right: 9px; white-space: nowrap; }
+  .gl-src { font-size: 12px; margin-top: 6px; }
+  .gl-none { display: none; color: var(--muted); border: 2px dashed var(--border); border-radius: 12px; padding: 18px; }
+  @media (max-width: 720px) { .gl-list { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="gl-head">
+  <div class="gl-kicker">Reference</div>
+  <h1>Glossary</h1>
+  <p class="gl-lede">
+    Every term and acronym the site uses, defined once. Each entry links to
+    the pages that use it, found by searching the site's own content, so the
+    links follow the pages rather than being kept up to date by hand.
+  </p>
+  <div class="gl-tools">
+    <input class="gl-search" type="search" placeholder="Search terms and definitions" aria-label="Search the glossary">
+    <span class="gl-count"><span data-shown>{{ g.count }}</span> of {{ g.count }} terms</span>
+  </div>
+</div>
+
+<div class="gl-cats" role="group" aria-label="Filter by subject">
+  <button type="button" class="is-on" data-cat="">All subjects</button>
+  {% for c in g.categories %}<button type="button" data-cat="{{ c.id }}">{{ c.title }}</button>{% endfor %}
+</div>
+
+{% for c in g.categories %}
+<section class="gl-cat" data-cat="{{ c.id }}">
+  <h2 class="gl-cat-title">{{ c.title }}</h2>
+  <p class="gl-cat-blurb">{{ c.blurb }}</p>
+  <div class="gl-list">
+    {% for t in c.terms %}
+    <article class="gl-term" id="{{ t.id }}" data-text="{{ (t.term ~ ' ' ~ (t.expansion or '') ~ ' ' ~ t.definition) | lower }}">
+      <h3 class="gl-name"><a href="#{{ t.id }}">{{ t.term }}</a></h3>
+      {% if t.expansion %}<div class="gl-exp">{{ t.expansion }}</div>{% endif %}
+      <p class="gl-def">{{ t.definition }}</p>
+      {% if t.url %}<div class="gl-src"><a href="{{ t.url }}" target="_blank" rel="noopener">Project page</a></div>{% endif %}
+      {% if t.appears_in %}<div class="gl-seen">Appears in: {% for a in t.appears_in %}<a href="{{ a.href }}">{{ a.title }}</a>{% endfor %}</div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+<div class="gl-none">No term matches that search.</div>
+
+<script>
+  (function () {
+    var input = document.querySelector(".gl-search"), shown = document.querySelector("[data-shown]");
+    var terms = document.querySelectorAll(".gl-term"), cats = document.querySelectorAll(".gl-cat");
+    var buttons = document.querySelectorAll(".gl-cats button"), none = document.querySelector(".gl-none");
+    var cat = "";
+    function apply() {
+      var q = (input.value || "").trim().toLowerCase(), n = 0;
+      cats.forEach(function (sec) {
+        var visible = 0, catOk = !cat || sec.getAttribute("data-cat") === cat;
+        sec.querySelectorAll(".gl-term").forEach(function (t) {
+          var ok = catOk && (!q || t.getAttribute("data-text").indexOf(q) >= 0);
+          t.style.display = ok ? "" : "none";
+          if (ok) { visible++; n++; }
+        });
+        sec.style.display = visible ? "" : "none";
+      });
+      shown.textContent = n;
+      none.style.display = n ? "none" : "block";
+    }
+    input.addEventListener("input", apply);
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        cat = b.getAttribute("data-cat");
+        buttons.forEach(function (x) { x.classList.toggle("is-on", x === b); });
+        apply();
+      });
+    });
+  })();
+</script>
+{% endblock %}

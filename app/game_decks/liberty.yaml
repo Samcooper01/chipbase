@@ -1,0 +1,1170 @@
+# Liberty timing library flash-card deck.
+#
+# Grounded in the Nangate45 Liberty file shipped with OpenROAD-flow-scripts
+# (NangateOpenCellLibrary_typical.lib): its header attributes, the DFF_X1 cell
+# group, its pin and timing groups, and the leakage tables. Excerpts are quoted
+# from that file. See liberty_scope.md.
+
+deck: liberty
+title: Liberty timing libraries
+reference: https://github.com/parallaxsw/OpenSTA/blob/master/doc/Commands.md
+default_question: "What does this declare?"
+basis:
+  tool: Liberty
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/master/flow/platforms/nangate45/lib
+  tag: read against a real library
+  doc_title: the OpenSTA command reference
+  note: >-
+    Liberty is the format that carries a cell library's timing and power. These
+    cards are checked against the Nangate45 library that OpenROAD-flow-scripts
+    ships, and the excerpts are quoted from it. Liberty is a Synopsys format
+    whose specification is licensed; the behaviour described here is what the
+    open timer OpenSTA implements, and answers link to its command reference.
+
+sections:
+  - id: header
+    title: Library header
+    blurb: The units, the delay model, and the conditions a library was characterized at.
+    commands: [time_unit, capacitive_load_unit, delay_model, nom_voltage, operating_conditions,
+               default_max_transition]
+  - id: cell
+    title: Cell and pin groups
+    blurb: What a cell declares about itself, and what each pin declares.
+    commands: [cell, area, ff, pg_pin, pin, direction, capacitance, function]
+  - id: special
+    title: Special cells
+    blurb: Latches, tristate outputs, clock gates, and scan flops declare themselves differently.
+    commands: [latch, preset, clear, three_state, statetable, clock_gating_integrated_cell, test_cell]
+  - id: timing
+    title: Timing arcs
+    blurb: "The arcs between pins: what relates them, what kind of check or delay each is."
+    commands: [timing, related_pin, timing_type, timing_sense, when, sdf_cond]
+  - id: tables
+    title: Delay tables and models
+    blurb: How a delay is stored, looked up, and which model a library uses.
+    commands: [cell_rise, cell_fall, rise_transition, index_1, index_2, lu_table_template]
+  - id: checks
+    title: Constraints and limits
+    blurb: Setup, hold, and the electrical limits a cell declares.
+    commands: [setup_rising, hold_rising, recovery_rising, removal_rising, max_transition,
+               max_capacitance, max_fanout]
+  - id: power
+    title: Power
+    blurb: Leakage by state, and the energy a switching cell spends internally.
+    commands: [cell_leakage_power, leakage_power, internal_power, rise_power, related_pg_pin]
+  - id: reading
+    title: Reading a library
+    blurb: Questions about a real Liberty file, quoted from Nangate45.
+    commands: [cell, pin, timing, leakage_power]
+
+cards:
+
+  # ---------------------------------------------------------------- Library header
+
+  - id: lib-units
+    section: header
+    command: |-
+      time_unit               : "1ns";
+      capacitive_load_unit      (1,ff);
+      voltage_unit            : "1V";
+      current_unit            : "1mA";
+    hint: "Every number later in the file is bare. Ask what these lines are for."
+    answer: Declares the units that every value in the library is expressed in.
+    wrong:
+      - Declares the units that reports and commands should print in.
+      - Declares the conditions the library was characterized at.
+      - Converts the library's values into the units listed here.
+    explain: >-
+      A delay of 0.02 in this file means 0.02 ns, and a capacitance of 1.14
+      means 1.14 fF. Mixing libraries whose units differ is a classic way to
+      get timing that is wrong by a factor of a thousand, which is why
+      `report_units` exists.
+    source: report_units
+
+  - id: lib-delay-model
+    section: header
+    command: "'delay_model : table_lookup;'"
+    hint: "Ask what the alternative would be, and which one a modern library uses."
+    answer: Says delays come from characterized tables rather than an equation.
+    wrong:
+      - Says delays are computed from a resistance and capacitance equation.
+      - Says the tables are looked up rather than interpolated between.
+      - Says the library uses the current-source model rather than tables.
+    explain: >-
+      The older `generic_cmos` model computed delay from a formula, which is
+      too crude below about 130 nm. `table_lookup` stores measured values
+      against input transition and output load, which is the
+      NLDM (Non-Linear Delay Model). Current-source models such as CCS
+      (Composite Current Source) add more data alongside these tables.
+    source: report_dcalc
+
+  - id: lib-operating-conditions
+    section: header
+    command: |-
+      nom_process     : 1.00;
+      nom_voltage     : 1.10;
+      nom_temperature : 25.00;
+      operating_conditions (typical) { ... }
+    hint: "Ask what would have to change for the same cells to need a second file."
+    answer: Records the process, voltage, and temperature the library was characterized at.
+    wrong:
+      - Records the conditions the design using this library must run at.
+      - Records the range of conditions the library's values remain valid in.
+      - Records the nominal values that the timer derates away from.
+    explain: >-
+      One Liberty file is one corner. A design that must work from a low to a
+      high voltage and over a temperature range needs several files, and
+      sign-off analyses them together. Derating scales around these values; it
+      does not replace them.
+    source: set_operating_conditions
+
+  - id: lib-default-limits
+    section: header
+    command: "'default_max_transition : 0.198535;'"
+    hint: "The word default says where it applies. Ask what can override it."
+    answer: The transition limit used for any pin that does not declare its own.
+    wrong:
+      - The transition limit for every pin in the library, without exception.
+      - The largest transition the library's tables were characterized over.
+      - The transition assumed at an input whose driver is unknown.
+    explain: >-
+      Library-level defaults exist for transition, capacitance, and fanout, and
+      a pin may declare a tighter one. Here the value matches the largest
+      transition index in the tables, which is the usual choice: beyond the
+      characterized range the delay would be extrapolated.
+    source: report_check_types
+
+  # ---------------------------------------------------------------- Cell and pin groups
+
+  - id: lib-cell-area
+    section: cell
+    command: |-
+      cell (DFF_X1) {
+        drive_strength : 1;
+        area           : 4.522000;
+    hint: "Ask which of the two numbers a floorplanner can use directly."
+    answer: The cell's area in library units, and its relative drive strength.
+    wrong:
+      - The cell's area in square microns, and the number of its inputs.
+      - The cell's width in sites, and the number of transistors it has.
+      - The cell's area and the current it can drive in milliamps.
+    explain: >-
+      Area is what `report_design_area` adds up, and it is the number
+      utilization is computed from. Drive strength is the relative label that
+      appears in the cell's name as `_X1`; the real drive capability is in the
+      delay tables.
+    source: report_design_area
+
+  - id: lib-ff-group
+    section: cell
+    command: |-
+      ff ("IQ" , "IQN") {
+        next_state : "D";
+        clocked_on : "CK";
+      }
+    hint: "Ask what this tells a timer that a list of pins and arcs could not."
+    answer: Declares the cell as sequential, naming its state and what clocks it.
+    wrong:
+      - Declares the cell's internal flip-flop, so it can be simulated.
+      - Declares which pins are the data and clock inputs of the cell.
+      - Declares the initial state the cell powers up in.
+    explain: >-
+      The group names the internal state (`IQ` and its complement), what the
+      next state is (`D`), and which pin clocks it (`CK`). That is how a timer
+      knows the cell breaks timing paths rather than passing them through, and
+      where its checks belong. Latches use a `latch` group instead.
+    source: report_lib_cell
+
+  - id: lib-pg-pin
+    section: cell
+    command: |-
+      pg_pin(VDD) {
+        voltage_name : VDD;
+        pg_type      : primary_power;
+      }
+    hint: "Ask which tools need to know about a cell's supply pins."
+    answer: Declares the cell's supply pins and which is power and which ground.
+    wrong:
+      - Declares the voltage the cell runs at, for timing purposes.
+      - Declares that the cell needs a connection to the power grid.
+      - Declares the pins that the power grid generator must route.
+    explain: >-
+      Power intent needs this: a cell with two supplies, such as a level
+      shifter or a retention flop, declares each one and what it is for.
+      Signal pins then refer to them through `related_power_pin`, which ties a
+      pin's characterization to the supply it was measured against.
+    source: report_lib_cell
+
+  - id: lib-pin-capacitance
+    section: cell
+    command: |-
+      pin (D) {
+        direction   : input;
+        capacitance : 1.140290;
+        rise_capacitance : 1.140290;
+        fall_capacitance : 1.062342;
+    hint: "Ask who pays for this number: the cell itself, or whatever drives it."
+    answer: The load this input presents to its driver, in library units.
+    wrong:
+      - The capacitance the cell can drive on its output pin.
+      - The internal capacitance of the cell, which sets its own delay.
+      - The maximum capacitance allowed on the net connected to D.
+    explain: >-
+      Every load pin adds its capacitance to the net, which is what makes the
+      driver slower. It is why upsizing a cell can hurt: the bigger cell
+      presents a bigger load to the stage before it. Separate rise and fall
+      values exist because the input's capacitance depends on which way it is
+      switching.
+    source: report_net
+
+  # ---------------------------------------------------------------- Timing arcs
+
+  - id: lib-timing-group
+    section: timing
+    command: |-
+      timing () {
+        related_pin : "CK";
+        timing_type : hold_rising;
+    hint: "Two attributes: one names the other end of the arc, one names its kind."
+    answer: An arc from CK to this pin, holding a hold check on the rising edge.
+    wrong:
+      - An arc from this pin to CK, holding a hold check on the rising edge.
+      - A delay arc from CK to this pin, measured on the rising edge.
+      - A hold check on CK itself, relative to the pin that contains the group.
+    explain: >-
+      A `timing` group lives inside the pin it ends at, and `related_pin` says
+      where it starts. `timing_type` says what kind of arc it is: a
+      combinational delay, an edge-triggered delay, or a check such as
+      `setup_rising` or `hold_rising`.
+    source: report_edges
+
+  - id: lib-timing-sense
+    section: timing
+    command: "'timing_sense : negative_unate;'"
+    hint: "Ask what happens to the output when the input rises."
+    answer: A rising input makes the output fall, as in an inverter.
+    wrong:
+      - A rising input makes the output rise, as in a buffer.
+      - The output's direction depends on the other inputs' values.
+      - The arc is only valid for falling transitions of the input.
+    explain: >-
+      Unateness tells the timer which output edge to propagate for a given
+      input edge. `positive_unate` preserves direction, `negative_unate`
+      inverts it, and `non_unate`, as in an exclusive-OR gate, means both
+      must be considered. It is also why a clock through such a gate needs
+      `set_sense`.
+    source: set_sense
+
+  - id: lib-when
+    section: timing
+    command: |-
+      timing () {
+        related_pin : "A1";
+        when        : "!A2";
+        timing_sense : negative_unate;
+    hint: "The condition names another pin. Ask when this arc is the one that applies."
+    answer: This arc applies only while A2 is low, as a NAND's other input must be.
+    wrong:
+      - This arc applies only while A2 is switching at the same time.
+      - This arc is disabled whenever A2 is low, and used otherwise.
+      - This arc's delay is measured with A2 held low, but always applies.
+    explain: >-
+      A gate's delay from one input depends on what the others are doing, so a
+      library can hold several arcs for the same pin pair with different
+      conditions. The timer picks the one whose condition can hold, and case
+      analysis can make that choice definite.
+    source: report_dcalc
+
+  - id: lib-sdf-cond
+    section: timing
+    command: |-
+      sdf_cond : "A2 == 1'b0";
+    hint: "Compare it with `when`: same idea, different consumer."
+    answer: The same condition written for an SDF (Standard Delay Format) file.
+    wrong:
+      - A condition that applies only when delays come from an SDF file.
+      - A condition for simulation, which timing analysis ignores entirely.
+      - The condition under which an SDF annotation may override the table.
+    explain: >-
+      `when` is the condition the timer uses; `sdf_cond` is the same condition
+      in the syntax an SDF (Standard Delay Format) writer needs, so that
+      annotated delays land on the right arc. They should agree, and a
+      mismatch shows up as unannotated arcs.
+    source: report_annotated_delay
+
+  # ---------------------------------------------------------------- Delay tables
+
+  - id: lib-table-axes
+    section: tables
+    command: |-
+      cell_rise (Timing_7_7) {
+        index_1 ("0.00117378, 0.00472397, ...");   /* input transition */
+        index_2 ("0.365616, 1.893040, ...");       /* output load */
+        values ("0.0189, 0.0247, ...", ...);
+    hint: "Two indexes, one grid of values. Ask what each axis is."
+    answer: Delay against input transition and output load.
+    wrong:
+      - Delay against output load and supply voltage, at this corner.
+      - Delay against input transition and temperature, on a grid.
+      - Rise delay in one index and fall delay in the other.
+    explain: >-
+      The grid is characterized, so a real value is interpolated on it. These
+      are the two things a cell's delay depends on most. A real value
+      between grid points is interpolated, and outside the grid it is
+      extrapolated, which is why the limits exist. The template name says the
+      grid's size, here seven by seven.
+    source: report_dcalc
+
+  - id: lib-four-tables
+    section: tables
+    command: |-
+      cell_rise (...)        cell_fall (...)
+      rise_transition (...)  fall_transition (...)
+    hint: "Two are delays. Ask what the other two are for."
+    answer: Delay and output slew, each for a rising and a falling output.
+    wrong:
+      - Delay and its derivative, each for a rising and falling output.
+      - Delay at the minimum and maximum corner, for each direction.
+      - Delay of the cell and of the wire after it, for each direction.
+    explain: >-
+      A stage's output slew is the next stage's input transition, so the
+      transition tables are what let delay propagate along a path. Rise and
+      fall are characterized separately because the pull-up and pull-down
+      networks are not identical.
+    source: report_dcalc
+
+  - id: lib-template
+    section: tables
+    command: |-
+      lu_table_template (Timing_7_7) {
+        variable_1 : input_net_transition;
+        variable_2 : total_output_net_capacitance;
+        index_1 (...); index_2 (...);
+      }
+    hint: "Ask why a library would name a grid instead of repeating it."
+    answer: Names a reusable grid, so each table lists only its values.
+    wrong:
+      - Names a default table used by cells that have no tables of their own.
+      - Names the interpolation method the tables are looked up with.
+      - Names a template that the characterization tool filled in.
+    explain: >-
+      Hundreds of cells share the same axes, so the axes are declared once and
+      referenced by name. `variable_1` and `variable_2` say what the axes mean,
+      which is how a reader knows whether index 1 is transition or load.
+    source: report_dcalc
+
+  - id: lib-ccs
+    section: tables
+    command: |-
+      output_current_rise () {
+        vector (...) { ... }
+      }
+    hint: "Ask what this gives a delay calculator that a single delay number cannot."
+    answer: The driver's current over time, not a single delay value.
+    wrong:
+      - The current the cell draws from the supply while switching.
+      - The delay measured at several output voltages, not just one.
+      - The current limit the output pin may drive before damage.
+    explain: >-
+      The receiving waveform is computed from that current.
+      CCS (Composite Current Source) models the driver as a current source
+      rather than a single delay, which matters when the load is resistive
+      enough that the received waveform is not a simple ramp. The library is
+      much larger, and the older NLDM (Non-Linear Delay Model) tables usually
+      remain alongside.
+    source: report_dcalc
+
+  # ---------------------------------------------------------------- Constraints and limits
+
+  - id: lib-setup-hold-types
+    section: checks
+    command: |-
+      timing_type : setup_rising;
+      timing_type : hold_rising;
+    hint: "Both mention the rising edge. Ask whose edge it is."
+    answer: "Checks against the rising clock edge: one a setup, one a hold."
+    wrong:
+      - "Checks on the rising data edge: one a setup, one a hold."
+      - A setup check that fires on the rising edge and a hold on the falling.
+      - Checks that apply only to cells clocked on the rising edge of any clock.
+    explain: >-
+      The edge in the name is the active clock edge at the related pin. A
+      falling-edge flop uses `setup_falling` and `hold_falling`. The values
+      themselves are constraint tables, indexed by the data and clock
+      transitions rather than by load.
+    source: report_checks
+
+  - id: lib-recovery-removal
+    section: checks
+    command: |-
+      timing_type : recovery_rising;
+      timing_type : removal_rising;
+    hint: "Ask which pin these checks belong to; it is not the data pin."
+    answer: The checks on an asynchronous pin's release relative to the clock.
+    wrong:
+      - The checks on an asynchronous pin's assertion relative to the clock.
+      - Setup and hold under different names, used for latches.
+      - Checks that the clock recovers its duty cycle after a reset.
+    explain: >-
+      Asserting a reset needs no timing: the flop resets whenever it arrives.
+      Releasing it does, because a release too close to the clock edge leaves
+      the flop metastable. Recovery is the setup-like check on the release and
+      removal the hold-like one.
+    source: report_checks
+
+  - id: lib-constraint-table
+    section: checks
+    command: |-
+      fall_constraint (Hold_3_3) {
+        index_1 ("...");   /* related pin transition */
+        index_2 ("...");   /* constrained pin transition */
+    hint: "Compare the axes with a delay table's. Ask what replaced the load."
+    answer: A setup or hold value indexed by the clock and data transitions.
+    wrong:
+      - A setup or hold value indexed by the data transition and output load.
+      - A constraint on how fast the two pins may transition.
+      - The margin added to the check, on top of the characterized value.
+    explain: >-
+      A check depends on how sharp both edges are, not on what the pin drives,
+      so load does not appear. A slow clock edge makes setup worse, which is
+      one reason clock slew is held tight.
+    source: report_checks
+
+  - id: lib-pin-limits
+    section: checks
+    command: |-
+      pin (ZN) {
+        direction       : output;
+        max_capacitance : 0.150479;
+        max_transition  : 0.198535;
+    hint: "These sit on an output pin. Ask who has to respect them."
+    answer: The limits this output declares, which design-rule repair must meet.
+    wrong:
+      - The limits measured on this output during characterization.
+      - The capacitance and transition the output actually presents.
+      - The limits that apply to the net, rather than to the pin.
+    explain: >-
+      Beyond these values the tables no longer cover the cell's behaviour.
+      `repair_design` buffers or upsizes to meet them, and
+      `report_check_types -max_slew -max_capacitance` reports what remains.
+      SDC (Synopsys Design Constraints) can tighten them but not relax them.
+    source: report_check_types
+
+  # ---------------------------------------------------------------- Power
+
+  - id: lib-leakage-states
+    section: power
+    command: |-
+      cell_leakage_power : 79.112308;
+      leakage_power () {
+        when  : "!CK & !D & !Q & QN";
+        value : 73.812310;
+      }
+    hint: "One number, then several. Ask why leakage would depend on a condition."
+    answer: An average leakage, plus the leakage in each specific logic state.
+    wrong:
+      - The total leakage, plus the leakage contributed by each pin.
+      - The leakage at the nominal corner, plus values at other corners.
+      - The static leakage, plus the leakage while the cell switches.
+    explain: >-
+      Which transistors are off depends on the state the cell is in, so
+      leakage does too. Power analysis uses the state-dependent values with
+      the probabilities it has for each state, falling back to the average
+      when it has none.
+    source: report_power
+
+  - id: lib-internal-power
+    section: power
+    command: |-
+      internal_power () {
+        related_pin : "A";
+        rise_power (Power_7_7) { ... }
+      }
+    hint: "Ask which of the three kinds of power this is, given that it sits in the library."
+    answer: The energy the cell itself spends when it switches.
+    wrong:
+      - The energy spent charging the load capacitance on the output.
+      - The static power the cell draws while it holds its state.
+      - The power the cell draws from its supply pins in total.
+    explain: >-
+      This is the internal part of switching power. It splits in two:
+      charging the external load, which the
+      tool computes from the net, and the cell's own internal cost, which only
+      the library can know. The tables are indexed like delay tables, so a
+      slower input costs more internal power.
+    source: report_power
+
+  - id: lib-related-pg
+    section: power
+    command: "'related_pg_pin : \"VDD\";'"
+    hint: "Ask why a table would need to name a supply at all."
+    answer: Ties this data to the supply it was characterized against.
+    wrong:
+      - Ties the pin to the supply that the power grid must connect it to.
+      - Says the pin's power is drawn from that supply rather than another.
+      - Says which supply must be on for the pin to be valid.
+    explain: >-
+      A multi-supply cell, such as a level shifter, has values that depend on
+      which supply is meant. Naming the supply keeps power intent and timing
+      consistent, and it is how a tool knows what happens when one supply is
+      switched off.
+    source: report_power
+
+  # ---------------------------------------------------------------- Reading a library
+
+  - id: lib-read-cell
+    section: reading
+    question: "What does this tell you about the cell, before any timing is read?"
+    excerpt: |2-
+        cell (DFF_X1) {
+
+      	drive_strength     	: 1;
+
+      	ff ("IQ" , "IQN") {
+      		next_state         	: "D";
+      		clocked_on         	: "CK";
+      	}
+
+      	area               	: 4.522000;
+    hint: "One group here only appears on a certain kind of cell."
+    answer: "It is sequential: the ff group gives its state and its clock."
+    wrong:
+      - "It is combinational, with its function given by the ff group."
+      - "It is a flip-flop cell of drive strength 4.5, by its area."
+      - "It is a two-output cell, since the ff group names two signals."
+    explain: "The `ff` group marks the cell as a flip-flop, names the internal state IQ and its complement, says the next state comes from D, and says CK clocks it. `area` is in library units and feeds utilization; `drive_strength` is the relative label that appears in the cell's name."
+    source: report_lib_cell
+
+  - id: lib-read-timing
+    section: reading
+    question: "Which check is this, and between which two pins?"
+    excerpt: |2-
+
+      	pin (D) {
+
+      		direction		: input;
+      		related_power_pin		: "VDD";
+      		related_ground_pin		: "VSS";
+      		capacitance		: 1.140290;
+      		fall_capacitance	: 1.062342;
+      		rise_capacitance	: 1.140290;
+
+      		timing () {
+
+      			related_pin	   : "CK";
+      			timing_type	   : hold_rising;
+      			fall_constraint(Hold_3_3) {
+      				index_1 ("0.00117378,0.0449324,0.198535");
+    hint: "Look at related_pin and timing_type together, and note which pin group they sit in."
+    answer: "A hold check on D against the rising edge of CK."
+    wrong:
+      - "A setup check on D against the rising edge of CK."
+      - "A hold check on CK against a rising edge of D."
+      - "A delay arc from CK to D, measured on the rising edge."
+    explain: "The group sits inside `pin (D)`, so the check is on D; `related_pin` names CK as the reference and `timing_type` says it is a hold check on the rising edge. The values come as a constraint table indexed by the two pins' transitions, not by load."
+    source: report_checks
+
+  - id: lib-read-leakage
+    section: reading
+    question: "Why does this cell have more than one leakage value?"
+    excerpt: |2-
+
+      	cell_leakage_power 	: 79.112308;
+
+      	leakage_power () {
+      		when           : "!CK & !D & !Q & QN";
+      		value          : 73.812310;
+      	}
+      	leakage_power () {
+      		when           : "!CK & !D & Q & !QN";
+      		value          : 77.650980;
+      	}
+      	leakage_power () {
+      		when           : "!CK & D & !Q & QN";
+    hint: "Read the when conditions: they describe the cell's state, not an event."
+    answer: "Leakage depends on the state the cell is holding."
+    wrong:
+      - "Leakage depends on how often the cell switches."
+      - "Leakage is given per corner, one value for each."
+      - "Leakage is given per supply pin of the cell."
+    explain: "Which transistors are off depends on the stored state and the inputs, so each state leaks differently. `cell_leakage_power` is the average used when the state probabilities are unknown; `report_power` uses the state-dependent values when it has activity data."
+    source: report_power
+
+  - id: lib-read-units
+    section: reading
+    question: "A delay table in this library holds the value 0.0189. What is that?"
+    excerpt: |2-
+        delay_model             		: table_lookup;
+        in_place_swap_mode      		: match_footprint;
+        library_features        		  (report_delay_calculation,report_power_calculation);
+        /* Units Attributes */
+        time_unit               		: "1ns";
+        leakage_power_unit      		: "1nW";
+        voltage_unit            		: "1V";
+        current_unit            		: "1mA";
+        pulling_resistance_unit 		: "1kohm";
+        capacitive_load_unit    		  (1,ff);
+    hint: "The file declares its units once, at the top."
+    answer: "0.0189 nanoseconds, since the library's time unit is 1 ns."
+    wrong:
+      - "0.0189 picoseconds, the usual unit for a delay this small."
+      - "0.0189 of the clock period, as a fraction."
+      - "0.0189 in whatever unit the tool is currently reporting in."
+    explain: "Values in Liberty are bare numbers, and the header says what they mean: time in nanoseconds, capacitance in femtofarads, power in nanowatts here. A tool reporting in different units converts on the way out, which `report_units` shows."
+    source: report_units
+
+  # ---------------------------------------------------------------- Header additions
+
+  - id: lib-thresholds
+    section: header
+    command: |-
+      slew_lower_threshold_pct_rise : 30.00 ;
+      slew_upper_threshold_pct_rise : 70.00 ;
+      input_threshold_pct_rise      : 50.00 ;
+      output_threshold_pct_rise     : 50.00 ;
+    hint: "A delay is measured between two points on two waveforms. These name the points."
+    answer: Where on a waveform a delay and a transition are measured.
+    wrong:
+      - The voltages at which a cell actually changes its output state.
+      - The fraction of the supply a signal must reach to count as valid.
+      - The transition limits a pin may reach before it is a violation.
+    explain: >-
+      Delay runs from the 50 percent point of the input to the 50 percent point
+      of the output, and a transition is the time between the 30 and 70 percent
+      points. Two libraries measured at different thresholds describe the same
+      silicon with different numbers, so they cannot be mixed without care.
+    source: report_units
+
+  - id: lib-slew-derate
+    section: header
+    command: "slew_derate_from_library : 1.00 ;"
+    hint: "The tables hold a slew measured between thresholds, not a full swing."
+    answer: How to scale a threshold-to-threshold transition to the full swing.
+    wrong:
+      - How much to derate the library's transitions for on-chip variation.
+      - How to scale the transition limits when the supply voltage changes.
+      - How to convert transition values into the library's time unit.
+    explain: >-
+      A transition measured between the 30 and 70 percent points covers 40
+      percent of the swing, so a library characterized that way may carry a
+      derate of 0.4. Nangate45 carries 1.00, meaning its values are already
+      what the timer should use. A wrong value scales every transition, and
+      through them every delay.
+    source: report_units
+
+  - id: lib-voltage-map
+    section: header
+    command: |-
+      voltage_map (VDD,1.10);
+      voltage_map (VSS,0.00);
+    hint: "Each cell names its rails by name. Ask what turns a name into a number."
+    answer: The voltage on each supply rail the cells refer to by name.
+    wrong:
+      - Which supply rails the cells in this library are allowed to connect to.
+      - The mapping from the library's rail names onto the design's domains.
+      - The voltage range over which this library's values stay valid.
+    explain: >-
+      Every cell's `pg_pin` groups name a rail, such as VDD or VSS, and this is
+      where those names are given values. It matters most when a design runs
+      several supplies, because the timer has to know which pin sits on which
+      rail before it can check a level shifter or an always-on path.
+    source: read_liberty
+
+  - id: lib-wire-load
+    section: header
+    command: |-
+      wire_load("5K_hvratio_1_1") {
+        capacitance : 1.774000e-01;
+        resistance : 3.571429e-03;
+        fanout_length( 1, 1.7460 );
+        fanout_length( 2, 3.9394 );
+      }
+      default_wire_load : "5K_hvratio_1_1" ;
+    hint: "Before a design is placed, nobody knows a net's length. Ask what stands in."
+    answer: A guess at a net's length, and so its parasitics, from its fanout.
+    wrong:
+      - The parasitics of the wires inside the cells of this library.
+      - The limit on how long a net driven by these cells may be.
+      - The resistance and capacitance per unit length of each metal layer.
+    explain: >-
+      A net with two loads is assumed to be 3.9 units long, which times the
+      resistance and capacitance gives an estimate. It is a pre-layout
+      stand-in only, and it is thrown away once real parasitics are extracted
+      into SPEF (Standard Parasitic Exchange Format). Physical synthesis
+      replaced it with placement-based estimates.
+    source: set_wire_load_model
+
+  - id: lib-db-form
+    section: header
+    command: |-
+      NangateOpenCellLibrary_typical.lib
+      NangateOpenCellLibrary_typical.db
+    hint: "Both hold the same library. Ask what differs, and which one you can read."
+    answer: The same library as readable text and as a compiled binary.
+    wrong:
+      - A timing library and the matching power library for the same cells.
+      - The library before and after it is merged with other corners.
+      - A text library and its index, which the tool builds to load faster.
+    explain: >-
+      Commercial tools compile Liberty into a binary that loads faster and
+      hides the source. Open tools read the text form, which is why every
+      excerpt in this deck can be quoted. A very large library is often
+      shipped compressed instead, and `read_liberty` accepts that directly.
+    source: read_liberty
+
+  # ---------------------------------------------------------------- Cell additions
+
+  - id: lib-function
+    section: cell
+    command: |-
+      pin (ZN) {
+        direction : output;
+        function  : "!((A1 A2) + B)";
+      }
+    hint: "Read the operators: a space, a plus, and an exclamation mark."
+    answer: The logic the output performs on the inputs, as a boolean expression.
+    wrong:
+      - The name of the function this cell was generated from.
+      - The truth table of the cell, written in a compressed form.
+      - The condition under which this output is driven rather than floating.
+    explain: >-
+      A space means and, a plus means or, an exclamation mark means not, and a
+      circumflex means exclusive or. This is what lets a tool swap one cell for
+      an equivalent one, and what a formal equivalence check compares the
+      netlist against.
+    source: report_lib_cell
+
+  - id: lib-fanout-load
+    section: cell
+    command: |-
+      default_fanout_load : 1.000000;
+      pin (A) { fanout_load : 1.000000; }
+    hint: "A fanout limit counts something. Ask what unit it counts in."
+    answer: The unit a fanout limit counts, which need not be one per pin.
+    wrong:
+      - The capacitance this input presents, expressed in fanout units.
+      - The number of loads this output is allowed to drive.
+      - The load that a fanout estimate assumes for an unconnected pin.
+    explain: >-
+      A `max_fanout` of 10 means the sum of the fanout loads on the net must
+      not exceed 10, and a heavy input can declare more than 1. It is a
+      technology-independent stand-in for capacitance, used during synthesis
+      before real loads are known.
+    source: set_max_fanout
+
+  - id: lib-dont-use
+    section: cell
+    command: dont_use
+    hint: "The library ships a cell, but this project must not have it placed."
+    answer: A mark that keeps a cell in the library but out of the design.
+    wrong:
+      - A mark that stops a tool from resizing an instance of this cell.
+      - A mark that removes the cell from the library when it is read.
+      - A mark that stops the router from connecting to this cell's pins.
+    explain: >-
+      Teams exclude cells for many reasons: poor yield, high leakage, a hold
+      buffer reserved for repair, or a cell the foundry has withdrawn. The
+      library may carry the attribute, and the flow can add its own with
+      `set_dont_use`. A cell already placed is not removed, which is why the
+      list is set before synthesis.
+    source: set_dont_use
+
+  # ---------------------------------------------------------------- Special cells
+
+  - id: lib-latch-group
+    section: special
+    command: |-
+      latch ("IQ" , "IQN") {
+        data_in : "D";
+        enable  : "G";
+      }
+    hint: "Compare the keywords with the ones a flip-flop uses."
+    answer: A level-sensitive latch, open while its enable is active.
+    wrong:
+      - A flip-flop, written with the older keywords for data and clock.
+      - A latch built from two flip-flops in the same cell.
+      - The transparent stage inside a flip-flop, declared separately.
+    explain: >-
+      A flip-flop declares `next_state` and `clocked_on`; a latch declares
+      `data_in` and `enable`, and that difference is how the timer knows to
+      allow time borrowing rather than to check a single edge. The two names
+      in parentheses are the internal state and its complement.
+    source: set_max_time_borrow
+
+  - id: lib-ff-async
+    section: special
+    command: |-
+      ff ("IQ" , "IQN") {
+        next_state : "D";
+        clocked_on : "CK";
+        preset     : "!SN";
+      }
+    hint: "One of these lines does not mention the clock."
+    answer: An asynchronous set, active when the SN pin is low.
+    wrong:
+      - A synchronous set, loaded on the clock edge when SN is low.
+      - The initial state the register takes at the start of simulation.
+      - The state the register holds when the clock is not running.
+    explain: >-
+      A `preset` or `clear` expression acts without the clock, which is why the
+      arcs on such a pin are recovery and removal rather than setup and hold.
+      A cell with both needs `clear_preset_var1` to say what the outputs do
+      when both are asserted at once.
+    source: set_false_path
+
+  - id: lib-three-state
+    section: special
+    command: |-
+      pin (Z) {
+        function    : "A";
+        three_state : "EN";
+      }
+    hint: "Ask what this output does when EN is low."
+    answer: The output goes high impedance unless the enable is asserted.
+    wrong:
+      - The output holds its last value unless the enable is asserted.
+      - The output is driven by EN rather than by A when EN is high.
+      - The output is undefined unless the enable pin is connected.
+    explain: >-
+      The cell has a third state besides high and low, so the timer needs arcs
+      for turning the driver on and off. Those appear as `three_state_enable`
+      and `three_state_disable` arcs, and the design has to guarantee that two
+      drivers on the same net are never enabled together.
+    source: report_lib_cell
+
+  - id: lib-icg
+    section: special
+    command: |-
+      statetable ("CK E SE","IQ") {
+        table : "L L L : - : L , \
+                 L L H : - : H , \
+                 L H L : - : H , \
+                 H - - : - : N " ;
+      }
+      clock_gating_integrated_cell : latch_posedge_precontrol;
+    hint: "Look at the last row: what does the cell do while the clock is high?"
+    answer: A clock gate whose enable is latched while the clock is low.
+    wrong:
+      - A clock gate that passes the enable straight through to the output.
+      - A latch whose state table is given instead of a `latch` group.
+      - A clock multiplexer that selects between the enable and the scan input.
+    explain: >-
+      Latching the enable while the clock is low stops a late enable from
+      chopping the clock pulse. The attribute tells the tools this is a clock
+      gate rather than ordinary logic, so `set_clock_gating_check` applies and
+      the clock tree can be built through it. The `SE` input keeps the gate
+      transparent during scan shift.
+    source: set_clock_gating_check
+
+  - id: lib-scan-cell
+    section: special
+    command: |-
+      cell (SDFF_X1) {
+        ff ("IQ" , "IQN") {
+          next_state : "(D & !SE) | (SI & SE)";
+          clocked_on : "CK";
+        }
+      }
+    hint: "Read the next-state expression: it has a choice in it."
+    answer: A flip-flop with the scan multiplexer built into the cell.
+    wrong:
+      - A flip-flop whose data input is gated by a scan enable.
+      - A pair of flip-flops, one functional and one for scan.
+      - A flip-flop that shifts its value out on the SI pin.
+    explain: >-
+      Scan insertion swaps ordinary flops for these, which is why the netlist
+      grows and every register gets two more pins. The multiplexer sits on the
+      data path, so it costs setup time on every functional path, not only
+      during test.
+    source: insert_dft
+
+  # ---------------------------------------------------------------- Timing additions
+
+  - id: lib-arc-direction
+    section: timing
+    command: |-
+      pin (Q) {
+        timing () {
+          related_pin : "CK";
+        }
+      }
+    hint: "The group sits inside one pin and names another."
+    answer: An arc from CK to Q, since the arc belongs to the pin holding it.
+    wrong:
+      - An arc from Q to CK, since the related pin is the destination.
+      - An arc between CK and Q whose direction the timer infers.
+      - A statement that Q and CK are related, with no direction.
+    explain: >-
+      Every arc is read this way: the enclosing pin is the endpoint, and
+      `related_pin` is the start. The same shape carries both delays and
+      checks, so a `timing` group inside a data pin naming a clock is a setup
+      or hold check, while one inside an output is a delay.
+    source: report_edges
+
+  - id: lib-timing-types
+    section: timing
+    command: |-
+      timing_type : combinational;
+      timing_type : rising_edge;
+      timing_type : preset;
+      timing_type : three_state_enable;
+    hint: "Ask what each one tells the timer about when the arc is active."
+    answer: Four kinds of arc, from plain logic to a clocked or enabling one.
+    wrong:
+      - Four kinds of cell, identified by the arcs each one carries.
+      - Four kinds of check the arc applies at its endpoint.
+      - Four stages of the arc, from the input to the output.
+    explain: >-
+      `combinational` is a plain propagation, `rising_edge` fires only on a
+      rising clock, `preset` is an asynchronous path to the output, and the
+      tristate types turn a driver on or off. The type decides which edges the
+      timer pairs and which checks it looks for.
+    source: report_edges
+
+  - id: lib-min-pulse-width
+    section: timing
+    command: |-
+      timing () {
+        related_pin : "CK";
+        timing_type : min_pulse_width;
+        fall_constraint(Pulse_width_3) {
+          index_1 ("0.00117378,0.0449324,0.198535");
+          values  ("0.075346,0.087068,0.198733");
+        }
+      }
+    hint: "The values are times, and the axis is a transition. Ask what has to last that long."
+    answer: The shortest the clock may stay low, given how sharp its edges are.
+    wrong:
+      - The shortest period the clock may run at, given its transition.
+      - The shortest time between two clock edges reaching this cell.
+      - The shortest transition the clock pin is allowed to have.
+    explain: >-
+      A pulse shorter than this may not be captured at all. The constraint
+      grows with a slower clock transition, from 0.075 nanoseconds at a sharp
+      edge to 0.199 at the slowest, which is one reason the clock network is
+      held to a tight transition limit. `set_min_pulse_width` can tighten it.
+    source: set_min_pulse_width
+
+  # ---------------------------------------------------------------- Table additions
+
+  - id: lib-interpolation
+    section: tables
+    command: |-
+      index_1 ("0.00117378,...,0.198535");
+      index_2 ("0.365616,...,23.4"); /* a load of 40 is asked for */
+    hint: "The value asked for is past the end of the axis."
+    answer: The tool extrapolates, which is far less trustworthy than interpolating.
+    wrong:
+      - The tool clamps the value to the last point on the axis.
+      - The tool reports an error, since the value is outside the table.
+      - The tool falls back to the library's default for that pin.
+    explain: >-
+      Inside the grid the tool interpolates between characterized points,
+      which is accurate. Outside it, the straight-line continuation can be
+      badly wrong, which is why a driver loaded far past its `max_capacitance`
+      gives delays nobody should trust, and why the limit exists.
+    source: report_dcalc
+
+  - id: lib-values-order
+    section: tables
+    command: |-
+      cell_rise (Timing_7_7) {
+        index_1 ("0.0012, ... , 0.1985");  /* input transition */
+        index_2 ("0.3656, ... , 23.40");   /* output load */
+        values ("0.0189,0.0243,...", \
+                "0.0221,0.0276,...");
+      }
+    hint: "There is one string per value of one axis. Ask which axis."
+    answer: One string per input transition, each holding the values across the loads.
+    wrong:
+      - One string per output load, each holding the values across transitions.
+      - One string per row of the grid, ordered by rising value.
+      - One string per table, split only to keep the lines short.
+    explain: >-
+      Rows follow `index_1` and columns follow `index_2`, so reading a table by
+      hand means counting into the right string. Getting the order backwards
+      is a classic error when a library is written by a script rather than a
+      characterization tool.
+    source: report_dcalc
+
+  - id: lib-lvf
+    section: tables
+    command: |-
+      ocv_sigma_cell_rise (Timing_7_7) {
+        sigma_type : early;
+        values ( ... );
+      }
+    hint: "The ordinary table holds one delay. Ask what this one adds."
+    answer: How much this delay varies, per cell rather than by a flat derate.
+    wrong:
+      - How much this delay varies between the library's corners.
+      - The earliest delay this cell can have, as a second table.
+      - The delay after the library's derating factor has been applied.
+    explain: >-
+      A single derate factor over-margins long paths and under-margins short
+      ones. LVF (Liberty Variation Format) stores a standard deviation beside
+      every delay and constraint, so a timer can combine variation along the
+      path statistically. It multiplies the library's size, which is why not
+      every library ships it.
+    source: set_timing_derate
+
+  # ---------------------------------------------------------------- Check additions
+
+  - id: lib-negative-hold
+    section: checks
+    command: |-
+      rise_constraint (Hold_3_3) {
+        values ("-0.012, -0.009, -0.004");
+      }
+    hint: "A hold requirement is a time the data must stay stable after the edge."
+    answer: The data may change slightly before the edge and still be captured.
+    wrong:
+      - The data must be stable for longer than the table suggests.
+      - The value is an error, since a hold time cannot be negative.
+      - The check is disabled, which is how a library marks it unused.
+    explain: >-
+      Negative values are normal and come from the delays inside the cell: the
+      clock reaches the internal latch after the data does. They make hold
+      easier to meet. Negative setup values also occur, and both are why hold
+      repair must read the library rather than assume zero.
+    source: report_checks
+
+  - id: lib-limit-precedence
+    section: checks
+    command: |-
+      default_max_transition : 0.198535;   /* library */
+      pin (ZN) { max_transition : 0.30; }  /* cell pin */
+      set_max_transition 0.15 [current_design]
+    hint: "Three sources set the same limit. Ask which one a tool obeys."
+    answer: "The tightest of the three applies at that pin."
+    wrong:
+      - The last one read applies, so the constraint always wins.
+      - The pin's own value applies, and the others are ignored.
+      - The library's default applies, and constraints only add margin.
+    explain: >-
+      A cell that can genuinely take a slower edge says so on its pin. A
+      project that wants a sharper edge than any cell requires sets it in the
+      constraints. Design-rule repair works to whichever is smallest at that
+      pin, so a stray global constraint can create work nobody asked for.
+    source: set_max_transition
+
+  # ---------------------------------------------------------------- Power additions
+
+  - id: lib-power-axes
+    section: power
+    command: |-
+      internal_power () {
+        related_pin : "A";
+        rise_power (Power_7_7) {
+          index_1 (" ... ");  /* input transition */
+          index_2 (" ... ");  /* output load */
+        }
+      }
+    hint: "Same two axes as a delay table. Ask why the load appears at all."
+    answer: The energy the cell spends inside itself, per transition.
+    wrong:
+      - The power drawn while the input is held at that transition.
+      - The energy spent charging the load, per transition.
+      - The average power at the load and transition given.
+    explain: >-
+      Internal energy is what the cell spends inside itself, mostly the brief
+      current that flows through both transistor stacks while the input
+      crosses. It grows with the input transition. The energy delivered into
+      the load is counted separately as switching power, so the two are not
+      double counted.
+    source: report_power
+
+  - id: lib-leakage-default
+    section: power
+    command: |-
+      cell_leakage_power : 79.112308;
+      leakage_power () { when : "!A1 & !A2"; value : 86.94; }
+    hint: "The timer may not know what state the cell is in."
+    answer: The single value is used when no state is known, the conditional ones when it is.
+    wrong:
+      - The single value is the total, and the conditional ones break it down.
+      - The single value is the worst state, and the conditional ones refine it.
+      - The single value is used at the nominal corner, the others elsewhere.
+    explain: >-
+      With switching activity annotated, a tool weights each state by how long
+      the cell spends in it. Without it, the plain value stands, usually an
+      average over states. The spread between states can be large, which is
+      why a design held in a deliberate low-leakage state at idle saves real
+      power.
+    source: report_power
+
+  # ---------------------------------------------------------------- Reading additions
+
+  - id: lib-read-latch
+    section: reading
+    question: What kind of cell is this, and what does the timer allow it to do?
+    excerpt: |2-
+        cell (DLH_X1) {
+          latch ("IQ" , "IQN") {
+            data_in : "D";
+            enable  : "G";
+          }
+          area : 2.660000;
+        }
+    hint: "Compare the group's keywords against a flip-flop's."
+    answer: A transparent latch, so late data can borrow time through it.
+    wrong:
+      - A flip-flop, which captures on the edge of the G pin.
+      - A latch whose output is held until the next rising edge of G.
+      - A two-phase latch pair, since two state names are given.
+    explain: >-
+      The `latch` group with `data_in` and `enable` is the signature.
+      While G is active the cell is transparent, so the timer checks the data
+      against the closing edge and permits borrowing up to the limit set by
+      `set_max_time_borrow`. The two names are the state and its complement.
+    source: set_max_time_borrow
+
+  - id: lib-read-icg
+    section: reading
+    question: "This cell's state table ends with the row \"H - - : - : N\". What does that row say?"
+    excerpt: |2-
+        statetable ("CK E SE","IQ") {
+             table : "L L L : - : L ,\
+                      L L H : - : H ,\
+                      L H L : - : H ,\
+                      L H H : - : H ,\
+                      H - - : - : N " ;
+        }
+        clock_gating_integrated_cell : latch_posedge_precontrol;
+    hint: "The three inputs are CK, E, and SE, and N is not a logic level."
+    answer: While the clock is high the cell holds its state, whatever the enables do.
+    wrong:
+      - While the clock is high the output is high, whatever the enables do.
+      - While the clock is high the cell is transparent to the enables.
+      - While the clock is high the state is unknown and must not be relied on.
+    explain: >-
+      `N` means no change. The enable is captured only while the clock is low,
+      so a late enable cannot cut a pulse that has already started. That is the
+      whole point of an integrated clock gating cell, and the reason
+      `set_clock_gating_check` times the enable against the opposite edge.
+    source: set_clock_gating_check
+
+  - id: lib-read-pulse-width
+    section: reading
+    question: "The clock reaching this pin has a transition of about 0.045 nanoseconds. What does this table then require?"
+    excerpt: |2-
+        timing () {
+            related_pin    : "CK";
+            timing_type    : min_pulse_width;
+            fall_constraint(Pulse_width_3) {
+                index_1 ("0.00117378,0.0449324,0.198535");
+                values ("0.075346,0.087068,0.198733");
+            }
+        }
+    hint: "Find 0.045 on the axis and read the value beneath it."
+    answer: The clock must stay low for at least 0.087 nanoseconds.
+    wrong:
+      - The clock must stay low for at least 0.045 nanoseconds.
+      - The clock must stay high for at least 0.087 nanoseconds.
+      - The clock period must be at least 0.087 nanoseconds.
+    explain: >-
+      It is a fall constraint, so it governs the low phase, and 0.0449 is the
+      second point on the axis, giving 0.087068. A sharper edge would need only
+      0.075. This is why a clock with a degraded transition can fail a pulse
+      width check that a clean one passes at the same frequency.
+    source: report_check_types

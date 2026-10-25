@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Problems{% endblock %}
+{% block content %}
+<div class="hero">
+  <div class="hero-body">
+    <h1>Problems</h1>
+    <p>
+      Real physical-design tasks, the kind an engineer is actually handed,
+      each graded by a tool run on the layout you produce. Grouped by the six
+      Education topics, in flow order. This is the plan: the problem types
+      below are being built out.
+    </p>
+  </div>
+</div>
+
+{% for s in sections %}
+<section class="topic-card"{% if s.slug %} id="{{ s.slug }}"{% endif %}>
+  <div class="topic-head">
+    <div class="topic-head-titles">
+      <h2>{{ s.name }}</h2>
+      <span class="topic-count">
+        {% if s.type_count %}{{ s.type_count }} problem types{% else %}coming soon{% endif %}
+      </span>
+    </div>
+    {% if s.slug %}
+    <a class="topic-guide-link" href="/education/{{ s.slug }}">Read the guide →</a>
+    {% endif %}
+  </div>
+  <div class="topic-body">
+    {% if s.groups %}
+    {% for g in s.groups %}
+    <details class="ptype-group">
+      <summary class="ptype-group-head">
+        <h3 class="ptype-group-title">{{ g.group }}</h3>
+        <span class="ptype-group-count">{{ g["items"] | length }}</span>
+        <span class="ptype-group-caret" aria-hidden="true">▾</span>
+      </summary>
+      <div class="ptype-group-body">
+        {% if g.blurb %}<p class="ptype-group-blurb">{{ g.blurb }}</p>{% endif %}
+        <ul class="ptype-list">
+          {% for t in g["items"] %}
+          <li class="ptype">
+            <div class="ptype-main">
+              {% if t.href %}
+              <a class="ptype-title ptype-link" href="{{ t.href }}">{{ t.title }}</a>
+              <span class="chip eng-openroad">interactive</span>
+              {% else %}
+              <span class="ptype-title">{{ t.title }}</span>
+              <span class="chip chip-soon">planned</span>
+              {% endif %}
+            </div>
+            <p class="ptype-blurb">{{ t.blurb }}{% if t.href %} <a class="ptype-cta" href="{{ t.href }}">Open the lab →</a>{% endif %}</p>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+    {% endfor %}
+    {% else %}
+    <p class="topic-empty">
+      Problem types coming soon.
+      {% if s.slug %}<a href="/education/{{ s.slug }}">Learn the concepts →</a>{% endif %}
+    </p>
+    {% endif %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

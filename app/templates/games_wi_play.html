@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} - {{ game.title }} - PD-Leet{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="fc-page">
+  <div class="crumb"><a href="/games">Games</a> / <a href="/games/what-if">{{ game.title }}</a> / {{ section.title }}</div>
+  <h1 class="lab-title">{{ section.title }}</h1>
+  <p class="fc-intro">
+    Read the situation and the numbers it starts from, then pick the change you
+    would make. Every option was run, so the answer comes from the measurement
+    rather than from anyone's judgement, and after you choose you see what all
+    of them did. Progress is stored in this browser.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}</span></div>
+  <div id="wi-root"></div>
+  <div id="fg-root"></div>
+
+  <details class="fc-deck">
+    <summary>All {{ play["items"] | length }} situations {% if mixed %}in this drill{% else %}in this kind{% endif %}, with their tables</summary>
+    <ul class="fc-list">
+      {% for i in play["items"] %}
+      <li>
+        <div class="fc-list-cmd">{{ i.question }}</div>
+        <div class="fc-list-ans">{% for o in i.options %}{{ o.label }}: {{ o.outcome[i.objective.metric] }}{% if not loop.last %} &middot; {% endif %}{% endfor %}</div>
+        <p class="fc-list-exp">{{ i.explain_html | safe }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+</article>
+{% endblock %}
+{% block scripts %}
+<script src="/static/games/whatif.js?v={{ asset_v }}"></script>
+<script src="/static/games/flag.js?v={{ asset_v }}"></script>
+<script id="wi-data" type="application/json">{{ data_json | safe }}</script>
+<script>
+  (function () {
+    var data = JSON.parse(document.getElementById("wi-data").textContent);
+    WhatIf.mount(document.getElementById("wi-root"), data, { confirm: function (m) { return window.confirm(m); } });
+    Flag.mount(document.getElementById("fg-root"), "what-if");
+  })();
+</script>
+{% endblock %}

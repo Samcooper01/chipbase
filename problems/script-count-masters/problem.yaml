@@ -1,0 +1,24 @@
+id: script-count-masters
+title: "Write a script: count instances per cell master"
+topic: Scripting
+difficulty: easy
+points: 100
+engine: script
+kind: files
+order: 1
+editable:
+  - path: script.tcl
+    language: tcl
+checks:
+  - id: lines
+    label: "One report line per master, no extras"
+    metric: masters_reported
+    op: "~="
+    value: 5
+    tolerance: 0.1
+  - id: counts
+    label: "Every count is correct"
+    metric: counts_correct
+    op: "~="
+    value: 1
+    tolerance: 0.1

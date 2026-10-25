@@ -1,0 +1,1401 @@
+# OpenROAD-flow-scripts variables flash-card deck.
+#
+# Card fields are the same as the other decks. A card's `command` is a line as
+# it appears in a design's or a platform's config.mk. Descriptions and defaults
+# come from the flow's own documentation (docs/user/FlowVariables.md, copied to
+# orfs_src/), and the tiers from counting how many shipped configurations set
+# each variable (orfs_src/vars.json). See orfs_scope.md.
+
+deck: orfs
+title: OpenROAD-flow-scripts variables
+reference: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/blob/master/docs/user/FlowVariables.md
+source_link: anchor
+basis:
+  tool: OpenROAD-flow-scripts
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts
+  doc_title: flow variable reference
+  note: >-
+    These cards cover the make variables that drive OpenROAD-flow-scripts, the
+    reference flow built on OpenROAD. Each card shows a line as it appears in a
+    design's or a platform's config.mk, and each answer links to that variable
+    in the flow's own variable reference. Variables come and go between
+    releases; this deck follows the version in the openroad/orfs image.
+
+sections:
+  - id: design
+    title: Design and platform
+    blurb: "What is being built and what it is built from: sources, constraints, libraries, macros."
+    commands: [DESIGN_NAME, DESIGN_NICKNAME, PLATFORM, VERILOG_FILES, VERILOG_INCLUDE_DIRS, SDC_FILE,
+               ADDITIONAL_LEFS, ADDITIONAL_LIBS, ADDITIONAL_GDS, LIB_FILES, SC_LEF, TECH_LEF, BLOCKS]
+  - id: synth
+    title: Synthesis
+    blurb: "How the netlist is produced: hierarchy, optimization target, and cell mappings."
+    commands: [SYNTH_HIERARCHICAL, SYNTH_MINIMUM_KEEP_SIZE, ABC_AREA, ABC_DRIVER_CELL, ABC_LOAD_IN_FF,
+               ADDER_MAP_FILE, CLKGATE_MAP_FILE, LATCH_MAP_FILE, TIEHI_CELL_AND_PORT, TIELO_CELL_AND_PORT,
+               SYNTH_HDL_FRONTEND, SYNTH_NETLIST_FILES, SWAP_ARITH_OPERATORS]
+  - id: floorplan
+    title: Floorplan
+    blurb: Die and core size, macro handling, and the scripts for pins, power, and taps.
+    commands: [CORE_UTILIZATION, CORE_ASPECT_RATIO, CORE_MARGIN, DIE_AREA, CORE_AREA, PLACE_SITE,
+               MACRO_PLACE_HALO, MACRO_WRAPPERS, MACRO_PLACEMENT_TCL, RTLMP_MAX_MACRO, IO_CONSTRAINTS,
+               PDN_TCL, TAPCELL_TCL, FLOORPLAN_DEF]
+  - id: place
+    title: Placement
+    blurb: Density, padding, pin layers, and the placement options a design can turn on.
+    commands: [PLACE_DENSITY, PLACE_DENSITY_LB_ADDON, CELL_PAD_IN_SITES_GLOBAL_PLACEMENT,
+               CELL_PAD_IN_SITES_DETAIL_PLACEMENT, IO_PLACER_H, IO_PLACER_V, PLACE_PINS_ARGS,
+               GLOBAL_PLACEMENT_ARGS, GPL_TIMING_DRIVEN, CLUSTER_FLOPS, ENABLE_DPO, DONT_USE_CELLS]
+  - id: cts
+    title: Clock tree synthesis
+    blurb: Sink clustering, buffer distance, and the library the clock buffers come from.
+    commands: [CTS_CLUSTER_SIZE, CTS_CLUSTER_DIAMETER, CTS_BUF_DISTANCE, CTS_ARGS, CTS_LIB_NAME,
+               SKIP_CTS_REPAIR_TIMING]
+  - id: routing
+    title: Routing
+    blurb: Which layers may be used, how their capacity is derated, and router options.
+    commands: [MIN_ROUTING_LAYER, MAX_ROUTING_LAYER, MIN_CLK_ROUTING_LAYER, ROUTING_LAYER_ADJUSTMENT,
+               FASTROUTE_TCL, DISABLE_VIA_GEN, ENABLE_RESISTANCE_AWARE]
+  - id: timing
+    title: Timing and optimization
+    blurb: Margins, how much of the failing tail is repaired, and which repairs are skipped.
+    commands: [TNS_END_PERCENT, SETUP_SLACK_MARGIN, HOLD_SLACK_MARGIN, CAP_MARGIN, SLEW_MARGIN,
+               SKIP_GATE_CLONING, SKIP_INCREMENTAL_REPAIR, SKIP_LAST_GASP, RECOVER_POWER,
+               MATCH_CELL_FOOTPRINT]
+  - id: final
+    title: Finishing and outputs
+    blurb: Fill, supply voltages for analysis, extraction rules, and the files the flow writes.
+    commands: [FILL_CELLS, USE_FILL, FILL_CONFIG, PWR_NETS_VOLTAGES, GND_NETS_VOLTAGES, IR_DROP_LAYER,
+               GDS_ALLOW_EMPTY, SEAL_GDS, CDL_FILE, KLAYOUT_TECH_FILE, RCX_RULES, CORNER]
+  - id: running
+    title: Running the flow
+    blurb: Switches that change how a run behaves rather than what the design is.
+    commands: [OPENROAD_HIERARCHICAL, SKIP_REPORT_METRICS, LEC_CHECK, REMOVE_CELLS_FOR_LEC,
+               GPL_RANDOM_SEED, ASAP7_USE_VT, CORNERS]
+
+cards:
+
+  # ---------------------------------------------------------------- Design and platform
+
+  - id: orfs-design-name
+    section: design
+    command: export DESIGN_NAME = gcd
+    hint: "The flow has to know which module is the design, out of everything it reads."
+    answer: Names the top-level module that the flow builds.
+    wrong:
+      - Names the directory the flow writes its results into.
+      - Names the design as it appears in reports and metrics only.
+      - Names the Verilog file that holds the top-level module.
+    explain: >-
+      Every stage works on this module, and it must match a module in the
+      Verilog that is read. `DESIGN_NICKNAME` is the separate variable that
+      renames the output directory.
+    source: DESIGN_NAME
+
+  - id: orfs-design-nickname
+    section: design
+    command: export DESIGN_NICKNAME = riscv32i
+    hint: "Compare it with DESIGN_NAME: only one of the two has to match the Verilog."
+    answer: Changes the output directory name without changing the module built.
+    wrong:
+      - Changes which top-level module the flow builds from the sources.
+      - Adds a second name that reports and metrics are labelled with.
+      - Renames the design's module inside the netlist that is written.
+    explain: >-
+      Results go to `results/<platform>/<nickname>/`. It exists for designs
+      whose top module name is unwieldy or collides with another design's.
+    source: DESIGN_NICKNAME
+
+  - id: orfs-platform
+    section: design
+    command: export PLATFORM = nangate45
+    hint: "One word pulls in a whole directory of technology files."
+    answer: Selects the process design kit the design is built with.
+    wrong:
+      - Selects the machine or container the flow runs on.
+      - Selects the standard cell library within the current technology.
+      - Selects which of the design's configurations the flow reads.
+    explain: >-
+      The platform directory supplies the technology and cell files, the site,
+      the power grid script, and its own default variables. Changing this one
+      line rebuilds the same design on a different technology.
+    source: PLATFORM
+
+  - id: orfs-verilog-files
+    section: design
+    command: export VERILOG_FILES = $(sort $(wildcard ./designs/src/gcd/*.v))
+    hint: "Ask what synthesis is given to read."
+    answer: Lists the design's source files for synthesis to read.
+    wrong:
+      - Lists the files the flow writes the synthesized netlist to.
+      - Lists the directories that Verilog include statements search.
+      - Lists the source files that the flow checks for changes.
+    explain: >-
+      The list is read by synthesis, in order. `sort` around a wildcard keeps
+      the order stable so a build is repeatable. Header directories are given
+      separately with `VERILOG_INCLUDE_DIRS`.
+    source: VERILOG_FILES
+
+  - id: orfs-sdc-file
+    section: design
+    command: export SDC_FILE = ./designs/nangate45/gcd/constraint.sdc
+    hint: "It is read early and then used by every stage that thinks about timing."
+    answer: Gives the timing constraints, starting with the clock definition.
+    wrong:
+      - Gives the physical constraints, such as the die size and pin sides.
+      - Gives the constraints that only the final timing report uses.
+      - Gives the constraints used by synthesis and nothing after it.
+    explain: >-
+      The file holds the SDC (Synopsys Design Constraints) commands: clock
+      definitions, input and output delays, and any exceptions. Synthesis,
+      placement, clock tree synthesis, and routing all read it, and later
+      stages read the version each earlier stage wrote.
+    source: SDC_FILE
+
+  - id: orfs-additional-lefs
+    section: design
+    command: export ADDITIONAL_LEFS = ./designs/src/tiny/sram.lef
+    hint: "A hardened macro is not in the standard cell library. Ask what its shape comes from."
+    answer: "Adds hard macro geometry: outline, pins, and blockages."
+    wrong:
+      - Adds hard macro timing data for the analysis to use.
+      - Adds the standard cell library that the design is built from.
+      - Adds the macro's internal layout for the final layout file.
+    explain: >-
+      A macro needs three things in the flow: its shape from a LEF (Library
+      Exchange Format) file here, its timing from `ADDITIONAL_LIBS`, and its
+      layout from `ADDITIONAL_GDS` at the end. The shape is stored in the
+      design database; the timing is not.
+    source: ADDITIONAL_LEFS
+
+  - id: orfs-additional-libs
+    section: design
+    command: export ADDITIONAL_LIBS = ./designs/src/tiny/sram.lib
+    hint: "The counterpart of the macro's shape."
+    answer: Adds hard macro timing and power data for analysis.
+    wrong:
+      - Adds hard macro geometry for placement and routing to respect.
+      - Adds the platform's own standard cell timing libraries.
+      - Adds the macro's netlist so its contents can be timed inside.
+    explain: >-
+      The library is read in each session that times the design, because it is
+      not stored in the database, unlike the geometry. A macro missing from
+      here times as if it had no delay at all.
+    source: ADDITIONAL_LIBS
+
+  - id: orfs-additional-gds
+    section: design
+    command: export ADDITIONAL_GDS = ./designs/src/tiny/sram.gds
+    hint: "It matters only at the very end, when one file has to contain everything."
+    answer: Adds the macro's real layout for the final merged layout file.
+    wrong:
+      - Adds the macro's outline so placement can avoid overlapping it.
+      - Adds the macro's layout for the design-rule check to read.
+      - Adds a layout view used to display the macro in the viewer.
+    explain: >-
+      Through the flow a macro is only an outline with pins. The finishing
+      stage merges the real layout of each macro into the design's own layout,
+      which is what goes to the foundry.
+    source: ADDITIONAL_GDS
+
+  - id: orfs-blocks
+    section: design
+    command: export BLOCKS = aes_cipher_top
+    hint: "It turns part of your own design into something the top level treats as a macro."
+    answer: Names sub-blocks that are hardened first and used as macros above.
+    wrong:
+      - Names the modules that synthesis must keep as separate hierarchy.
+      - Names the hard macros from the library that the design instantiates.
+      - Names the blocks to skip, leaving them as black boxes in the flow.
+    explain: >-
+      In a hierarchical run each named block goes through the flow on its own
+      and produces an abstract and a timing model. The top level then places it
+      as a macro, which is how a design too big for one flat run is built.
+    source: BLOCKS
+
+  # ---------------------------------------------------------------- Synthesis
+
+  - id: orfs-synth-hierarchical
+    section: synth
+    command: export SYNTH_HIERARCHICAL = 1
+    hint: "The default flattens everything. Ask what is kept instead."
+    answer: Keeps the module hierarchy through synthesis instead of flattening it.
+    wrong:
+      - Runs synthesis on each module separately and merges the results.
+      - Hardens each module as a macro before the top level is built.
+      - Keeps the hierarchy in the reports while flattening the netlist.
+    explain: >-
+      Flat synthesis optimizes across module boundaries and usually gives
+      better results, but it loses the names that make a large design
+      navigable. Hierarchical synthesis keeps modules above the size set by
+      `SYNTH_MINIMUM_KEEP_SIZE` and flattens the rest.
+    source: SYNTH_HIERARCHICAL
+
+  - id: orfs-synth-keep-size
+    section: synth
+    command: export SYNTH_MINIMUM_KEEP_SIZE = 1000
+    hint: "The unit is not gates, and not microns. It is relative to one small cell."
+    answer: Keeps modules bigger than 1000 basic gates and flattens smaller ones.
+    wrong:
+      - Keeps modules of more than 1000 cells and flattens the rest.
+      - Keeps the 1000 largest modules in the design's hierarchy.
+      - Stops synthesis if a kept module is smaller than 1000 gates.
+    explain: >-
+      The size is measured in units of the platform's basic two-input gate
+      area, so it means the same thing on different technologies. It applies
+      to hierarchical synthesis: small modules are flattened so they can be
+      optimized across their boundaries anyway.
+    source: SYNTH_MINIMUM_KEEP_SIZE
+
+  - id: orfs-abc-area
+    section: synth
+    command: export ABC_AREA = 1
+    hint: "The two strategies pull in opposite directions."
+    answer: Tells the synthesis optimizer to aim for area rather than speed.
+    wrong:
+      - Sets the area budget that synthesis must not exceed.
+      - Reports the area after synthesis rather than the timing.
+      - Aims for speed, which is what the name of the variable means.
+    explain: >-
+      ABC (And-Inverter-Graph optimizer) is the engine inside Yosys that maps
+      logic to library cells. The
+      default is the speed strategy; setting this switches to the area
+      strategy, which gives a smaller but slower netlist.
+    source: ABC_AREA
+
+  - id: orfs-abc-driver-cell
+    section: synth
+    command: export ABC_DRIVER_CELL = BUF_X1
+    hint: "Synthesis has no placement and no real drivers yet, so it needs an assumption."
+    answer: Says what drives the design's inputs while synthesis estimates timing.
+    wrong:
+      - Says which cell synthesis uses whenever it needs a buffer.
+      - Says which cell drives the clock network during synthesis.
+      - Says which cell replaces weak drivers found after synthesis.
+    explain: >-
+      Without a driver the input slew is unknown, and slew drives every delay
+      after it. This variable and `ABC_LOAD_IN_FF`, the load on the outputs,
+      are the boundary assumptions synthesis works from.
+    source: ABC_DRIVER_CELL
+
+  - id: orfs-abc-load
+    section: synth
+    command: export ABC_LOAD_IN_FF = 3
+    hint: "The unit is in the name, and it is the other end of the design from the driver."
+    answer: Sets the capacitance synthesis assumes on the design's outputs.
+    wrong:
+      - Sets the largest load any cell may drive during synthesis.
+      - Sets the input capacitance assumed for the design's input ports.
+      - Sets the load used only when a cell's library value is missing.
+    explain: >-
+      Outputs drive something off-block, and the size of that load decides how
+      strongly synthesis builds the last stage. The value is in femtofarads,
+      hence the name.
+    source: ABC_LOAD_IN_FF
+
+  - id: orfs-adder-map
+    section: synth
+    command: export ADDER_MAP_FILE = $(PLATFORM_DIR)/cells_adders.v
+    hint: "Ask what synthesis would otherwise build an adder out of."
+    answer: Maps the design's adders onto the platform's own adder cells.
+    wrong:
+      - Tells synthesis how many adders the design is allowed to use.
+      - Maps the design's adders onto a faster adder architecture.
+      - Lists the adder modules that synthesis must keep unflattened.
+    explain: >-
+      Left alone, synthesis builds an adder from ordinary gates. A platform
+      with dedicated full-adder cells maps to them instead, which is smaller
+      and faster. The same mechanism exists for clock gates and latches.
+    source: ADDER_MAP_FILE
+
+  - id: orfs-tiehi
+    section: synth
+    command: export TIEHI_CELL_AND_PORT = LOGIC1_X1 Z
+    hint: "Two values: which cell, and which of its pins."
+    answer: Names the cell and pin that synthesis uses to drive a constant 1.
+    wrong:
+      - Names the cell and pin used to pull unused inputs to a constant 1.
+      - Names the cell and pin that the power grid connects to as VDD.
+      - Names the cell used for both constant 1 and constant 0 nets.
+    explain: >-
+      A gate input must never be tied straight to the supply rail, since that
+      exposes the thin oxide. A tie cell provides a safe constant instead.
+      `TIELO_CELL_AND_PORT` is the same for logic 0.
+    source: TIEHI_CELL_AND_PORT
+
+  - id: orfs-synth-netlist-files
+    section: synth
+    command: export SYNTH_NETLIST_FILES = ./results/nangate45/gcd/base/1_synth.v
+    hint: "Ask which stage of the flow stops being needed."
+    answer: Skips synthesis and starts the flow from the netlist given.
+    wrong:
+      - Adds pre-synthesized netlists to the design's own sources.
+      - Writes the synthesized netlist to the path that is given.
+      - Reuses a cached netlist only if the sources have not changed.
+    explain: >-
+      This is how a netlist from elsewhere, or from an earlier run, enters the
+      flow. It is also the way to iterate on placement and routing without
+      paying for synthesis each time.
+    source: SYNTH_NETLIST_FILES
+
+  - id: orfs-swap-arith
+    section: synth
+    command: export SWAP_ARITH_OPERATORS = 1
+    hint: "The same arithmetic can be built in several shapes, with different speeds."
+    answer: Lets the flow rebuild adders and multipliers in a faster architecture.
+    wrong:
+      - Swaps the operands of arithmetic operators to shorten the paths.
+      - Replaces arithmetic operators with the platform's own macro blocks.
+      - Moves arithmetic out of the critical path by re-timing around it.
+    explain: >-
+      An adder can be a ripple-carry, a Kogge-Stone, a Brent-Kung, and more,
+      all with the same function but different delay and area. The flow can
+      swap the module for another architecture when timing needs it.
+    source: SWAP_ARITH_OPERATORS
+
+  # ---------------------------------------------------------------- Floorplan
+
+  - id: orfs-core-utilization
+    section: floorplan
+    command: export CORE_UTILIZATION = 40
+    hint: "It is a percentage, and it decides a size rather than reporting one."
+    answer: Sizes the core so the cells fill 40% of it, leaving the rest free.
+    wrong:
+      - Stops the flow if utilization rises above 40% after placement.
+      - Places cells until 40% of the core area has been filled.
+      - Sets the maximum density any placement bin may reach.
+    explain: >-
+      The die size follows from the cell area and this number, together with
+      `CORE_ASPECT_RATIO` and `CORE_MARGIN`. Low utilization eases routing and
+      wastes area; high utilization does the opposite. Giving `DIE_AREA` and
+      `CORE_AREA` instead sets the size directly.
+    source: CORE_UTILIZATION
+
+  - id: orfs-core-aspect-ratio
+    section: floorplan
+    command: export CORE_ASPECT_RATIO = 2.0
+    hint: "Read the ratio in the documented order: height over width."
+    answer: Makes the core twice as tall as it is wide.
+    wrong:
+      - Makes the core twice as wide as it is tall.
+      - Makes the die twice the area of the core.
+      - Allows the core's shape to vary by a factor of two.
+    explain: >-
+      It only applies when the size comes from `CORE_UTILIZATION`. A shape
+      other than square is used to fit a block into a fixed slot at the top
+      level, or to suit a design's pin sides.
+    source: CORE_ASPECT_RATIO
+
+  - id: orfs-core-margin
+    section: floorplan
+    command: export CORE_MARGIN = 2
+    hint: "It is the space between two boundaries, and something has to live there."
+    answer: Leaves 2 microns between the core area and the die edge.
+    wrong:
+      - Leaves 2 microns of empty sites at each end of every row.
+      - Leaves 2 microns between the macros and the core boundary.
+      - Shrinks the die by 2 microns on each side after placement.
+    explain: >-
+      The margin is where the power ring and the boundary pins go, so a core
+      pressed against the die edge leaves nowhere to bring power in. One value
+      sets all four sides; four values set them separately.
+    source: CORE_MARGIN
+
+  - id: orfs-die-area
+    section: floorplan
+    command: |-
+      export DIE_AREA  = 0 0 100.13 100.8
+      export CORE_AREA = 10.07 11.2 90.25 91
+    hint: "Four numbers each: two corners. Ask which rectangle sits inside the other."
+    answer: Sets the die and the core rectangles directly, in microns.
+    wrong:
+      - Sets the die rectangle and the area reserved for macros inside it.
+      - Sets the core rectangle and the margin around it, in microns.
+      - Sets the placement area and the routing area of the design.
+    explain: >-
+      Each is a lower-left and an upper-right corner. Giving both replaces the
+      utilization-based sizing, which is how a block gets the exact size a
+      top-level floorplan has reserved for it.
+    source: DIE_AREA
+
+  - id: orfs-place-site
+    section: floorplan
+    command: export PLACE_SITE = FreePDK45_38x28_10R_NP_162NW_34O
+    hint: "It comes from the technology file, and it decides the shape of a row."
+    answer: Names the site whose height and width the placement rows are built from.
+    wrong:
+      - Names the region of the die where cells may be placed.
+      - Names the standard cell library that the rows are filled with.
+      - Names the grid that cells are snapped to during legalization.
+    explain: >-
+      A site is the smallest legal cell footprint in the technology. Rows are
+      one site high, and every cell's width is a whole number of sites, which
+      is what makes legalization possible.
+    source: PLACE_SITE
+
+  - id: orfs-macro-place-halo
+    section: floorplan
+    command: export MACRO_PLACE_HALO = 10 10
+    hint: "Two numbers, and the space they describe stays empty."
+    answer: Keeps a 10 micron band clear around each macro, in x and y.
+    wrong:
+      - Grows each macro by 10 microns in x and y when placing it.
+      - Keeps macros at least 10 microns from the core boundary.
+      - Leaves 10 microns between one macro and the next, but not cells.
+    explain: >-
+      Cells packed against a macro leave no room to reach the macro's pins or
+      to add buffers later. The halo reserves that room. It is used by
+      automatic macro placement.
+    source: MACRO_PLACE_HALO
+
+  - id: orfs-macro-placement-tcl
+    section: floorplan
+    command: export MACRO_PLACEMENT_TCL = ./designs/nangate45/bp/macro.tcl
+    hint: "You can use it for some macros and leave the others alone."
+    answer: Places named macros by hand, leaving the rest to the automatic placer.
+    wrong:
+      - Replaces automatic macro placement for every macro in the design.
+      - Records the macro placement that the automatic placer produced.
+      - Constrains the regions in which the automatic placer may work.
+    explain: >-
+      The file holds `place_macro` commands. Any macro it does not place is
+      left to `rtl_macro_placer`, which is how a floorplan fixes the macros
+      that matter and lets the tool handle the rest.
+    source: MACRO_PLACEMENT_TCL
+
+  - id: orfs-io-constraints
+    section: floorplan
+    command: export IO_CONSTRAINTS = ./designs/nangate45/gcd/io.tcl
+    hint: "Ask which stage reads it, and what it would otherwise decide for itself."
+    answer: Restricts where the boundary pins may be placed, by edge or by name.
+    wrong:
+      - Sets the input and output delays that constrain the boundary.
+      - Sets which metal layers the boundary pins are created on.
+      - Places every boundary pin at the coordinates it lists.
+    explain: >-
+      The file holds `set_io_pin_constraint` and related commands, read before
+      `place_pins`. Without it the pin placer is free to put any pin anywhere
+      on the boundary. The layers are set separately by `IO_PLACER_H` and
+      `IO_PLACER_V`.
+    source: IO_CONSTRAINTS
+
+  - id: orfs-pdn-tcl
+    section: floorplan
+    command: export PDN_TCL = $(PLATFORM_DIR)/grid_strategy-M1-M4-M7.tcl
+    hint: "The file name names three layers. Ask what is built across them."
+    answer: Gives the script that describes the power grid to build.
+    wrong:
+      - Gives the script that analyses the power grid once it is built.
+      - Gives the list of layers the power grid is allowed to use.
+      - Gives the power and ground net names for the design.
+    explain: >-
+      The script holds the grid definition commands: the rails, the straps per
+      layer, and the layer pairs to connect, which `pdngen` then builds. It
+      usually comes from the platform, since the grid depends on the metal
+      stack.
+    source: PDN_TCL
+
+  - id: orfs-tapcell-tcl
+    section: floorplan
+    command: export TAPCELL_TCL = $(PLATFORM_DIR)/tapcell.tcl
+    hint: "Two kinds of cell, both about the rows rather than the logic."
+    answer: Gives the script that inserts the well taps and the endcap cells.
+    wrong:
+      - Gives the script that inserts the filler cells between cells.
+      - Gives the name of the tap cell and the spacing to use.
+      - Gives the script that cuts the rows around the macros.
+    explain: >-
+      The script calls `tapcell` with the platform's masters and spacing. The
+      spacing comes from the foundry's rule on how far a transistor may be
+      from a well tap, so the script belongs to the platform.
+    source: TAPCELL_TCL
+
+  - id: orfs-floorplan-def
+    section: floorplan
+    command: export FLOORPLAN_DEF = ./designs/nangate45/bp/floorplan.def
+    hint: "Ask what it replaces, rather than what it adds."
+    answer: Starts from a ready-made floorplan instead of creating one.
+    wrong:
+      - Writes the floorplan the flow creates to the given file.
+      - Adds a floorplan for the blocks that have no floorplan yet.
+      - Checks the created floorplan against the one in the file.
+    explain: >-
+      The file brings the die and core areas, the rows, and often the pin and
+      macro placement. It is mutually exclusive with sizing by utilization or
+      by explicit areas, and it is how an externally agreed floorplan enters
+      the flow.
+    source: FLOORPLAN_DEF
+
+  # ---------------------------------------------------------------- Placement
+
+  - id: orfs-place-density
+    section: place
+    command: export PLACE_DENSITY = 0.60
+    hint: "It is a target for the placer, not a property of the floorplan."
+    answer: Asks global placement to spread cells to 60% density per bin.
+    wrong:
+      - Sets the core size so that cells fill 60% of the core area.
+      - Stops placement once 60% of the cells have been placed.
+      - Requires every row in the design to be 60% occupied.
+    explain: >-
+      Utilization sizes the die; this decides how tightly the placer packs
+      cells within it. A lower value spreads cells out, which eases routing
+      and lengthens wires; a higher value does the opposite and runs faster.
+    source: PLACE_DENSITY
+
+  - id: orfs-place-density-addon
+    section: place
+    command: export PLACE_DENSITY_LB_ADDON = 0.20
+    hint: "The flow computes a lower bound for density on its own. Ask what this does to it."
+    answer: Raises the flow's computed lower bound on density by 0.20.
+    wrong:
+      - Lowers the placement density target by 0.20 from its value.
+      - Adds 0.20 to the density target set by PLACE_DENSITY.
+      - Allows density to vary by 0.20 around its target value.
+    explain: >-
+      The flow derives a minimum sensible density from the design, and this
+      adds headroom above it, which spreads cells further. It is the usual
+      knob for a design that places easily but routes badly.
+    source: PLACE_DENSITY_LB_ADDON
+
+  - id: orfs-cell-pad-global
+    section: place
+    command: export CELL_PAD_IN_SITES_GLOBAL_PLACEMENT = 4
+    hint: "The unit is sites, and the padding is not real silicon."
+    answer: Reserves four sites of empty space beside each cell.
+    wrong:
+      - Makes every cell four sites wider in the final layout.
+      - Reserves four sites at each end of every placement row.
+      - Requires four empty sites between any two macros.
+    explain: >-
+      The padding applies during global placement. It is a placement fiction
+      that leaves room for routing to reach
+      pins and for repair to add cells. It is set separately for global and
+      detailed placement, usually larger for global.
+    source: CELL_PAD_IN_SITES_GLOBAL_PLACEMENT
+
+  - id: orfs-io-placer-layers
+    section: place
+    command: |-
+      export IO_PLACER_H = metal3
+      export IO_PLACER_V = metal2
+    hint: "Horizontal and vertical describe the tracks, not which edge the pin sits on."
+    answer: Puts pins on horizontal tracks on metal3 and on vertical tracks on metal2.
+    wrong:
+      - Puts the pins of the top and bottom edges on metal3, the sides on metal2.
+      - Routes horizontal wires on metal3 and vertical wires on metal2.
+      - Allows pins on metal3 and metal2 and lets the tool choose freely.
+    explain: >-
+      The two variables become the `-hor_layers` and `-ver_layers` arguments of
+      `place_pins`. The layer has to match the track direction, since the pin
+      shape sits on a track.
+    source: IO_PLACER_H
+
+  - id: orfs-gpl-timing-driven
+    section: place
+    command: export GPL_TIMING_DRIVEN = 0
+    hint: "Check the default before deciding what setting it to 0 means."
+    answer: Turns off timing-driven placement, which is on by default.
+    wrong:
+      - Turns on timing-driven placement, which is off by default.
+      - Runs timing-driven placement without repairing timing afterwards.
+      - Lets the placer ignore timing until the first placement is done.
+    explain: >-
+      Timing-driven placement weights critical nets so they are shortened,
+      at the cost of runtime. It is on by default and turned off for quick
+      exploration runs or when the timing estimate is not yet meaningful.
+    source: GPL_TIMING_DRIVEN
+
+  - id: orfs-cluster-flops
+    section: place
+    command: export CLUSTER_FLOPS = 1
+    hint: "It only works if the library has the cells for it."
+    answer: Groups flip-flops into multi-bit cells where the library has them.
+    wrong:
+      - Places the flip-flops together in clusters across the core.
+      - Groups flip-flops by clock so each clock tree is built apart.
+      - Clusters the flip-flops for the clock tree without moving them.
+    explain: >-
+      One multi-bit register serves several bits from a single clock pin, so
+      the clock tree drives fewer sinks and spends less power. The flow
+      ignores the setting on a platform whose library has no such cells.
+    source: CLUSTER_FLOPS
+
+  - id: orfs-dont-use-cells
+    section: place
+    command: export DONT_USE_CELLS = TAPCELL_X1 FILLCELL_X1 AOI211_X1 OAI211_X1
+    hint: "Ask why a cell that exists would be excluded from use."
+    answer: Keeps optimization from choosing those cells anywhere in the flow.
+    wrong:
+      - Removes those cells from the design wherever they appear.
+      - Excludes those cells from the library files that are read.
+      - Keeps those cells out of the final layout that is written.
+    explain: >-
+      Cells are excluded when they are hard to route into, when they belong to
+      another purpose (a tap or a filler), or when they behave badly. The list
+      becomes `set_dont_use` inside the flow.
+    source: DONT_USE_CELLS
+
+  - id: orfs-enable-dpo
+    section: place
+    command: export ENABLE_DPO = 0
+    hint: "Another one where the default matters. It names an optimization after legalization."
+    answer: Turns off the detailed placement optimization pass, which is on by default.
+    wrong:
+      - Turns on detailed placement optimization, which is off by default.
+      - Turns off detailed placement itself, leaving cells unlegalized.
+      - Turns off the timing-driven part of detailed placement only.
+    explain: >-
+      The pass is `improve_placement`: local swaps and shifts that shorten
+      wires while keeping the placement legal. It is turned off when it costs
+      more runtime than it is worth, or to keep a placement stable.
+    source: ENABLE_DPO
+
+  # ---------------------------------------------------------------- Clock tree synthesis
+
+  - id: orfs-cts-cluster-size
+    section: cts
+    command: export CTS_CLUSTER_SIZE = 30
+    hint: "A cluster is a group of sinks that will share one buffer."
+    answer: Allows at most 30 clock sinks in one cluster under a buffer.
+    wrong:
+      - Builds exactly 30 clusters of clock sinks in the design.
+      - Allows at most 30 buffers in one level of the clock tree.
+      - Allows a cluster to span at most 30 microns across.
+    explain: >-
+      Sinks are grouped before the tree is built, and each group gets its own
+      buffer, which becomes a leaf of the tree above. A larger cluster means
+      fewer buffers and more load on each.
+      `CTS_CLUSTER_DIAMETER` limits the same group by distance instead.
+    source: CTS_CLUSTER_SIZE
+
+  - id: orfs-cts-cluster-diameter
+    section: cts
+    command: export CTS_CLUSTER_DIAMETER = 100
+    hint: "The unit is microns, so this limit is geometric."
+    answer: Keeps a clock sink cluster within 100 microns across.
+    wrong:
+      - Keeps at most 100 clock sinks in any one cluster.
+      - Keeps clock buffers at least 100 microns apart.
+      - Keeps the clock tree's total span under 100 microns.
+    explain: >-
+      A cluster that is small in count can still be spread across the block,
+      and then its buffer drives a long wire to each sink. The diameter limit
+      keeps a cluster compact; the two limits are used together.
+    source: CTS_CLUSTER_DIAMETER
+
+  - id: orfs-cts-buf-distance
+    section: cts
+    command: export CTS_BUF_DISTANCE = 60
+    hint: "It concerns the wire between buffers, not the sinks."
+    answer: Puts a buffer roughly every 60 microns along the clock tree's wires.
+    wrong:
+      - Keeps clock buffers at least 60 microns away from each other.
+      - Keeps clock buffers within 60 microns of the sinks they drive.
+      - Sets the clock tree's maximum wire length to 60 microns.
+    explain: >-
+      Wire delay grows with the square of length, so a long clock wire is
+      split by buffers. Setting the distance makes the tree regular; leaving
+      it unset lets the tool choose from its characterization.
+    source: CTS_BUF_DISTANCE
+
+  - id: orfs-cts-lib-name
+    section: cts
+    command: export CTS_LIB_NAME = NangateOpenCellLibrary
+    hint: "Ask where the clock buffers are chosen from when several libraries are loaded."
+    answer: Names the library that the clock buffers are chosen from.
+    wrong:
+      - Names the library that the whole design is synthesized against.
+      - Names the list of clock buffer cells that may be used.
+      - Names the library whose timing is used for the clock tree.
+    explain: >-
+      A run may load several libraries, including macro libraries and
+      different threshold-voltage flavours. Naming one keeps clock buffer
+      selection inside it.
+    source: CTS_LIB_NAME
+
+  - id: orfs-skip-cts-repair
+    section: cts
+    command: export SKIP_CTS_REPAIR_TIMING = 1
+    hint: "Ask what is being traded away, and when that would be acceptable."
+    answer: Skips the timing repair that normally follows clock tree synthesis.
+    wrong:
+      - Skips clock tree synthesis itself, leaving the clock ideal.
+      - Skips the repair of the clock nets before the tree is built.
+      - Skips the hold repair only, keeping the setup repair in place.
+    explain: >-
+      Repair after the clock tree is often the longest step of a run, because
+      real skew appears there for the first time. Skipping it suits early
+      exploration or a fast test run, and it leaves timing unfixed.
+    source: SKIP_CTS_REPAIR_TIMING
+
+  # ---------------------------------------------------------------- Routing
+
+  - id: orfs-routing-layers
+    section: routing
+    command: |-
+      export MIN_ROUTING_LAYER = metal2
+      export MAX_ROUTING_LAYER = metal10
+    hint: "Ask why the lowest layer is not metal1."
+    answer: Confines routing to metal2 through metal10, leaving metal1 alone.
+    wrong:
+      - Routes on metal2 and metal10 only, using nothing in between.
+      - Prefers metal2 to metal10 but allows other layers when needed.
+      - Reserves metal2 to metal10 for signals and the rest for power.
+    explain: >-
+      metal1 is left out because the standard cells' own pins and supply rails
+      already occupy it. The upper bound keeps routing off layers the power
+      grid or the package needs. Both become `set_routing_layers` inside the
+      flow.
+    source: MIN_ROUTING_LAYER
+
+  - id: orfs-min-clk-routing-layer
+    section: routing
+    command: export MIN_CLK_ROUTING_LAYER = metal4
+    hint: "It is usually higher than the signal minimum. Ask what is gained higher up."
+    answer: Keeps clock routing off the lowest layers, starting it at metal4.
+    wrong:
+      - Reserves metal4 and above for clock routing, excluding signals.
+      - Puts the clock on metal4 alone, whatever the router prefers.
+      - Sets the lowest layer that the clock tree's buffers may use.
+    explain: >-
+      Upper layers are thicker and so less resistive, which keeps clock delay
+      and skew down. The variable is the lower bound of
+      `set_routing_layers -clock`, and it is typically higher than the signal
+      minimum.
+    source: MIN_CLK_ROUTING_LAYER
+
+  - id: orfs-routing-layer-adjustment
+    section: routing
+    command: export ROUTING_LAYER_ADJUSTMENT = 0.3
+    hint: "The number derates something the global router counts. Ask which way the trade runs."
+    answer: Tells the global router each layer has 30% less capacity.
+    wrong:
+      - Tells the global router to leave 30% of each layer unrouted.
+      - Reduces the width of the wires the router builds by 30%.
+      - Sets a congestion limit of 30% on each routing layer.
+    explain: >-
+      Thirty percent of each layer's tracks are treated as unavailable. Some
+      are already taken by pins, the power grid, and blockages.
+      A larger adjustment spreads routing out and eases detailed routing, at
+      the cost of detours and longer global routing; a smaller one risks
+      congestion the detailed router cannot solve. The default is 0.5.
+    source: ROUTING_LAYER_ADJUSTMENT
+
+  - id: orfs-fastroute-tcl
+    section: routing
+    command: export FASTROUTE_TCL = $(PLATFORM_DIR)/fastroute.tcl
+    hint: "It runs before the router, so ask what it can still change."
+    answer: Runs a script of routing settings before global routing starts.
+    wrong:
+      - Replaces the global router with the script's own routing commands.
+      - Runs a script after global routing to check its congestion.
+      - Sets the arguments passed to the global_route command itself.
+    explain: >-
+      The script holds the per-platform routing setup: the layer ranges, the
+      clock layers, and the layer adjustments. Platforms ship one because
+      those choices depend on the metal stack.
+    source: FASTROUTE_TCL
+
+  - id: orfs-enable-resistance-aware
+    section: routing
+    command: export ENABLE_RESISTANCE_AWARE = 1
+    hint: "It is passed straight through to the global router as a flag."
+    answer: Passes the resistance-aware flag to global routing.
+    wrong:
+      - Makes the router prefer the least resistive layer for every net.
+      - Turns on resistance extraction after global routing has finished.
+      - Makes timing analysis account for wire resistance after routing.
+    explain: >-
+      Resistance-aware routing weighs the resistance of the layer a net is
+      assigned to, instead of treating layers as interchangeable capacity. The
+      OpenROAD documentation marks the option as not ready for production.
+    source: ENABLE_RESISTANCE_AWARE
+
+  - id: orfs-disable-via-gen
+    section: routing
+    command: export DISABLE_VIA_GEN = 1
+    hint: "It is a flag for the detailed router, and vias come in two kinds."
+    answer: Stops the detailed router generating its own vias, using only the technology's.
+    wrong:
+      - Stops the detailed router from using vias, keeping wires on one layer.
+      - Stops the power grid generator from building its via stacks.
+      - Stops the router from adding redundant vias for reliability.
+    explain: >-
+      The router can either build via shapes from rules or use the fixed vias
+      the technology defines. Restricting it to the fixed set is used when a
+      technology's generated vias would not be manufacturable.
+    source: DISABLE_VIA_GEN
+
+  # ---------------------------------------------------------------- Timing and optimization
+
+  - id: orfs-tns-end-percent
+    section: timing
+    command: export TNS_END_PERCENT = 100
+    hint: "Ask what a lower number would buy, given that the worst path is always repaired."
+    answer: Repairs all violating endpoints, not only the worst ones.
+    wrong:
+      - Requires total negative slack to reach 100% of its target.
+      - Repairs timing until 100% of endpoints have positive slack.
+      - Spends 100% of the repair time budget on the worst endpoint.
+    explain: >-
+      The worst path is always repaired; this says how much of the failing
+      tail is repaired after it, as a percentage of violating endpoints.
+      The default is 100, and it is reduced (5 is common) to cut runtime,
+      which leaves total negative slack worse.
+    source: TNS_END_PERCENT
+
+  - id: orfs-setup-slack-margin
+    section: timing
+    command: export SETUP_SLACK_MARGIN = 0.05
+    hint: "Repair normally stops at zero slack. Ask what this changes about stopping."
+    answer: Keeps repairing setup until each path has 0.05 ns of slack in hand.
+    wrong:
+      - Ignores setup violations smaller than 0.05 ns when repairing.
+      - Relaxes every setup check in the design by 0.05 ns.
+      - Adds 0.05 ns of clock uncertainty to every setup check.
+    explain: >-
+      Repairing to a margin (overfixing) leaves headroom for what later
+      stages add, since routing and extraction usually make timing worse. A
+      negative value underfixes, stopping before slack reaches zero, which is
+      used to save runtime. `HOLD_SLACK_MARGIN` is the same for hold.
+    source: SETUP_SLACK_MARGIN
+
+  - id: orfs-hold-slack-margin
+    section: timing
+    command: export HOLD_SLACK_MARGIN = 0.1
+    hint: "Hold is fixed by adding delay. Ask what a margin costs here."
+    answer: Repairs hold until each path has 0.1 ns of hold slack in hand.
+    wrong:
+      - Ignores hold violations that are smaller than 0.1 ns.
+      - Relaxes every hold check in the design by 0.1 ns.
+      - Allows hold violations up to 0.1 ns to remain unrepaired.
+    explain: >-
+      Hold margin costs buffers and area, because delay has to be added to the
+      fast paths. It buys safety against the on-chip variation that a single
+      corner does not show. A negative value underfixes.
+    source: HOLD_SLACK_MARGIN
+
+  - id: orfs-cap-slew-margin
+    section: timing
+    command: |-
+      export CAP_MARGIN  = 20
+      export SLEW_MARGIN = 20
+    hint: "Both are design-rule limits, and the margins work the same way as the slack ones."
+    answer: Repairs capacitance and slew to limits 20% tighter than the real ones.
+    wrong:
+      - Allows capacitance and slew to exceed their limits by 20%.
+      - Repairs only the violations that are more than 20% over the limit.
+      - Adds 20 femtofarads and 20 picoseconds of margin to the limits.
+    explain: >-
+      Before routing, parasitics are estimated from placement and are
+      optimistic. Overfixing against tighter limits leaves room for the real
+      wires. The two become the margin arguments of `repair_design`.
+    source: CAP_MARGIN
+
+  - id: orfs-skip-gate-cloning
+    section: timing
+    command: export SKIP_GATE_CLONING = 1
+    hint: "Cloning is one of the transforms timing repair can apply. Ask what it costs."
+    answer: Stops timing repair from duplicating a gate to split its load.
+    wrong:
+      - Stops timing repair from resizing gates to fix violations.
+      - Stops the flow from copying gates across hierarchy boundaries.
+      - Stops gate cloning only during the repair after clock tree synthesis.
+    explain: >-
+      Cloning a gate lets each copy drive part of the fanout, which helps a
+      heavily loaded driver, but it adds area and makes the netlist diverge
+      from the synthesized one. Flows disable it when netlist stability or
+      area matters more. Cloning is used by default.
+    source: SKIP_GATE_CLONING
+
+  - id: orfs-skip-last-gasp
+    section: timing
+    command: export SKIP_LAST_GASP = 1
+    hint: "The name says when it runs, not what it does."
+    answer: Skips the final timing-repair attempt made after the main passes.
+    wrong:
+      - Skips the timing repair that follows clock tree synthesis.
+      - Skips the last routing iteration when violations remain.
+      - Skips timing repair whenever the previous pass made no progress.
+    explain: >-
+      The last-gasp pass is a final push on whatever still fails after the
+      normal transforms have run. It costs runtime for a small gain, so runs
+      that care about turnaround skip it. It is used by default.
+    source: SKIP_LAST_GASP
+
+  - id: orfs-skip-incremental-repair
+    section: timing
+    command: export SKIP_INCREMENTAL_REPAIR = 1
+    hint: "Ask which stage's repair this is, given the parasitics that stage provides."
+    answer: Skips the repair that runs inside global routing.
+    wrong:
+      - Skips every repair after placement, keeping only the first one.
+      - Skips the incremental global routing of the repaired nets.
+      - Skips repair of the nets that global routing changed.
+    explain: >-
+      After global routing, parasitics are much closer to the truth, so the
+      flow repairs timing again with better numbers. Skipping it saves runtime
+      and leaves those violations for later stages, or unfixed.
+    source: SKIP_INCREMENTAL_REPAIR
+
+  - id: orfs-recover-power
+    section: timing
+    command: export RECOVER_POWER = 20
+    hint: "The percentage refers to paths that are not in trouble."
+    answer: Slows the 20% of paths with the most slack, to save power.
+    wrong:
+      - Recovers 20% of the design's total power consumption.
+      - Repairs the 20% of paths with the worst slack for power.
+      - Allows power to rise by 20% while repairing timing.
+    explain: >-
+      Slack on a path means it is running faster than it has to, which costs
+      leakage and area. Downsizing those cells trades the unneeded speed back
+      for power. The value becomes `repair_timing -recover_power`.
+    source: RECOVER_POWER
+
+  - id: orfs-match-cell-footprint
+    section: timing
+    command: export MATCH_CELL_FOOTPRINT = 1
+    hint: "The restriction is physical, not electrical."
+    answer: Allows sizing to swap only cells with the same layout boundary.
+    wrong:
+      - Allows sizing to swap only cells with the same drive strength.
+      - Requires every swapped cell to keep the same threshold voltage.
+      - Requires the swapped cell to fit in the same placement row.
+    explain: >-
+      Same-footprint swaps drop into place without disturbing placement or
+      routing, so they can be made late. It narrows the choice of cells,
+      which limits how much timing can improve.
+    source: MATCH_CELL_FOOTPRINT
+
+  - id: orfs-opt-post-grt-wns
+    section: timing
+    command: export OPT_POST_GRT_WNS = 0
+    hint: "Check the default. Ask what kind of repair is gentle enough to run after routing."
+    answer: Turns off the worst-slack repair that normally runs after global routing.
+    wrong:
+      - Turns on a repair pass after global routing, which is off by default.
+      - Turns off all timing repair once global routing has finished.
+      - Turns off the reporting of worst negative slack after routing.
+    explain: >-
+      The pass is deliberately gentle: it swaps threshold voltage and reroutes
+      wires rather than adding or moving cells, so it disturbs the placement
+      and routing as little as possible. It is on by default.
+    source: OPT_POST_GRT_WNS
+
+  # ---------------------------------------------------------------- Finishing and outputs
+
+  - id: orfs-fill-cells
+    section: final
+    command: export FILL_CELLS = FILLCELL_X1 FILLCELL_X2 FILLCELL_X4
+    hint: "Ask what happens if the variable is left empty."
+    answer: Names the cells used to fill the gaps between placed cells.
+    wrong:
+      - Names the cells used to add metal fill in empty areas.
+      - Names the cells the flow may not use when filling gaps.
+      - Names the cells inserted to balance the power rails' load.
+    explain: >-
+      A filler carries the supply rails and the well layers across a gap, so
+      the rows stay legal to manufacture. If the variable is unset or empty,
+      the flow skips filler insertion altogether. Metal fill is the separate
+      `USE_FILL`.
+    source: FILL_CELLS
+
+  - id: orfs-use-fill
+    section: final
+    command: export USE_FILL = 1
+    hint: "Compare it with FILL_CELLS: one fills rows, the other fills layers."
+    answer: Turns on metal fill, which evens out each layer's density.
+    wrong:
+      - Turns on filler cell insertion in the placement rows.
+      - Fills the empty core area with spare logic cells.
+      - Fills the gaps in the power grid with extra straps.
+    explain: >-
+      Dummy metal shapes are added where a layer is too empty.
+      Manufacturing needs each layer's metal density inside a band, or
+      polishing leaves an uneven surface. Metal fill adds unconnected shapes
+      where a layer is too empty, following the rules in `FILL_CONFIG`. It is
+      off by default because it is slow and enlarges the layout.
+    source: USE_FILL
+
+  - id: orfs-nets-voltages
+    section: final
+    command: |-
+      export PWR_NETS_VOLTAGES = VDD 1.1
+      export GND_NETS_VOLTAGES = VSS 0.0
+    hint: "Ask which analysis needs to know a voltage, rather than just a net name."
+    answer: Gives the supply voltages that the drop analysis solves against.
+    wrong:
+      - Gives the voltages the power grid generator builds the grid for.
+      - Gives the operating voltage used for timing at this corner.
+      - Gives the voltages written into the final layout's labels.
+    explain: >-
+      The analysis pushes current through the grid's resistance and reports how
+      far the local voltage falls below these values.
+      `IR_DROP_LAYER` says which layer the result is reported on.
+    source: PWR_NETS_VOLTAGES
+
+  - id: orfs-ir-drop-layer
+    section: final
+    command: export IR_DROP_LAYER = metal1
+    hint: "The drop is worst furthest from the source. Ask where that is in the stack."
+    answer: Chooses the layer whose voltage drop is reported.
+    wrong:
+      - Chooses the layer the drop analysis starts its solution from.
+      - Chooses the layer that carries the supply into the design.
+      - Chooses the layer whose resistance the analysis accounts for.
+    explain: >-
+      The analysis solves the whole grid, but the number that matters is what
+      the cells see, and they connect on the lowest layer. Reporting there
+      shows the worst case.
+    source: IR_DROP_LAYER
+
+  - id: orfs-gds-allow-empty
+    section: final
+    command: export GDS_ALLOW_EMPTY = sram.*
+    hint: "The value is a pattern, and the stage is the one that merges layouts."
+    answer: Allows macros matching that pattern to have no layout of their own.
+    wrong:
+      - Allows the final layout file to be written even if it is empty.
+      - Allows macros matching the pattern to be left out of the design.
+      - Allows the flow to write an empty placeholder layout per macro.
+    explain: >-
+      Merging normally fails if a macro has no layout, which catches a missing
+      file. The pattern makes that deliberate, for a macro whose layout comes
+      later or is supplied by the foundry.
+    source: GDS_ALLOW_EMPTY
+
+  - id: orfs-seal-gds
+    section: final
+    command: export SEAL_GDS = sky130_seal_ring.gds
+    hint: "A ring placed around the outside of the die, once the design is done."
+    answer: Adds a seal ring layout around the design in the final merge.
+    wrong:
+      - Adds a power ring around the core before placement starts.
+      - Seals the final layout so later stages cannot change it.
+      - Adds the pad ring's layout around the design's boundary.
+    explain: >-
+      A seal ring is a metal barrier around the die edge that protects the
+      circuit from the cracks and moisture that dicing can introduce. It is
+      foundry-supplied and merged in at the end.
+    source: SEAL_GDS
+
+  - id: orfs-cdl-file
+    section: final
+    command: export CDL_FILE = $(PLATFORM_DIR)/cdl/sc.cdl
+    hint: "Ask what the flow's own netlist output is missing for this check."
+    answer: Gives the cells' own subcircuits for the netlist that is written.
+    wrong:
+      - Gives the netlist that the layout is compared against.
+      - Gives the file that the flow writes the netlist out to.
+      - Gives the transistor models used to simulate the cells.
+    explain: >-
+      Without them the netlist would name cells it never defines.
+      The flow writes a netlist for layout-versus-schematic checking, and that
+      netlist has to include the standard cells' transistor-level contents.
+      This file supplies them, as the `-masters` argument of `write_cdl`.
+    source: CDL_FILE
+
+  - id: orfs-klayout-tech-file
+    section: final
+    command: export KLAYOUT_TECH_FILE = $(PLATFORM_DIR)/KLayout/tech.lyt
+    hint: "Two formats describe the same layers with different names and numbers."
+    answer: Maps the flow's layer names onto the layout format's numbers.
+    wrong:
+      - Gives the design rules that KLayout checks the layout against.
+      - Gives the display settings used when viewing the layout.
+      - Gives the technology that KLayout builds the layout from.
+    explain: >-
+      LEF (Library Exchange Format) and DEF (Design Exchange Format) name
+      layers; a layout file identifies them by number and
+      datatype. The mapping lets the flow write the final layout and lets
+      KLayout read it back with the right layers.
+    source: KLAYOUT_TECH_FILE
+
+  - id: orfs-rcx-rules
+    section: final
+    command: export RCX_RULES = $(PLATFORM_DIR)/rcx_patterns.rules
+    hint: "Extraction has to turn geometry into numbers from somewhere."
+    answer: Gives the model that extraction turns routed geometry into parasitics with.
+    wrong:
+      - Gives the per-layer resistance and capacitance used for estimates.
+      - Gives the rules that check the routing against the design rules.
+      - Gives the corner definitions that extraction runs for.
+    explain: >-
+      The rules file is built once per process from field-solver runs over
+      test patterns. Extraction measures each wire's geometry and neighbours
+      and looks the values up in it, which is what sign-off timing uses.
+    source: RCX_RULES
+
+  - id: orfs-corner
+    section: final
+    command: export CORNER = BC
+    hint: "It selects among libraries that the platform already ships."
+    answer: Picks which process, voltage, and temperature library set is used.
+    wrong:
+      - Picks which corner of the die the analysis reports on.
+      - Picks the corner cells placed at the die's four corners.
+      - Defines a new corner from the platform's library files.
+    explain: >-
+      A platform that ships several characterizations, such as best case,
+      typical, and worst case, selects one this way. It is available on the
+      ASAP7 and GF180 platforms; `CORNERS` is the separate variable for
+      analyzing several at once.
+    source: CORNER
+
+  # ---------------------------------------------------------------- Running the flow
+
+  - id: orfs-openroad-hierarchical
+    section: running
+    command: export OPENROAD_HIERARCHICAL = 1
+    hint: "Compare it with SYNTH_HIERARCHICAL, which concerns one stage only."
+    answer: Runs the physical stages hierarchically rather than on a flat design.
+    wrong:
+      - Runs synthesis hierarchically and the physical stages flat.
+      - Hardens each block separately and assembles them at the top.
+      - Keeps the hierarchy in the reports while the flow works flat.
+    explain: >-
+      The database keeps the module hierarchy through placement, routing, and
+      the rest, instead of a flat netlist. The documentation says it will
+      become the default and the option will then be retired. Hardening blocks
+      separately is `BLOCKS`.
+    source: OPENROAD_HIERARCHICAL
+
+  - id: orfs-skip-report-metrics
+    section: running
+    command: export SKIP_REPORT_METRICS = 1
+    hint: "Ask what is lost, and what is gained, on a long run."
+    answer: Stops the per-stage metric reporting, to make a build faster.
+    wrong:
+      - Stops the flow writing its report files for each stage.
+      - Stops the final metrics summary while keeping the per-stage ones.
+      - Stops the flow from failing when a metric misses its target.
+    explain: >-
+      After each stage the flow reports area, timing, and more into JSON
+      (JavaScript Object Notation) metrics files. That costs a timing run each time. Skipping it speeds up
+      exploration and gives up the record of how the run progressed.
+    source: SKIP_REPORT_METRICS
+
+  - id: orfs-lec-check
+    section: running
+    command: export LEC_CHECK = 1
+    hint: "Ask which two versions of the netlist there are to compare."
+    answer: Checks the netlist is logically unchanged by the tool's edits.
+    wrong:
+      - Checks the netlist against the design's Verilog sources.
+      - Checks the layout against the netlist for connectivity errors.
+      - Checks that the netlist has no cells excluded by dont_use.
+    explain: >-
+      The two versions compared are the netlist before and after the tool's
+      changes. Resizing, buffering, and clock tree synthesis rewrite it, and a
+      formal equivalence check proves the rewrite changed no function. The
+      documentation says a failure is an OpenROAD bug worth reporting.
+      `REMOVE_CELLS_FOR_LEC` drops cells the checker cannot handle.
+    source: LEC_CHECK
+
+  - id: orfs-gpl-random-seed
+    section: running
+    command: export GPL_RANDOM_SEED = 42
+    hint: "Ask what changes between two runs that are otherwise identical."
+    answer: Fixes the placer's random seed, so a run can be repeated or varied.
+    wrong:
+      - Makes global placement deterministic, which it otherwise is not.
+      - Sets how many random placement attempts the placer tries.
+      - Seeds the random moves that detailed placement makes.
+    explain: >-
+      Setting the seed to different values gives different placements of the
+      same design, which is how the effect of placement noise on a result is
+      measured. The documentation calls this a perturbation study.
+    source: GPL_RANDOM_SEED
+
+  - id: orfs-asap7-use-vt
+    section: running
+    command: export ASAP7_USE_VT = RVT LVT
+    hint: "The letters name transistor flavours, and each one trades the same two things."
+    answer: Allows the flow to use both the regular and low threshold-voltage cells.
+    wrong:
+      - Uses the low threshold-voltage cells on the critical paths only.
+      - Selects one library per corner, regular for slow and low for fast.
+      - Allows the tool to change a cell's threshold voltage during repair.
+    explain: >-
+      A lower threshold voltage makes a cell faster and leakier. Offering
+      several flavours lets optimization spend leakage only where speed is
+      needed. It applies to the ASAP7 platform, whose library ships regular,
+      low, and super-low flavours.
+    source: ASAP7_USE_VT
+
+  - id: orfs-corners
+    section: running
+    command: export CORNERS = slow fast
+    hint: "Ask how the flow then knows which library belongs to which name."
+    answer: Analyses timing at both named corners, not just one.
+    wrong:
+      - Analyses timing at whichever of the two corners is worse.
+      - Selects the two library sets and times them one run each.
+      - Names the corners the extraction rules file provides.
+    explain: >-
+      Libraries are loaded per corner: for each name the flow reads the
+      matching per-corner library variable,
+      such as `SLOW_LIB_FILES`. Several corners at once is how a design is
+      signed off, since setup is usually worst slow and hold worst fast.
+    source: CORNERS
+
+  - id: orfs-tech-lef
+    section: design
+    command: |-
+      export TECH_LEF = $(PLATFORM_DIR)/lef/NangateOpenCellLibrary.tech.lef
+      export SC_LEF   = $(PLATFORM_DIR)/lef/NangateOpenCellLibrary_macro.lef
+    hint: "Two files in the same format, describing two different things."
+    answer: Gives the technology layers in one file and the cell shapes in the other.
+    wrong:
+      - Gives the cell shapes in one file and their timing in the other.
+      - Gives the layers for routing in one and for the grid in the other.
+      - Gives the same data twice, one for placement and one for routing.
+    explain: >-
+      The technology file carries the metal layers, vias, sites, and spacing
+      rules; the cell file carries each standard cell's outline, pins, and
+      blockages. Both are LEF (Library Exchange Format), and both come from
+      the platform.
+    source: TECH_LEF
+
+  - id: orfs-clkgate-map
+    section: synth
+    command: export CLKGATE_MAP_FILE = $(PLATFORM_DIR)/cells_clkgate.v
+    hint: "The same mapping mechanism as the adder file, for a different kind of cell."
+    answer: Maps inferred clock gating onto the platform's clock-gating cells.
+    wrong:
+      - Tells synthesis to insert clock gating wherever it can.
+      - Maps the clock buffers onto the platform's own clock buffers.
+      - Lists the clock-gating cells that synthesis may not use.
+    explain: >-
+      A clock gate built from ordinary gates can glitch the clock. The
+      platform's integrated cell latches the enable so it cannot. The file
+      tells synthesis which cell to use; `LATCH_MAP_FILE` does the same for
+      latches.
+    source: CLKGATE_MAP_FILE
+
+  - id: orfs-latch-map
+    section: synth
+    command: export LATCH_MAP_FILE = $(PLATFORM_DIR)/cells_latch.v
+    hint: "Ask what synthesis does with an inferred latch when no such cell is named."
+    answer: Maps inferred latches onto the platform's own latch cells.
+    wrong:
+      - Stops synthesis from inferring latches from the design's code.
+      - Converts the inferred latches into flip-flops during synthesis.
+      - Reports the latches that the design's code accidentally infers.
+    explain: >-
+      A latch inferred from incomplete code has to become some real cell.
+      Without a mapping file, synthesis builds one from gates, which is larger
+      and less predictable than the library's own latch.
+    source: LATCH_MAP_FILE
+
+  - id: orfs-synth-hdl-frontend
+    section: synth
+    command: export SYNTH_HDL_FRONTEND = slang
+    hint: "It changes how the sources are read, before any logic is built."
+    answer: Reads the sources with the slang front end, not the default one.
+    wrong:
+      - Runs slang as a lint pass before synthesis reads the sources.
+      - Synthesizes with slang instead of the usual synthesis tool.
+      - Converts SystemVerilog to Verilog before synthesis reads it.
+    explain: >-
+      The sources are parsed by slang before any logic is built. The default
+      reader handles a subset of SystemVerilog. The slang front
+      end supports considerably more of the language, which is what designs
+      written in modern SystemVerilog need. Leaving the variable empty keeps
+      the default.
+    source: SYNTH_HDL_FRONTEND
+
+  - id: orfs-macro-wrappers
+    section: floorplan
+    command: export MACRO_WRAPPERS = ./designs/src/bp/wrappers.tcl
+    hint: "Ask why a macro would be replaced by another version of itself."
+    answer: Swaps each macro for a wrapped version of it before placement.
+    wrong:
+      - Wraps each macro in a placement blockage of its own size.
+      - Names the modules that should be treated as macros, not logic.
+      - Adds a power ring wrapper around each macro in the design.
+    explain: >-
+      A wrapper adds what the macro itself does not carry, such as pin
+      access structures or a keepout, so the flow can treat a bare macro
+      as a well-behaved block.
+    source: MACRO_WRAPPERS
+
+  - id: orfs-rtlmp-max-macro
+    section: floorplan
+    command: export RTLMP_MAX_MACRO = 12
+    hint: "The macro placer groups things first. Ask what the number limits."
+    answer: Allows at most 12 macros in one cluster of the macro placer.
+    wrong:
+      - Allows at most 12 macros in the whole design's floorplan.
+      - Places at most 12 macros and leaves the rest to be placed by hand.
+      - Allows the macro placer 12 attempts at placing the macros.
+    explain: >-
+      The placer clusters the netlist into a hierarchy of blocks and shapes
+      them before placing macros. The cluster limits, `RTLMP_MAX_MACRO`,
+      `RTLMP_MIN_MACRO`, and their instance counterparts, control how coarse
+      that hierarchy is. Unset, the tool derives values from the design.
+    source: RTLMP_MAX_MACRO
+
+  - id: orfs-cell-pad-detail
+    section: place
+    command: export CELL_PAD_IN_SITES_DETAIL_PLACEMENT = 2
+    hint: "Compare it with the global placement padding: same idea, later stage, usually smaller."
+    answer: Keeps two sites free beside each cell during legalization.
+    wrong:
+      - Keeps two sites free beside each cell in the final layout.
+      - Keeps two sites free at the ends of each placement row.
+      - Keeps cells two sites away from the macros and blockages.
+    explain: >-
+      Legalization is the stage that uses it. Global placement is padded more
+      to spread cells early, while legalization is
+      padded less because the space still has to exist in real rows. The
+      padding is removed before filler insertion, so it costs no area in the
+      end.
+    source: CELL_PAD_IN_SITES_DETAIL_PLACEMENT
+
+  - id: orfs-place-pins-args
+    section: place
+    command: export PLACE_PINS_ARGS = -min_distance 4 -min_distance_in_tracks
+    hint: "The name says where the text goes, not what it means."
+    answer: Passes those extra arguments straight to the pin placer.
+    wrong:
+      - Replaces the pin placement step with the arguments' own commands.
+      - Restricts the pins to the region that the arguments describe.
+      - Sets the layers and spacing that every design's pins must use.
+    explain: >-
+      A passthrough variable exists so a design can reach an option the flow
+      does not otherwise expose, here the minimum spacing between pins in
+      tracks. `GLOBAL_PLACEMENT_ARGS` and `CTS_ARGS` do the same for their own
+      stages.
+    source: PLACE_PINS_ARGS
+
+  - id: orfs-global-placement-args
+    section: place
+    command: export GLOBAL_PLACEMENT_ARGS = -routability_driven
+    hint: "Ask what this reaches that the flow's own density variables cannot."
+    answer: Adds arguments to the global placement call the flow already makes.
+    wrong:
+      - Replaces the flow's global placement command with this one.
+      - Sets the arguments used by both global and detailed placement.
+      - Overrides the density and padding variables set elsewhere.
+    explain: >-
+      The flow builds its own `global_placement` call from the density and
+      timing variables; this appends to it. It is how a design turns on an
+      option such as routability-driven placement without editing the flow.
+    source: GLOBAL_PLACEMENT_ARGS
+
+  - id: orfs-cts-args
+    section: cts
+    command: export CTS_ARGS = -sink_clustering_size 20
+    hint: "Compare it with the CTS (Clock Tree Synthesis) variables that have their own names."
+    answer: Overrides the arguments the flow passes to clock tree synthesis.
+    wrong:
+      - Adds arguments to those the cluster variables already produce.
+      - Sets the arguments for the timing repair that follows the tree.
+      - Passes arguments to the characterization step before the tree.
+    explain: >-
+      The named variables, such as `CTS_CLUSTER_SIZE`, build the usual clock tree synthesis call.
+      This variable replaces those arguments outright, which is the way to
+      reach an option that has no variable of its own.
+    source: CTS_ARGS

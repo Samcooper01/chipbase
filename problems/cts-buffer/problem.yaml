@@ -1,0 +1,27 @@
+id: cts-buffer
+title: "Build a clock tree: buffer size vs fanout"
+topic: Clock Tree Synthesis
+difficulty: medium
+points: 150
+engine: sim
+kind: files
+order: 1
+editable:
+  - path: cts.tcl
+    language: tcl
+checks:
+  - id: skew
+    label: "Global clock skew ≤ 65 ps"
+    metric: skew_ps
+    op: "<="
+    value: 65
+  - id: insertion
+    label: "Clock insertion delay ≤ 550 ps"
+    metric: insertion_delay_ps
+    op: "<="
+    value: 550
+  - id: power
+    label: "Clock tree power ≤ 0.30 mW"
+    metric: clock_power_mw
+    op: "<="
+    value: 0.30

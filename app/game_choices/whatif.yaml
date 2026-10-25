@@ -1,0 +1,1088 @@
+# What happens if: decision experiments.
+#
+# Each situation is a real design in a real state, with the alternatives
+# somebody might actually try. Every alternative was run in the openroad/orfs
+# container (OpenROAD 26Q3) and its outcome is what that run measured. The
+# best option is worked out from those numbers by the loader, so the content
+# cannot claim a winner the runs do not support. See whatif_scope.md.
+
+game: what-if
+title: Your move
+reference: https://openroad.readthedocs.io/en/latest/main/README.html
+basis:
+  tool: OpenROAD-flow-scripts
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts
+  tag: every option was run
+  note: >-
+    Each option in these situations is a run of the same design with one thing
+    changed, and the table you see afterwards is what those runs produced. The
+    answer is whichever run came out best on the measure the question names,
+    which is not always the change that sounds most sensible.
+
+sections:
+  - id: timing
+    title: Closing timing
+    blurb: The block misses its target. Which lever actually moves it?
+    kinds: [clock target, interface budget, room, repair effort, logic depth]
+  - id: routing
+    title: Routing pressure
+    blurb: The wires do not have room. What relieves it?
+    kinds: [layers, utilization, spreading, what it costs at scale]
+  - id: area
+    title: Area and density
+    blurb: Somebody wants the block smaller. Which knob actually does that?
+    kinds: [utilization, synthesis objective, what area means]
+  - id: power
+    title: The power grid
+    blurb: The supply sags. What brings it back?
+    kinds: [grid, frequency, spreading, current]
+  - id: floorplan
+    title: Floorplan
+    blurb: The shape of the block before a single cell is placed.
+    kinds: [macro keep-out, aspect ratio]
+  - id: placement
+    title: Placement
+    blurb: Where the cells go, and the passes that decide it on your behalf.
+    kinds: [timing-driven, routability-driven, density at scale]
+  - id: repair
+    title: Repair
+    blurb: The tools fix what they can. How much of that effort is worth paying for?
+    kinds: [effort, gate cloning, pin swapping]
+
+items:
+  - id: wi-tight-target
+    section: timing
+    situation: >-
+      The gcd block closes comfortably at 0.46 nanoseconds. The system wants
+      0.40, and left alone the run ends 0.02 short of it, having grown from
+      716 to 951 square micrometres while repair tried.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: asked for, value: 0.40 nanoseconds}
+      - {label: left alone, value: "reaches 0.42, at 951 square micrometres"}
+      - {label: interface, value: a fifth of the period budgeted at each port}
+    question: Which change gets closest to the target?
+    objective: {metric: period, direction: min}
+    metrics:
+      - {key: period, label: smallest period, unit: ns}
+      - {key: area, label: cell area, unit: um2}
+      - {key: wire, label: wire, unit: um}
+    options:
+      - id: asis
+        label: Nothing else, let repair fight it
+        detail: the tighter clock and no other change
+        outcome: {period: 0.42, area: 951, wire: 4554}
+      - id: area
+        label: Give it more room
+        detail: utilization target dropped from 55 to 40 percent
+        outcome: {period: 0.42, area: 887, wire: 4156}
+      - id: io
+        label: Give back half the interface budget
+        detail: external delay at each port cut from a fifth of the period to a tenth
+        outcome: {period: 0.40, area: 793, wire: 3682}
+      - id: spread
+        label: Spread the placement
+        detail: the placer's density allowance raised from 0.20 to 0.30
+        outcome: {period: 0.42, area: 849, wire: 3856}
+    explain: >-
+      Three of the four land on 0.42 and one reaches 0.40, and it is the one
+      that never touched the layout. The block was not short of room: it was
+      short of period, because a fifth of the cycle was promised away at each
+      port before the logic got any. Giving half of that back also costs the
+      least area of the four, since repair had less to fix. Room does help a
+      little, and spreading helps a little, but neither closes the gap.
+    caveat: >-
+      The measurement cannot see what this costs elsewhere. An interface
+      budget is a promise to whatever sits on the other side of the port, so
+      taking it back moves the problem rather than removing it. That is a
+      conversation with the system architect, not a knob.
+    source: t1_asis, t1_room, t1_io, t1_spread
+
+  - id: wi-save-area
+    section: area
+    situation: >-
+      A block review asks for the gcd block to be made smaller. It sits at 62
+      percent utilization and closes its timing. Three things get tried: the
+      utilization target loosened, the utilization target tightened, and
+      synthesis told to optimize for delay instead of area.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: today, value: 716 square micrometres of cells at 62 percent}
+      - {label: asked for, value: less silicon}
+      - {label: timing, value: "closes at 0.46, and could run at 0.44"}
+    question: Which of these leaves the least cell area?
+    objective: {metric: area, direction: min}
+    metrics:
+      - {key: area, label: cell area, unit: um2}
+      - {key: cells, label: instances, unit: count}
+      - {key: wire, label: wire, unit: um}
+      - {key: period, label: smallest period, unit: ns}
+    options:
+      - id: u30
+        label: Loosen it to 33 percent
+        detail: more room between the cells
+        outcome: {area: 723, cells: 521, wire: 4193, period: 0.44}
+      - id: u55
+        label: Leave it at the default
+        detail: the platform's 55 percent target, which lands at 62
+        outcome: {area: 716, cells: 521, wire: 3605, period: 0.44}
+      - id: u70
+        label: Pack it to 79 percent
+        detail: less room between the cells
+        outcome: {area: 709, cells: 521, wire: 3448, period: 0.44}
+      - id: abc0
+        label: Synthesise for speed instead of area
+        detail: the area objective switched off in the logic optimizer
+        outcome: {area: 870, cells: 382, wire: 4052, period: 0.57}
+    explain: >-
+      Fourteen square micrometres separate the loosest floorplan from the
+      tightest, which is two percent, and the ranking is the opposite of what
+      the knob sounds like it does: the loose run is the largest, because
+      longer wires made repair work harder. Utilization sets how much empty
+      space surrounds the cells, not how many cells there are, and all three
+      floorplans reach the same 0.44 nanosecond floor. The fourth option is
+      the only one that really moves the area, and it moves it the wrong way.
+      Optimizing for delay gives 870 square micrometres from 382 instances,
+      21 percent more silicon out of a quarter fewer cells, because the ones
+      it chose are much larger. It is also slower once placed and routed, at 0.57
+      against 0.44, and it stops closing. The lever that changes cell area is
+      synthesis, and on this block it was already set the right way round.
+    caveat: >-
+      Pushing to 79 percent buys almost nothing here and costs room for later
+      fixes. On a block that needs an engineering change after tapeout, that
+      spare space is the difference between a metal fix and a new mask set.
+      The synthesis result is one design on one library: the delay objective
+      exists because it wins elsewhere.
+    source: n45_u30, n45_base, n45_u70, n45_abc0
+
+  - id: wi-three-layers
+    section: routing
+    situation: >-
+      The block has been given only metal1 to metal3 to route on, out of the
+      ten the process offers. It still routes, with no violations, but global
+      routing had to run extra iterations to clear congestion and the placer
+      could not reach its routability target.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: routing, value: metal1 to metal3 only}
+      - {label: today, value: "2 congestion reports, 58 percent of the routing resource used"}
+      - {label: utilization, value: 62 percent}
+    question: Which change clears the congestion at the least cost?
+    objective:
+      metric: congestion
+      direction: min
+      tiebreak: {metric: wire, direction: min}
+    metrics:
+      - {key: congestion, label: congestion reports, unit: count}
+      - {key: usage, label: routing resource used, unit: percent}
+      - {key: wire, label: wire, unit: um}
+      - {key: area, label: cell area, unit: um2}
+    options:
+      - id: asis
+        label: Leave it, it routed
+        detail: three layers, nothing changed
+        outcome: {congestion: 2, usage: 58.25, wire: 3978, area: 721}
+      - id: util
+        label: Spread the design out
+        detail: utilization target dropped to 35 percent, still three layers
+        outcome: {congestion: 2, usage: 38.58, wire: 4131, area: 717}
+      - id: five
+        label: Ask for two more layers
+        detail: metal1 to metal5, utilization unchanged
+        outcome: {congestion: 0, usage: 29.97, wire: 3621, area: 716}
+    explain: >-
+      Spreading the design does relieve the pressure, cutting the routing
+      resource in use from 58 to 39 percent, and it still does not stop either
+      complaint: global routing runs its extra iterations anyway and the
+      placer still reports that it could not reach the target. It also pays
+      for what it does with 4 percent more wire, because everything is further
+      apart. Two more layers clear both reports while the wire gets shorter,
+      because the router can go up and over instead of around. When the
+      constraint is capacity, giving capacity back is the cheap answer, and
+      moving cells is what you do when you cannot.
+    caveat: >-
+      Layers are not usually yours to grant. A block held to a thin stack is
+      normally held there because the levels above are spoken for, by another
+      block's routing or by the chip's power grid, and then spreading out is
+      the only lever left. A congestion report counts the two messages the
+      flow prints when it has to work at it: extra global routing iterations,
+      and a placer that could not reach its routability target.
+    source: t2_m3, t2_m3_sp, t2_m5
+
+  - id: wi-thin-grid
+    section: power
+    situation: >-
+      Somebody narrowed the power straps to free up routing room: metal7 from
+      1.40 to 0.40 micrometres, which is the narrowest the rules allow, and
+      metal4 from 0.48 to 0.20, both keeping their pitch. The worst voltage
+      drop went from 0.38 percent of the supply to 0.60, and the review wants
+      it back under control.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: grid, value: straps at 0.40 and 0.20 micrometres}
+      - {label: today, value: "0.60 percent drop, drawing 2.62 milliwatts"}
+      - {label: clock, value: 0.46 nanoseconds}
+    question: Which change brings the drop down the most?
+    objective: {metric: drop, direction: min}
+    metrics:
+      - {key: drop, label: worst drop, unit: percent}
+      - {key: power, label: total power, unit: mW}
+      - {key: area, label: cell area, unit: um2}
+      - {key: wire, label: wire, unit: um}
+    options:
+      - id: asis
+        label: Leave it, it is well under one percent
+        detail: the thinned grid, nothing changed
+        outcome: {drop: 0.60, power: 2.62, area: 716, wire: 3608}
+      - id: grid
+        label: Put the grid back
+        detail: the platform's own straps, 1.40 and 0.48 micrometres
+        outcome: {drop: 0.38, power: 2.62, area: 716, wire: 3605}
+      - id: slow
+        label: Halve the clock frequency
+        detail: 0.92 nanoseconds instead of 0.46, on the thinned grid
+        outcome: {drop: 0.39, power: 1.29, area: 699, wire: 3634}
+      - id: util
+        label: Spread the design out
+        detail: utilization target dropped to 35 percent, on the thinned grid
+        outcome: {drop: 0.62, power: 2.62, area: 716, wire: 4033}
+    explain: >-
+      Restoring the grid is the direct fix and the best one, and it costs
+      nothing measurable in power, area or wire. Halving the frequency gets
+      almost the same drop by a different route: half the switching is half
+      the current, and it is a lot to give up for a tie. Spreading the design
+      out makes it slightly worse rather than better, because the current then
+      travels further through straps that are already too thin, and it pays 12
+      percent more wire for the privilege. When the metal is the problem, only
+      metal fixes it.
+    caveat: >-
+      Under one percent of the supply is comfortable on a block drawing
+      milliwatts, so the answer to the review might be that nothing needs
+      doing. A design pulling a hundred times the current is a different
+      conversation: the jpeg block on this platform draws 585 milliwatts and
+      reaches 6.9 percent of its supply on the grid the platform ships, before
+      anybody thins anything. The routing room the thinning frees is real
+      though, because these straps sit on metal4 and metal7, which is where
+      the long nets want to be.
+    source: t3_thin, n45_base, t3_slow, t3_sp
+
+  - id: wi-a7-gate-limited
+    section: timing
+    situation: >-
+      The gcd block on ASAP7 (Arizona State University 7 nanometre predictive
+      process design kit) misses its 310 picosecond clock by 42.82
+      picoseconds. Its critical path runs through fifteen cells between two
+      flip-flops. Every gate on it costs between 10 and 30 picoseconds and
+      every net between them costs under half a picosecond.
+    start:
+      - {label: design, value: "gcd on ASAP7, 306 instances on 46 square micrometres"}
+      - {label: asked for, value: 310 picoseconds}
+      - {label: today, value: "misses by 42.82, and cannot go below 331.69"}
+      - {label: the path, value: "fifteen cells, fourteen of them logic"}
+    question: Which change gets the worst slack closest to zero?
+    objective: {metric: slack, direction: max}
+    metrics:
+      - {key: slack, label: worst slack, unit: ps}
+      - {key: floor, label: smallest period, unit: ps}
+      - {key: wire, label: wire, unit: um}
+      - {key: area, label: cell area, unit: um2}
+    options:
+      - id: asis
+        label: Nothing, report it and move on
+        detail: the block as it stands
+        outcome: {slack: -42.82, floor: 331.69, wire: 778, area: 46}
+      - id: relax
+        label: Ask for 340 picoseconds instead of 310
+        detail: thirty picoseconds more than it has now
+        outcome: {slack: -12.80, floor: 338.66, wire: 757, area: 45}
+      - id: room
+        label: Give it room
+        detail: utilization target dropped from 65 to 45 percent
+        outcome: {slack: -43.50, floor: 334.13, wire: 858, area: 46}
+      - id: gasp
+        label: Run the optimization pass the config skips
+        detail: the last round of repair iterations, switched back on
+        outcome: {slack: -42.82, floor: 331.69, wire: 777, area: 46}
+    explain: >-
+      Only the clock moves the number, and even it does not close the block.
+      Thirty more picoseconds leaves it 12.80 short, because the interface
+      budget is a fifth of the period and grew with it: the path between the
+      two flip-flops now passes with 1.34 picoseconds to spare, and the worst
+      path becomes a flip-flop to an output port. Room makes it slightly
+      worse, since spreading the cells lengthens the wires, 858 micrometres
+      against 778. The extra optimization pass changes nothing at all, down to
+      the same 331.69 picosecond floor and one micrometre of wire. Fifteen
+      cells in a row is a synthesis result, and no floorplan knob removes a
+      gate.
+    caveat: >-
+      The list is missing the change that would work, because it is not a knob
+      on the flow. Fewer logic levels is the fix, which means retiming, a
+      different structure for the arithmetic, or a pipeline stage, and all
+      three are edits to the design rather than settings on the run.
+    source: a7_base, a7_relax, a7_room, a7_gasp
+
+  - id: wi-sky-room
+    section: timing
+    situation: >-
+      The gcd block on the Skywater 130 nanometre high density library was
+      given a floorplan sized for 38 percent utilization and finished at 92,
+      because repair kept adding to it. It is asked for 1.10 nanoseconds and
+      misses by 1.46. The obvious move is to give it room, so the target is
+      swept downwards.
+    start:
+      - {label: design, value: "gcd on Skywater 130, 222 instances"}
+      - {label: asked for, value: 1.10 nanoseconds}
+      - {label: today, value: "misses by 1.46, finished at 92 percent full"}
+      - {label: floorplan, value: sized for a 38 percent target}
+    question: Which target gives the best timing?
+    objective: {metric: slack, direction: max}
+    metrics:
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: floor, label: smallest period, unit: ns}
+      - {key: filled, label: finished at, unit: percent}
+      - {key: wire, label: wire, unit: um}
+    options:
+      - id: asis
+        label: Leave the target at 38 percent
+        detail: the floorplan as it stands
+        outcome: {slack: -1.46, floor: 2.56, filled: 92, wire: 10967}
+      - id: u25
+        label: Drop the target to 25 percent
+        detail: a third more room than it has
+        outcome: {slack: -1.33, floor: 2.43, filled: 60, wire: 9494}
+      - id: u18
+        label: Drop the target to 18 percent
+        detail: twice the room it has
+        outcome: {slack: -1.40, floor: 2.50, filled: 42, wire: 9218}
+    explain: >-
+      Room helps, and then it stops helping. Going from a 38 percent target to
+      25 takes the finished density from 92 percent to 60 and buys 0.13
+      nanoseconds. Going twice as far gives back less, not more: 0.07
+      nanoseconds instead of 0.13, on a block now spread thin enough that the
+      wires cost more than the crowding did. The optimum is in the middle and
+      neither end finds it, which is the argument for sweeping a knob rather
+      than reasoning about which way it points. Worth noticing too what the
+      target actually means: it is applied to the area synthesis produced, and
+      repair then adds to that, which is how a request for 38 percent finishes
+      at 92.
+    caveat: >-
+      None of the three closes the block. It is asked for 1.10 nanoseconds and
+      the best floor on offer is 2.43, so the real conversation is about the
+      clock or about the design. The knob here is being turned the right way
+      on the wrong problem.
+    source: sky_base, sky_u25, sky_u18
+
+  - id: wi-repair-effort
+    section: repair
+    situation: >-
+      The same gcd block is asked for 0.40 nanoseconds instead of the 0.46 it
+      closes at. Repair chases the difference and grows the block from 716 to
+      951 square micrometres, and it still ends 0.02 short. The knob that
+      controls how many violating endpoints repair will work on is set to all
+      of them.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: asked for, value: 0.40 nanoseconds}
+      - {label: with full repair, value: "misses by 0.02, at 951 square micrometres"}
+      - {label: untouched, value: 716 square micrometres at the 0.46 clock}
+    question: How much repair effort is worth spending here?
+    objective:
+      metric: slack
+      direction: max
+      tiebreak: {metric: area, direction: min}
+    metrics:
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: tns, label: total negative slack, unit: ns}
+      - {key: area, label: cell area, unit: um2}
+      - {key: power, label: total power, unit: mW}
+    options:
+      - id: all
+        label: Repair every violating endpoint
+        detail: the default, all of them
+        outcome: {slack: -0.02, tns: -0.55, area: 951, power: 4.28}
+      - id: ten
+        label: Repair the worst tenth
+        detail: ten percent of the violating endpoints
+        outcome: {slack: -0.02, tns: -0.29, area: 869, power: 3.81}
+      - id: one
+        label: Repair the worst one percent
+        detail: in practice, the worst endpoint and little else
+        outcome: {slack: -0.03, tns: -0.40, area: 824, power: 3.52}
+    explain: >-
+      Full effort and a tenth of the effort reach exactly the same worst
+      slack, and the tenth gets there with 82 square micrometres less cell
+      area, 13 percent less wire and 11 percent less power. The total negative
+      slack is the part worth staring at: working on every violating endpoint
+      left a larger total than working on the worst tenth. These three runs do
+      not explain why, and the useful habit is not to assume they would. Going
+      down to one percent finally costs something real, 0.01 nanoseconds of
+      worst slack, which is where this particular curve stops being free.
+    caveat: >-
+      Three runs of one small block is not a rule about the knob. The reason
+      to reach for it on real work is usually runtime, because repairing every
+      endpoint on a large design can take longer than everything else in the
+      flow put together, and the question is always where that block's own
+      curve flattens.
+    source: t1_asis, t4_tns10, t4_tns1
+
+  - id: wi-ibex-layers
+    section: routing
+    situation: >-
+      The block above yours has taken metal5 and everything over it, for its
+      own routing and for the chip's power grid. Your core has to fit in
+      metal2 to metal4. The small block in this drill answered the same
+      question already: it cost 10 percent more wire and nothing else worth
+      reporting. This is ibex, 14871 instances on 29158 square micrometres.
+    start:
+      - {label: design, value: "ibex on Nangate45, 14871 instances"}
+      - {label: today, value: "ten layers, 29 percent of the routing resource used"}
+      - {label: asked of you, value: metal2 to metal4 only}
+      - {label: timing, value: closes with 0.02 nanoseconds to spare}
+    question: Which way out costs the least?
+    objective:
+      metric: congestion
+      direction: min
+      tiebreak: {metric: wire, direction: min}
+    metrics:
+      - {key: congestion, label: congestion reports, unit: count}
+      - {key: usage, label: routing resource used, unit: percent}
+      - {key: wire, label: wire, unit: um}
+      - {key: drop, label: worst drop, unit: percent}
+    options:
+      - id: keep
+        label: Take the four layers and route it
+        detail: nothing else changed
+        outcome: {congestion: 2, usage: 66.31, wire: 315195, drop: 1.38}
+      - id: spread
+        label: Take the four layers and spread the design out
+        detail: utilization target dropped from 50 to 35 percent
+        outcome: {congestion: 2, usage: 49.65, wire: 338091, drop: 0.85}
+      - id: ask
+        label: Go back and ask for the upper layers
+        detail: the ten layers the process offers
+        outcome: {congestion: 0, usage: 29.04, wire: 262811, drop: 0.83}
+    explain: >-
+      Everything here routes. Both restricted runs finished with zero
+      violations and still closed their timing, so whether it fits was never
+      the question. What it costs is. Losing the upper layers adds 20 percent
+      to the wire, 9 percent to the power, and takes the worst voltage drop
+      from 0.83 percent of the supply to 1.38, because more wire is more
+      capacitance and more capacitance is more current. Spreading the design
+      out does relieve the routing, from 66 percent of the resource down to
+      50, and brings the drop back to 0.85. It pays with more wire than either
+      other option, 29 percent above the ten-layer run, and it still does not
+      stop the flow reporting congestion. So the ranking is the same as on the
+      small block, and the difference at this size is that second best now
+      arrives with a bill.
+    caveat: >-
+      Asking for the layers back is the best answer to the measurement and
+      frequently not one you are allowed. It is not free for the chip either:
+      the levels you take are levels another block or the power grid does not
+      get, and that trade is settled above the level of any one block.
+    source: ibex_m4, ibex_m4_sp, ibex_base
+
+  - id: wi-macro-halo
+    section: floorplan
+    situation: >-
+      The two macros in this block are 2481 square micrometres of silicon and
+      11928 once their keep-out halos are counted, which is nearly five times
+      the area on a block whose whole design is 55855. A floorplan review asks
+      why so much ground is fenced off, and the halo is a setting, not a rule.
+    start:
+      - {label: design, value: "tinyRocket on Nangate45, 27315 instances, 2 macros"}
+      - {label: halo, value: "22.4 by 15.12 micrometres on every side"}
+      - {label: fenced off, value: "11928 square micrometres, against 2481 of macro"}
+      - {label: timing, value: "misses by 0.13, total negative slack -47.93"}
+    question: How much of the keep-out is worth keeping?
+    objective: {metric: slack, direction: max}
+    metrics:
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: tns, label: total negative slack, unit: ns}
+      - {key: wire, label: wire, unit: um}
+      - {key: fenced, label: macros with halos, unit: um2}
+    options:
+      - id: keep
+        label: Leave the halo alone
+        detail: the flow's own 22.4 by 15.12
+        outcome: {slack: -0.13, tns: -47.93, wire: 500952, fenced: 11928}
+      - id: half
+        label: Halve it
+        detail: 11.2 by 7.56
+        outcome: {slack: -0.12, tns: -37.27, wire: 482133, fenced: 6527}
+      - id: none
+        label: Cut it to almost nothing
+        detail: 2 micrometres on every side
+        outcome: {slack: -0.15, tns: -70.64, wire: 499551, fenced: 3167}
+    explain: >-
+      Halving the halo is worth having. It frees 5400 square micrometres of
+      floorplan, shortens the wire by 4 percent, and takes the total negative
+      slack from -47.93 to -37.27 nanoseconds, because cells that were pushed
+      away from the macros can now sit where their connections are. Cutting it
+      to nothing undoes all of that and more: the wire goes back up, the worst
+      slack becomes the worst of the three, and the total negative slack nearly
+      doubles against the halved run. With no room at the macro edge, every
+      pin on those macros has to be reached through a strip that is now full
+      of cells, and the ground bounce under them goes from 1.38 percent to
+      2.75. The knob has an optimum and it is not at either end, which is the
+      only reliable thing anyone can tell you about a halo.
+    caveat: >-
+      Three points on one floorplan with two macros. The number that matters
+      is not the halo itself but what has to fit in it: the macro's pins are
+      on its edge, and how much room they need depends on how many there are
+      and which layers they sit on. A memory with pins down one side and a
+      block with pins on all four are not the same problem.
+    source: n45_rocket, rk_half, rk_min
+
+  - id: wi-ibex-push
+    section: timing
+    situation: >-
+      The ibex core closes at 2.2 nanoseconds with 0.02 to spare, and the run
+      reports that it could go as low as 2.18. The system would like it
+      faster, and the only way to find out how much faster is to ask for it
+      and see what comes back.
+    start:
+      - {label: design, value: "ibex on Nangate45, 14871 instances"}
+      - {label: today, value: "closes at 2.2, reports a floor of 2.18"}
+      - {label: asked for, value: "as fast as it will go"}
+      - {label: cost so far, value: "29158 square micrometres, 31.0 milliwatts"}
+    question: Which target gets the block to its real floor?
+    objective: {metric: floor, direction: min}
+    metrics:
+      - {key: floor, label: smallest period, unit: ns}
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: area, label: cell area, unit: um2}
+      - {key: power, label: total power, unit: mW}
+    options:
+      - id: hold
+        label: Leave it at 2.2
+        detail: the target it already meets
+        outcome: {floor: 2.18, slack: 0.02, area: 29158, power: 31.0}
+      - id: two
+        label: Ask for 2.0
+        detail: nine percent faster than it runs today
+        outcome: {floor: 2.05, slack: -0.05, area: 30067, power: 35.4}
+      - id: eighteen
+        label: Ask for 1.8
+        detail: eighteen percent faster
+        outcome: {floor: 2.06, slack: -0.26, area: 31241, power: 40.7}
+    explain: >-
+      The first thing to take from this is that the floor moved. A run that
+      was asked for 2.2 reported 2.18 as the smallest period it could reach,
+      and the same design asked for 2.0 reached 2.05. That number is not a
+      property of the design. It is a measure of how hard the tools were
+      pushed, and reading it as a limit will cost you performance you could
+      have had. The second thing is where it stops. Asking for 1.8 gets 2.06,
+      no better than asking for 2.0, and charges 7 percent more cell area and
+      31 percent more power for the attempt, with a total negative slack of
+      -279 nanoseconds where the 2.0 run had -9.35. The block runs at about
+      2.05 and no request changes that.
+    caveat: >-
+      Neither faster run closes, so shipping either one means finishing the
+      job by other means. The useful product of a sweep like this is not a
+      winner, it is the shape of the curve: 2.05 is where the effort stops
+      buying anything, and that is the number to take to whoever is asking.
+    source: ibex_base, ibex_20, ibex_18
+
+  - id: wi-margin
+    section: timing
+    situation: >-
+      The gcd block closes with 0.02 nanoseconds of setup slack and 0.11 of
+      hold slack. The sign-off review wants more margin before it will accept
+      the block, and there is more than one way to buy it.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: setup slack, value: "0.02 nanoseconds"}
+      - {label: hold slack, value: "0.11 nanoseconds"}
+      - {label: today, value: "716 square micrometres, 2.62 milliwatts"}
+    question: Which way of adding margin costs the least?
+    objective: {metric: area, direction: min}
+    metrics:
+      - {key: area, label: cell area, unit: um2}
+      - {key: wire, label: wire, unit: um}
+      - {key: power, label: total power, unit: mW}
+      - {key: slack, label: worst setup slack, unit: ns}
+    options:
+      - id: hold
+        label: Ask repair for 0.10 of hold margin
+        detail: hold fixing works to a margin of a tenth of a nanosecond
+        outcome: {area: 716, wire: 3605, power: 2.62, slack: 0.02}
+      - id: setup
+        label: Ask repair for 0.05 of setup margin
+        detail: setup repair works to a margin of five hundredths
+        outcome: {area: 899, wire: 4301, power: 3.44, slack: 0.03}
+      - id: clock
+        label: Tighten the clock from 0.46 to 0.40
+        detail: sign off against a faster clock than the one it will run at
+        outcome: {area: 951, wire: 4554, power: 4.28, slack: -0.02}
+    explain: >-
+      The hold margin is free, and the reason is in the starting numbers: the
+      block already had 0.11 nanoseconds of hold slack, so asking for 0.10
+      gave repair nothing to fix. It reported no hold violations and changed
+      no cell. Setup is the other way round. With 0.02 of slack, asking for
+      0.05 sends repair to work on every path in between, and it costs 26
+      percent more cell area and 31 percent more power. Tightening the clock
+      is the same idea taken further, and on this block it costs more still
+      and fails to close. A margin costs nothing until it is larger than the
+      slack you already have, and then it costs a great deal.
+    caveat: >-
+      Free here means free on this block. A design with tight hold paths,
+      which usually means a clock tree with real skew, would pay for hold
+      margin in buffers, and those buffers sit on paths that also have to
+      meet setup.
+    source: m_hold10, m_setup05, t1_asis
+
+  - id: wi-placement-passes
+    section: placement
+    situation: >-
+      Global placement runs two extra passes on your behalf: a timing-driven
+      pass that weights critical nets, and a routability-driven pass that
+      spreads cells out of congested regions. Both take runtime, and somebody
+      wants the flow faster. Either or both can be switched off.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: today, value: "both passes on, 716 square micrometres"}
+      - {label: routing, value: "21 percent of the resource used"}
+      - {label: timing, value: "closes with 0.02 to spare"}
+    question: Which one can go at the least cost?
+    objective: {metric: area, direction: min}
+    metrics:
+      - {key: area, label: cell area, unit: um2}
+      - {key: wire, label: wire, unit: um}
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: usage, label: routing resource used, unit: percent}
+    options:
+      - id: timing
+        label: Switch off the timing-driven pass
+        detail: routability-driven stays on
+        outcome: {area: 735, wire: 3694, slack: 0.02, usage: 21.08}
+      - id: route
+        label: Switch off the routability-driven pass
+        detail: timing-driven stays on
+        outcome: {area: 716, wire: 3605, slack: 0.02, usage: 20.63}
+      - id: both
+        label: Switch off both
+        detail: plain wirelength-driven placement
+        outcome: {area: 735, wire: 3694, slack: 0.02, usage: 21.08}
+    explain: >-
+      The routability pass ran in the default flow and did nothing: switching
+      it off gives a result identical to the last micrometre, because a block
+      using a fifth of its routing resource has no congestion for it to
+      relieve. The timing-driven pass was doing work. Without it the block
+      came out 3 percent larger with 2 percent more wire, and timing still
+      closed, so on this block the pass was buying area rather than slack. Switching
+      off both is exactly the same as switching off the timing pass alone,
+      which says the same thing a second way.
+    caveat: >-
+      The routability pass exists for blocks that are congested, and on one
+      of those it is the difference between routing and not. The only safe
+      reading of this result is that a pass which only acts on congestion
+      costs nothing to leave on where there is none.
+    source: pl_notd, pl_nord, pl_neither
+
+  - id: wi-aspect-ratio
+    section: floorplan
+    situation: >-
+      The block has to fit a slot on the chip floorplan, and the chip
+      architect asks whether it could be tall and narrow or short and wide
+      instead of square, for the same utilization.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: today, value: "square, 62 percent utilization"}
+      - {label: wire, value: "3605 micrometres"}
+      - {label: utilization, value: "62 percent, whatever the shape"}
+    question: Which shape costs the least wire?
+    objective: {metric: wire, direction: min}
+    metrics:
+      - {key: wire, label: wire, unit: um}
+      - {key: area, label: cell area, unit: um2}
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: drop, label: worst drop, unit: percent}
+    options:
+      - id: square
+        label: Keep it square
+        detail: height equal to width
+        outcome: {wire: 3605, area: 716, slack: 0.02, drop: 0.38}
+      - id: tall
+        label: Make it twice as tall as it is wide
+        detail: aspect ratio 2
+        outcome: {wire: 3840, area: 722, slack: 0.01, drop: 0.32}
+      - id: wide
+        label: Make it twice as wide as it is tall
+        detail: aspect ratio 0.5
+        outcome: {wire: 3754, area: 712, slack: 0.01, drop: 0.52}
+    explain: >-
+      Square wins, by 4 percent over wide and 7 percent over tall. Among
+      rectangles of the same area a square has the shortest average distance
+      between two points in it, and stretching the block lengthens the nets
+      that run along its long side. The two stretched shapes do not cost the
+      same, and the voltage drop moves in opposite directions, 0.32 percent in
+      the tall block and 0.52 in the wide one, a reminder that a block is not
+      symmetric: its routing layers alternate direction and its supply straps
+      run one way. Timing barely notices either shape.
+    caveat: >-
+      The block's own wire is rarely what decides its shape. The slot the chip
+      has room for, where the neighbours' pins are, and how long the nets to
+      them become are the real terms, and a 4 percent penalty inside the
+      block can easily be the price of much shorter wires outside it.
+    source: n45_base, fp_ar2, fp_ar05
+
+  - id: wi-adder-map
+    section: area
+    situation: >-
+      The platform ships a set of hand-mapped adder cells, and this design's
+      configuration switches them off with a one-line comment: adders degrade
+      it. Somebody new to the block reads the comment as superstition and
+      proposes turning the mapping back on.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: today, value: "adder mapping off, 716 square micrometres"}
+      - {label: timing, value: "closes at 0.46, floor 0.44"}
+      - {label: the comment, value: "adders degrade this design"}
+    question: Which setting gives the best timing?
+    objective: {metric: slack, direction: max}
+    metrics:
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: floor, label: smallest period, unit: ns}
+      - {key: area, label: cell area, unit: um2}
+      - {key: power, label: total power, unit: mW}
+    options:
+      - id: keepoff
+        label: Leave the adder mapping off
+        detail: the configuration as it stands
+        outcome: {slack: 0.02, floor: 0.44, area: 716, power: 2.62}
+      - id: turnon
+        label: Turn the adder mapping on
+        detail: the platform's hand-mapped adders
+        outcome: {slack: -0.13, floor: 0.59, area: 932, power: 7.41}
+      - id: onspeed
+        label: Turn it on and synthesise for speed
+        detail: adder mapping on, area objective off
+        outcome: {slack: -0.21, floor: 0.67, area: 913, power: 4.49}
+    explain: >-
+      The comment was right. With the adders mapped the block is 30 percent
+      larger, its floor goes from 0.44 nanoseconds to 0.59, and it stops
+      closing. Synthesising for speed on top makes the timing worse again, at
+      0.67. The power is the number that should stop anyone: 7.41 milliwatts
+      against 2.62, nearly three times, for a block doing the same
+      arithmetic. These runs do not say why, only that a mapping meant to
+      help arithmetic-heavy designs does the opposite on this one. Leaving it
+      off is the only option that keeps what the block already had.
+    caveat: >-
+      This is the situation where the right move is to change nothing, and
+      it is the least popular answer in any review. A one-line comment in a
+      configuration file is often the only record that somebody ran this
+      experiment before you.
+    source: n45_base, sy_adder, sy_adder_spd
+
+  - id: wi-repair-transforms
+    section: repair
+    situation: >-
+      The gcd block is being pushed to 0.40 nanoseconds and repair ends 0.02
+      short after growing it to 951 square micrometres. Repair has several
+      transforms it can use: resizing cells, inserting buffers, cloning a
+      gate so its load is split, and swapping the pins of a gate so the late
+      signal takes the fast input. Two of them can be switched off.
+    start:
+      - {label: design, value: "gcd on Nangate45, 521 instances"}
+      - {label: asked for, value: "0.40 nanoseconds"}
+      - {label: today, value: "misses by 0.02, at 951 square micrometres"}
+      - {label: transforms, value: "all of them on"}
+    question: Which setting reaches the same timing most cheaply?
+    objective:
+      metric: slack
+      direction: max
+      tiebreak: {metric: area, direction: min}
+    metrics:
+      - {key: slack, label: worst slack, unit: ns}
+      - {key: tns, label: total negative slack, unit: ns}
+      - {key: area, label: cell area, unit: um2}
+      - {key: power, label: total power, unit: mW}
+    options:
+      - id: all
+        label: Leave every transform on
+        detail: the default
+        outcome: {slack: -0.02, tns: -0.55, area: 951, power: 4.28}
+      - id: noclone
+        label: Switch off gate cloning
+        detail: no gate is duplicated to split its load
+        outcome: {slack: -0.02, tns: -0.32, area: 887, power: 3.92}
+      - id: noswap
+        label: Switch off pin swapping
+        detail: no gate has its inputs exchanged
+        outcome: {slack: -0.02, tns: -0.58, area: 921, power: 4.05}
+    explain: >-
+      All three end at the same worst slack, so the question is what each
+      spent getting there. Without cloning the block is 64 square
+      micrometres smaller, 7 percent, and its total negative slack is better
+      rather than worse. Cloning was buying area and giving nothing back on
+      this block. Switching off pin swapping also saves area, 30 square
+      micrometres, but leaves the worst total negative slack of the three, so
+      it is a smaller saving that costs something. The transform to question
+      first is the one that adds cells.
+    caveat: >-
+      Cloning exists for nets with a large load on one driver, and a small
+      block rarely has them. On a design with wide high-fanout nets the same
+      switch could cost the timing, which is the same conclusion as the
+      repair-effort situation: the default is chosen for the average block,
+      and yours is not the average block.
+    source: t1_asis, rp_noclone, rp_noswap
+
+  - id: wi-a7-interface
+    section: timing
+    situation: >-
+      The ASAP7 block was relaxed from 310 to 340 picoseconds, and its
+      register-to-register path now passes with 1.34 picoseconds to spare. It
+      still misses by 12.80, because the worst path is now a flip-flop to an
+      output port, and the budget promised to that port is a fifth of the
+      period and grew when the clock did.
+    start:
+      - {label: design, value: "gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), 306 instances"}
+      - {label: clock, value: "340 picoseconds"}
+      - {label: today, value: "misses by 12.80, on a path to an output port"}
+      - {label: interface, value: "a fifth of the period at each port"}
+    question: Which interface budget gets the best worst slack?
+    objective: {metric: slack, direction: max}
+    metrics:
+      - {key: slack, label: worst slack, unit: ps}
+      - {key: floor, label: smallest period, unit: ps}
+      - {key: wire, label: wire, unit: um}
+      - {key: area, label: cell area, unit: um2}
+    options:
+      - id: fifth
+        label: Keep a fifth of the period at the ports
+        detail: 68 picoseconds promised each way
+        outcome: {slack: -12.80, floor: 338.66, wire: 757, area: 45}
+      - id: tenth
+        label: Give back half of it
+        detail: a tenth of the period, 34 picoseconds
+        outcome: {slack: 9.24, floor: 326.32, wire: 735, area: 43}
+      - id: twentieth
+        label: Give back three quarters of it
+        detail: a twentieth of the period, 17 picoseconds
+        outcome: {slack: 11.61, floor: 328.39, wire: 723, area: 43}
+    explain: >-
+      Giving back half of the budget closes the block with 9.24 picoseconds
+      in hand, a swing of 22 picoseconds from a change that touched no cell.
+      The port path is still the worst one at that point, just passing now,
+      with the path between the flip-flops 13.68 picoseconds clear behind it.
+      Giving back three quarters leaves the port path 22.58 clear, and the
+      internal path, at 11.61, becomes the limit again, so the extra budget
+      buys only 2.37 picoseconds. Which path binds changed with every step
+      here, and the only way to know which one you are fighting is to look at
+      the endpoint, not the number.
+    caveat: >-
+      Every picosecond taken from a port budget is a picosecond the block on
+      the other side of the port no longer has. Halving it closes this block
+      and may break its neighbour, and neither block's runs can see the
+      other. That is why budgets are agreed rather than taken.
+    source: a7_relax, a7_io10, a7_io05
+
+  - id: wi-ibex-grid
+    section: power
+    situation: >-
+      Somebody thinned ibex's power straps to free routing resource: metal7
+      from 1.40 to 0.40 micrometres at twice the pitch, metal4 from 0.48 to
+      0.20 at twice the pitch. The small block in this drill took the same
+      kind of change and its drop went from 0.38 percent to 0.60, which nobody
+      noticed. On ibex the drop went from 0.83 percent to 8.82.
+    start:
+      - {label: design, value: "ibex on Nangate45, 14871 instances"}
+      - {label: grid, value: "straps thinned on metal4 and metal7"}
+      - {label: today, value: "8.82 percent drop, drawing 31.0 milliwatts"}
+      - {label: routing, value: "29 percent of the resource used"}
+    question: Which change brings the drop down the most?
+    objective: {metric: drop, direction: min}
+    metrics:
+      - {key: drop, label: worst drop, unit: percent}
+      - {key: power, label: total power, unit: mW}
+      - {key: usage, label: routing resource used, unit: percent}
+      - {key: wire, label: wire, unit: um}
+    options:
+      - id: asis
+        label: Keep the thinned grid
+        detail: nothing changed
+        outcome: {drop: 8.82, power: 31.0, usage: 28.66, wire: 262681}
+      - id: grid
+        label: Put the grid back
+        detail: the platform's own straps
+        outcome: {drop: 0.83, power: 31.0, usage: 29.04, wire: 262811}
+      - id: slow
+        label: Halve the clock frequency
+        detail: 4.4 nanoseconds instead of 2.2, on the thinned grid
+        outcome: {drop: 4.37, power: 15.7, usage: 28.73, wire: 262977}
+      - id: spread
+        label: Spread the design out
+        detail: utilization target from 50 to 35 percent, on the thinned grid
+        outcome: {drop: 7.42, power: 32.0, usage: 22.38, wire: 292303}
+    explain: >-
+      Same four choices as on the small block, same winner, and a completely
+      different outcome, because here only one of them works. Putting the grid
+      back takes the drop from 8.82 percent to 0.83. Halving the frequency
+      halves the power and only halves the drop, leaving 4.37 percent, which
+      is still a broken supply bought at the price of half the performance.
+      Spreading the design leaves 7.42. And the thinning never bought what it
+      was for: the routing resource in use fell from 29.04 percent to 28.66
+      and the wire got 130 micrometres shorter out of 262811. The trade that
+      sounded like a trade was ten times the voltage drop for nothing.
+    caveat: >-
+      The small block's version of this situation is the one most people
+      remember, and its conclusion was that the drop was harmless. Carried to
+      a real core, the same change breaks the supply. A rule taken from a
+      small block is how this mistake gets made.
+    source: ibex_thin, ibex_base, ibex_thin_slow, ibex_thin_sp
+
+  - id: wi-sky-reachable
+    section: timing
+    situation: >-
+      The Skywater block is asked for 1.10 nanoseconds and cannot get below
+      2.56, so it will run at whatever it can actually reach. The question is
+      what to put in the constraints now that everyone knows the target is
+      out of reach.
+    start:
+      - {label: design, value: "gcd on Skywater 130, 222 instances"}
+      - {label: asked for, value: "1.10 nanoseconds"}
+      - {label: today, value: "misses by 1.46, at 5400 square micrometres"}
+      - {label: power, value: "9.38 milliwatts"}
+    question: Which target gets you the smallest block?
+    objective: {metric: area, direction: min}
+    metrics:
+      - {key: area, label: cell area, unit: um2}
+      - {key: power, label: total power, unit: mW}
+      - {key: floor, label: smallest period, unit: ns}
+      - {key: slack, label: worst slack, unit: ns}
+    options:
+      - id: keep
+        label: Keep asking for 1.10
+        detail: let repair keep trying
+        outcome: {area: 5400, power: 9.38, floor: 2.56, slack: -1.46}
+      - id: p26
+        label: Ask for 2.6
+        detail: just above the floor it reached
+        outcome: {area: 4723, power: 3.50, floor: 2.65, slack: -0.10}
+      - id: p30
+        label: Ask for 3.0
+        detail: a little margin above the floor
+        outcome: {area: 4014, power: 2.46, floor: 2.66, slack: 0.06}
+    explain: >-
+      An impossible target is not a harmless one. Asking for 1.10 grew the
+      block 35 percent larger than asking for 3.0, and made it draw nearly four
+      times the power, because repair kept upsizing and buffering paths it
+      could never fix. What the chase bought is a floor of 2.56 instead of
+      2.66, a tenth of a nanosecond, which is the same effect the ibex
+      situation shows: the reported floor moves with how hard the tools are
+      pushed. Asking for 3.0 is the only one of the three that closes, and it
+      is also the smallest and the coolest. A target should be something the
+      block can meet, with a little room, because every picosecond it cannot
+      meet is paid for in area.
+    caveat: >-
+      If the block genuinely has to run at 2.56, then asking for 3.0 throws
+      away performance the tools could have found, and the right request is
+      a little below the floor rather than far below it. The expensive
+      mistake is the one this block started with: a number that was never
+      reachable, left in the constraints.
+    source: sky_base, sky_p26, sky_p30
+
+  - id: wi-ibex-density
+    section: placement
+    situation: >-
+      On the small block in this drill, the utilization target barely
+      mattered: two percent of cell area between the loosest and tightest
+      runs. ibex is fifty times bigger, and the floorplan review asks how
+      tightly it should be packed.
+    start:
+      - {label: design, value: "ibex on Nangate45, 14871 instances"}
+      - {label: today, value: "a 50 percent target, finishing at 51"}
+      - {label: routing, value: "29 percent of the resource used"}
+      - {label: supply, value: "0.83 percent worst drop"}
+    question: Which density routes cleanly on the least wire?
+    objective:
+      metric: congestion
+      direction: min
+      tiebreak: {metric: wire, direction: min}
+    metrics:
+      - {key: congestion, label: congestion reports, unit: count}
+      - {key: wire, label: wire, unit: um}
+      - {key: usage, label: routing resource used, unit: percent}
+      - {key: drop, label: worst drop, unit: percent}
+    options:
+      - id: loose
+        label: Loosen it to a 35 percent target
+        detail: finishes at 36 percent
+        outcome: {congestion: 0, wire: 292262, usage: 22.65, drop: 0.98}
+      - id: mid
+        label: Leave it at 50 percent
+        detail: finishes at 51 percent
+        outcome: {congestion: 0, wire: 262811, usage: 29.04, drop: 0.83}
+      - id: tight
+        label: Pack it to a 65 percent target
+        detail: finishes at 67 percent
+        outcome: {congestion: 1, wire: 250533, usage: 35.78, drop: 1.26}
+    explain: >-
+      Packing tighter saves 5 percent of the wire, and it is the first run in
+      which the flow reports congestion: global routing had to run extra
+      iterations to clear it. The worst drop rises by half as well, from 0.83
+      percent to 1.26, with more current in less area. Loosening avoids both
+      and pays 11 percent more wire for it, and the drop still gets worse,
+      because the current now travels further to the straps. The default sits
+      between two failure modes and is the only option clear of both. On the
+      small block this knob was close to irrelevant. On a real core it moves
+      the wire by tens of thousands of micrometres in each direction.
+    caveat: >-
+      One congestion report is a warning, not a failure: the tight run still
+      routed with no violations and closed its timing. Whether 5 percent of
+      wire is worth a warning and a higher drop is a judgement about the rest
+      of the chip, which is exactly what a floorplan review is for.
+    source: ibex_u35, ibex_base, ibex_u65
+
+  - id: wi-jpeg-grid
+    section: power
+    situation: >-
+      The jpeg block draws 585 milliwatts and its worst voltage drop is 6.9
+      percent of the supply, on the power grid the platform ships. Every other
+      power situation in this drill is on a block drawing milliwatts, where
+      nothing was at stake. This one is not.
+    start:
+      - {label: design, value: "jpeg on Nangate45, 56230 instances"}
+      - {label: today, value: "6.9 percent drop, 585 milliwatts"}
+      - {label: grid, value: "the platform's own straps"}
+      - {label: timing, value: "misses 1.0 nanoseconds by 0.11"}
+    question: Which change brings the drop down the most?
+    objective: {metric: drop, direction: min}
+    metrics:
+      - {key: drop, label: worst drop, unit: percent}
+      - {key: power, label: total power, unit: mW}
+      - {key: wire, label: wire, unit: um}
+      - {key: slack, label: worst slack, unit: ns}
+    options:
+      - id: asis
+        label: Leave it
+        detail: the platform grid, nothing changed
+        outcome: {drop: 6.90, power: 585, wire: 568656, slack: -0.11}
+      - id: grid
+        label: Double the strap density
+        detail: metal4 and metal7 straps at half the pitch, same width
+        outcome: {drop: 2.38, power: 583, wire: 566752, slack: -0.12}
+      - id: slow
+        label: Halve the clock frequency
+        detail: 2.0 nanoseconds instead of 1.0
+        outcome: {drop: 3.19, power: 265, wire: 551825, slack: 0.60}
+      - id: room
+        label: Spread the design out
+        detail: utilization target dropped to 40 percent
+        outcome: {drop: 4.42, power: 588, wire: 649594, slack: -0.12}
+    explain: >-
+      Doubling the straps takes the drop from 6.9 percent to 2.38 and changes
+      nothing else measurable: power, wire and timing all stay within a
+      fraction of a percent. Halving the clock comes second, at 3.19, and
+      gets there by removing more than half the power, which is a real
+      achievement bought with half the performance. Spreading the design out
+      is the worst fix of the three: 14 percent more wire for a drop still
+      above 4 percent. The platform's grid is sized for a typical block, and
+      a block drawing half a watt is not typical. When the drop is the
+      problem, metal is the cheap answer, again.
+    caveat: >-
+      Denser straps occupy routing tracks on metal4 and metal7. Here the
+      resource in use went from 32.8 percent to 33.3 and the wire did not
+      grow, because the block had room. On a block short of routing, the same
+      grid would be paid for in congestion.
+    source: jpeg_base, jpeg_grid, jpeg_slow, jpeg_room

@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Games{% endblock %}
+{% block head %}
+<style>
+  /* Games hub: page-local styles (this template is owned by the games session).
+     Each drill is a card whose artwork says what the drill looks like: a stack
+     of cards, a log with one bad line, a metric against a threshold, and a
+     congestion map with a hotspot. The art is inline SVG (Scalable Vector
+     Graphics), so it themes with the rest of the page and loads no files. */
+  /* The page's own header, built from the same parts as the drill cards below
+     it (panel fill, 2px navy border, hard offset shadow), so the top of the
+     page and the grid read as one thing rather than two. */
+  .gx-head { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel);
+    box-shadow: 5px 5px 0 var(--shadow-hard); padding: 22px 26px 20px; margin-bottom: 8px; }
+  .gx-kicker { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px;
+    text-transform: uppercase; color: var(--muted); }
+  .gx-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 7px 0 10px; }
+  .gx-lede { font-size: 15px; line-height: 1.55; margin: 0; max-width: 730px; }
+  .gx-counts { display: flex; flex-wrap: wrap; gap: 30px; margin-top: 17px; padding-top: 14px;
+    border-top: 1px solid var(--border); }
+  .gx-count b { display: block; font-family: var(--mono); font-size: 19px; font-weight: 700;
+    color: var(--green-deep); line-height: 1.2; }
+  .gx-count span { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); }
+  .gx-invite { display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    flex-wrap: wrap; margin-top: 16px; padding-top: 15px; border-top: 1px solid var(--border); }
+  .gx-invite b { display: block; font-size: 14.5px; }
+  .gx-invite span { display: block; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 620px; }
+  .gx-invite .btn { flex: none; }
+  .gx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); gap: 20px; margin: 24px 0 8px; }
+  .gx-card { display: flex; flex-direction: column; border: 2px solid var(--navy); border-radius: 14px;
+    background: var(--panel); overflow: hidden; color: var(--text); box-shadow: 5px 5px 0 var(--shadow-hard); }
+  a.gx-card { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+  /* pressing a card moves it into its own shadow */
+  a.gx-card:hover { text-decoration: none; transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--shadow-hard); }
+  a.gx-card:hover .gx-title { color: var(--green-deep); }
+  .gx-art { position: relative; height: 156px; border-bottom: 2px solid var(--navy); overflow: hidden; background: var(--panel-2); }
+  .gx-art.is-dark { background: var(--navy); }
+  .gx-art svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .gx-card.is-soon .gx-art { filter: saturate(0.75); opacity: 0.82; }
+  .gx-card.is-soon { border-style: dashed; box-shadow: none; }
+  .gx-body { display: flex; flex-direction: column; gap: 9px; padding: 16px 18px 18px; flex: 1; }
+  .gx-trains { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted); }
+  .gx-trains b { color: var(--green-deep); letter-spacing: 0.6px; }
+  .gx-title { font-size: 17px; font-weight: 700; margin: 0; }
+  .gx-summary { font-size: 14px; line-height: 1.5; margin: 0; }
+  .gx-example { font-size: 12.5px; color: var(--muted); margin: 0; }
+  .gx-example code { font-family: var(--mono); font-size: 12px; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .gx-foot { margin-top: auto; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .gx-stat { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  @media (max-width: 720px) { .gx-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+<div class="gx-head">
+  <div class="gx-kicker">Practice</div>
+  <h1>Games</h1>
+  <p class="gx-lede">
+    Five drills on the knowledge the problems assume.
+    Every question is built from a run that really happened, so the logs, the
+    numbers and the maps are the tools' own output rather than something
+    written for the exercise.
+  </p>
+  <div class="gx-counts">
+    <div class="gx-count"><b>{{ totals.questions }}</b><span>questions</span></div>
+    <div class="gx-count"><b>{{ totals.maps }}</b><span>maps from real runs</span></div>
+    <div class="gx-count"><b>{{ totals.logs }}</b><span>tool logs</span></div>
+  </div>
+  <div class="gx-invite">
+    <div>
+      <b>Want to add a game, or a drill that is missing?</b>
+      <span>
+        Send the idea, or the question itself. It goes in a queue and becomes
+        a card once its answer can be reviewed.
+      </span>
+    </div>
+    <a class="btn" href="/games/contribute">Suggest a drill</a>
+  </div>
+</div>
+
+<div class="gx-grid">
+  {% for g in games %}
+  {% if g.live %}<a class="gx-card" href="{{ g.href }}">{% else %}<div class="gx-card is-soon">{% endif %}
+    <div class="gx-art{% if g.id in ["log-forensics", "spot-the-pathology"] %} is-dark{% endif %}" aria-hidden="true">
+      {% if g.id == "flash-cards" %}
+      {# a stack of cards, the front one holding a command and four choices #}
+      <svg viewBox="0 0 330 138" preserveAspectRatio="xMidYMid meet">
+        <g transform="translate(40 18)">
+          <rect x="18" y="6" width="210" height="104" rx="9" fill="#ffffff" stroke="#e2e1d9" transform="rotate(-6 123 58)"/>
+          <rect x="10" y="3" width="210" height="104" rx="9" fill="#ffffff" stroke="#e2e1d9" transform="rotate(-3 115 55)"/>
+          <rect x="2" y="0" width="210" height="104" rx="9" fill="#ffffff" stroke="#16a34a"/>
+          <rect x="16" y="14" width="182" height="22" rx="5" fill="#16241b"/>
+          <rect x="24" y="22" width="96" height="6" rx="3" fill="#8fd3a6"/>
+          <rect x="126" y="22" width="40" height="6" rx="3" fill="#5f6470"/>
+          <rect x="16" y="46" width="182" height="13" rx="4" fill="#f0efe9"/>
+          <rect x="16" y="64" width="182" height="13" rx="4" fill="rgba(22,163,74,0.16)" stroke="#16a34a"/>
+          <rect x="16" y="82" width="182" height="13" rx="4" fill="#f0efe9"/>
+        </g>
+      </svg>
+      {% elif g.id == "log-forensics" %}
+      {# a log tail, ending in the line that stopped the run #}
+      <svg viewBox="0 0 560 156" preserveAspectRatio="xMidYMid slice">
+        <g fill="#5f7a66">
+          <rect x="26" y="20" width="260" height="7" rx="3.5"/>
+          <rect x="26" y="36" width="392" height="7" rx="3.5"/>
+          <rect x="26" y="52" width="196" height="7" rx="3.5"/>
+          <rect x="26" y="68" width="330" height="7" rx="3.5"/>
+          <rect x="26" y="84" width="238" height="7" rx="3.5"/>
+        </g>
+        <rect x="16" y="98" width="528" height="22" rx="5" fill="rgba(220,38,38,0.20)"/>
+        <rect x="16" y="98" width="3.5" height="22" rx="1.75" fill="#dc2626"/>
+        <g fill="#f4a6a6">
+          <rect x="28" y="106" width="70" height="7" rx="3.5"/>
+          <rect x="106" y="106" width="232" height="7" rx="3.5"/>
+        </g>
+        <g fill="#3d5546">
+          <rect x="26" y="130" width="150" height="7" rx="3.5"/>
+          <rect x="186" y="130" width="84" height="7" rx="3.5"/>
+        </g>
+      </svg>
+      {% elif g.id == "over-under" %}
+      {# a measured value against the number you are asked to bet on #}
+      <svg viewBox="0 0 330 138" preserveAspectRatio="xMidYMid meet">
+        <g fill="rgba(22,163,74,0.35)">
+          <rect x="34" y="78" width="22" height="28" rx="3"/>
+          <rect x="64" y="62" width="22" height="44" rx="3"/>
+          <rect x="94" y="48" width="22" height="58" rx="3"/>
+          <rect x="124" y="36" width="22" height="70" rx="3"/>
+        </g>
+        <g fill="rgba(217,119,6,0.55)">
+          <rect x="154" y="54" width="22" height="52" rx="3"/>
+          <rect x="184" y="70" width="22" height="36" rx="3"/>
+          <rect x="214" y="84" width="22" height="22" rx="3"/>
+          <rect x="244" y="94" width="22" height="12" rx="3"/>
+        </g>
+        <line x1="22" y1="106" x2="300" y2="106" stroke="#16241b" stroke-width="1.5"/>
+        <line x1="22" y1="44" x2="300" y2="44" stroke="#d97706" stroke-width="2" stroke-dasharray="7 5"/>
+        <polygon points="288,30 296,44 280,44" fill="#d97706"/>
+        <polygon points="288,58 296,44 280,44" fill="rgba(217,119,6,0.35)"/>
+      </svg>
+      {% else %}
+      {# a congestion map, with the hotspot you are asked to find #}
+      <svg viewBox="0 0 560 156" preserveAspectRatio="xMidYMid slice">
+        <g>
+          {% for row in range(7) %}{% for col in range(26) %}
+          <rect x="{{ 4 + col * 21.5 }}" y="{{ 4 + row * 22 }}" width="18.5" height="19" rx="2"
+                fill="{% if row in [2, 3] and col in [16, 17] %}#dc2626{% elif (row in [1, 2, 3, 4] and col in [15, 16, 17, 18]) or (row in [2, 3] and col == 14) %}#d97706{% elif row in [1, 2, 3, 4, 5] and col in [13, 14, 18, 19] %}rgba(217,119,6,0.42){% else %}rgba(143,211,166,0.20){% endif %}"/>
+          {% endfor %}{% endfor %}
+        </g>
+        <circle cx="365" cy="80" r="52" fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="2" stroke-dasharray="7 7"/>
+      </svg>
+      {% endif %}
+    </div>
+    <div class="gx-body">
+      <div class="gx-trains">trains <b>{{ g.trains }}</b></div>
+      <h2 class="gx-title">{{ g.title }}</h2>
+      <p class="gx-summary">{{ g.summary }}</p>
+      <p class="gx-example">Example: {% if g.id == "flash-cards" %}<code>{{ g.example }}</code>{% else %}{{ g.example }}{% endif %}</p>
+      <div class="gx-foot">
+        <span class="gx-stat">{% if g.stat %}{{ g.stat }}{% else %}not built yet{% endif %}</span>
+        {% if g.live %}<span class="chip diff-easy">play</span>{% else %}<span class="chip chip-soon">in the works</span>{% endif %}
+      </div>
+    </div>
+  {% if g.live %}</a>{% else %}</div>{% endif %}
+  {% endfor %}
+</div>
+
+<p class="gx-review">
+  <a href="{{ issues_url }}?q=is%3Aissue+is%3Aopen+label%3Aflag" target="_blank" rel="noopener">Flagged for review</a>
+  <span class="gx-review-hint">Every drill has a flag button under the card. A flag opens a GitHub issue, and the open issues are the review queue.</span>
+</p>
+{% endblock %}

@@ -1,0 +1,1121 @@
+# Spot the pathology: real heat maps from real runs.
+#
+# Every image is the flow's own output, rendered by OpenROAD at the end of a
+# run in the openroad/orfs container, and the run that produced it is named.
+# Several are from runs broken on purpose for the log forensics drill, and
+# several are healthy runs of the same design, because a drill made only of
+# faults teaches the wrong reflex. See pathology_scope.md.
+
+game: spot-the-pathology
+title: Read the die
+reference: https://openroad.readthedocs.io/en/latest/main/README.html
+basis:
+  tool: OpenROAD
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD
+  tag: the flow's own heat maps
+  note: >-
+    Each image is a map the flow drew at the end of a real run. Some runs were
+    broken on purpose and some were not, and the question is always what the
+    picture says rather than whether something must be wrong with it.
+
+sections:
+  - id: congestion
+    title: Congestion
+    blurb: Where the wires want to go, and whether there is room for them.
+    kinds: [layer starvation, hotspots, structure]
+  - id: power
+    title: Voltage drop
+    blurb: How far the supply sags, and how easily a colour scale misleads.
+    kinds: [gradient, grid strength, reading the legend]
+  - id: placement
+    title: Placement
+    blurb: Where the cells ended up, and what the empty space is telling you.
+    kinds: [utilization, spread, density]
+
+  - id: clock
+    title: Clock trees
+    blurb: The shape a tree takes, and what a knob does to it.
+    kinds: [balance, depth, buffer spacing]
+  - id: paths
+    title: The worst path
+    blurb: The one path the whole design is judged by, drawn on the die.
+    kinds: [launch, capture, data, distance]
+  - id: routing
+    title: Routing and repair
+    blurb: Where the wires went, on which layers, and which cells were changed to make it work.
+    kinds: [layers, palette, resizing]
+
+items:
+  - id: pa-congest-name
+    section: congestion
+    style: name
+    image: congest-congestion.webp
+    caption: gcd on Nangate45, routing congestion after global routing
+    describe: >-
+      Almost the whole core is orange, the level just below the top of the
+      scale, with a green margin around the edge and a handful of isolated
+      green tiles inside.
+    question: What was done to this run?
+    answer: It was made to route on only the lowest few metal layers.
+    wrong:
+      - The cells were packed far too densely for the die.
+      - The clock tree was routed across the middle of the block.
+      - The power grid was built with far too many straps.
+    explain: >-
+      Uniform heat across an entire core, rather than a hotspot, points at
+      capacity rather than at any one part of the design: every tile lost the
+      same fraction of its tracks. This run was held to metal1 through metal3
+      out of ten. A placement problem shows as a hot region, not a hot core.
+    source: congest
+    fact: The design still routed with no violations, on 8 percent more wire.
+
+  - id: pa-default-congest-spot
+    section: congestion
+    style: spot
+    image: default-congestion.webp
+    caption: gcd on Nangate45, a healthy run with all ten layers
+    describe: >-
+      Mostly green and olive, with four small deep-red tiles: one left of
+      centre, one right of centre, one near the top, and one below the middle.
+    question: Click a tile where the routing demand has reached the capacity.
+    targets:
+      - {x: 0.366, y: 0.594, w: 0.176, h: 0.108}
+      - {x: 0.094, y: 0.457, w: 0.108, h: 0.108}
+      - {x: 0.366, y: 0.116, w: 0.108, h: 0.108}
+      - {x: 0.707, y: 0.457, w: 0.108, h: 0.108}
+    explain: >-
+      A handful of tiles at capacity in an otherwise green map is the normal
+      state of a routed design, not a problem. They are where several nets had
+      to cross the same boundary, and the detailed router resolves them by
+      detouring. What matters is whether they cluster: four scattered tiles
+      route, a solid red region does not.
+    source: bad_driver
+    fact: This run finished with no violations and no detours worth noticing.
+
+  - id: pa-aes-structure
+    section: congestion
+    style: name
+    image: aes-congestion.webp
+    caption: aes on Nangate45, routing congestion after global routing
+    describe: >-
+      A regular grid of dark red blobs, roughly sixteen of them in rows and
+      columns, separated by green channels, over an orange background.
+    question: What is the repeating pattern?
+    answer: The design's own structure, repeated identically across the block.
+    wrong:
+      - Macros placed on a grid, with the channels between them.
+      - The power grid's straps showing through the congestion map.
+      - Regions the placer failed to legalize, left for the router.
+    explain: >-
+      This cipher is built from identical parallel units, and the placer kept
+      each one together because their internal connectivity is dense. The
+      green channels between them are where almost nothing crosses. Structure
+      in a congestion map is usually the architecture, and it is a sign the
+      placer understood the design rather than a fault to fix.
+    source: aes_tight
+    fact: 562 registers, in a design of about 15800 cells.
+
+  - id: pa-ir-pair
+    section: power
+    style: pair
+    images:
+      a: default-ir.webp
+      b: thin-ir.webp
+    caption: the same design, two power grids, voltage drop across the core
+    describe: >-
+      Two maps of similar shape: a cool band at the top, a dark red region
+      through the middle, and warmer colours below. Their colour legends read
+      up to 3.698 millivolts on the left and 13.921 on the right.
+    question: Which grid is the healthier one?
+    answer: a
+    explain: >-
+      They look alike because each map normalizes its colours to its own
+      range, so the worst region is always dark red whatever the numbers are.
+      The legends differ by nearly four times: 3.7 millivolts against 13.9.
+      Read the scale before reacting to the colour, on this map and on every
+      other one a tool draws.
+    source: bad_driver against thin_pdn
+    fact: 0.38 percent of the supply against 1.14 percent, for the same 2.6 milliwatts.
+
+  - id: pa-thin-ir-spot
+    section: power
+    style: spot
+    image: thin-ir.webp
+    caption: gcd on Nangate45 with narrowed, widely spaced power straps
+    describe: >-
+      A gradient from a cool band along the top to a dark red region filling
+      the right and centre of the middle, with orange along the bottom.
+    question: Click the region where the supply has sagged the most.
+    targets:
+      - {x: 0.53, y: 0.20, w: 0.44, h: 0.52}
+    explain: >-
+      The drop grows with distance from where the current enters, so the worst
+      place is the area furthest from the straps that feed it, not the area
+      with the most cells. Fixing it means getting metal closer to that
+      region: more straps, wider ones, or a connection from another direction.
+    source: thin_pdn
+    fact: 13.9 millivolts at the worst point, 1.14 percent of a 1.1 volt supply.
+
+  - id: pa-bigdie-name
+    section: placement
+    style: name
+    image: bigdie-placement.webp
+    caption: gcd on Nangate45, the cells after detailed placement
+    describe: >-
+      A large empty die with the cells gathered into a loose cloud in the
+      middle, occupying maybe a third of the area, with wide empty margins.
+    question: What is wrong here?
+    answer: The die is far larger than the design needs.
+    wrong:
+      - The placer failed and left most cells unplaced.
+      - The cells are packed too tightly into the centre.
+      - A macro in the middle has pushed the cells outward.
+    explain: >-
+      The placer did its job: with a utilization target of 8 percent it spread
+      the design as evenly as its density constraint allowed, and it still
+      cannot fill the die. Empty silicon is not free, because every net grows
+      with it. This run routes 69 percent more wire than the same design on a
+      sensible floorplan.
+    source: big_die
+    fact: 9 percent utilization, 6099 micrometres of wire against 3605.
+
+  - id: pa-placement-pair
+    section: placement
+    style: pair
+    images:
+      a: bigdie-placement.webp
+      b: default-placement.webp
+    caption: the same design, the same cells, two floorplans
+    describe: >-
+      On the left, cells in a loose cloud with wide empty margins. On the
+      right, cells filling the core evenly from edge to edge.
+    question: Which floorplan would you rather hand to the router?
+    answer: b
+    explain: >-
+      Even fill means short nets and predictable congestion. The loose one
+      wastes area and lengthens every connection, and the cost lands on timing
+      before it lands on power. There is a limit in the other direction too:
+      packed past about 80 percent, repair runs out of room to insert
+      anything.
+    source: big_die against bad_driver
+    fact: the same 521 instances in both, at 9 and 62 percent utilization.
+
+  - id: pa-clock-name
+    section: clock
+    style: name
+    image: clock-default.webp
+    caption: gcd on Nangate45, the clock tree after synthesis of the tree
+    describe: >-
+      A single root entering from the left, splitting into four coloured
+      branches, each one serving a quarter of the block: red at the top left,
+      yellow at the top right, orange at the bottom left, green at the bottom
+      right.
+    question: What shape is this tree?
+    answer: The region halved, then halved again, a branch to each quarter.
+    wrong:
+      - A mesh, with every register tapped from a grid of clock wires.
+      - A spine down the middle, with short branches hanging off it.
+      - A daisy chain, passing through each register in turn.
+    explain: >-
+      Bisecting the sink region and balancing the halves is what produces this
+      shape, and the colours are the branches the tool built. A mesh would
+      cover the block in a grid and cost far more power; a spine would show
+      one heavy trunk. The structure is worth recognizing because it tells you
+      immediately whether the tool balanced by region, which is what keeps
+      skew low.
+    source: bad_driver
+    fact: 5 buffers for 35 registers, minimum depth 2.
+
+  - id: pa-clock-pair
+    section: clock
+    style: pair
+    images:
+      a: clock-default.webp
+      b: clock-forced-spacing.webp
+    caption: the same design, two clock trees, drawn at the same scale
+    describe: >-
+      On the left, four short balanced branches, one per quarter of the block.
+      On the right, two long branches wandering across the block, with more
+      turns and longer runs between splits.
+    question: Which tree would you rather have?
+    answer: a
+    explain: >-
+      The right-hand run was told to place a buffer every micrometre, which
+      sounds harmless and is not: it produced 7 buffers instead of 5, a
+      minimum depth of 3 instead of 2, and 48 more square micrometres of
+      cells. Depth costs variation, and every extra level is one more place
+      for skew to accumulate. A knob that fights the tool usually loses.
+    source: bad_driver against tiny_bufdist
+    fact: 5 buffers at depth 2, against 7 at depth 3; 716 against 764 square micrometres.
+
+  - id: pa-routing-pair
+    section: routing
+    style: pair
+    images:
+      a: routing-ten-layers.webp
+      b: routing-three-layers.webp
+    caption: the same design routed twice, every layer drawn in its own colour
+    describe: >-
+      Both are dense grids of wire. The left one carries several colours
+      including pale yellow and white strands; the right one is built almost
+      entirely from red, green and blue.
+    question: Which run was restricted to the lowest few metal layers?
+    answer: b
+    explain: >-
+      The tool draws each metal layer in its own colour, so the palette counts
+      the layers for you. The restricted run has no upper-layer colours at
+      all: everything is on the first three. It routed anyway, on 8 percent
+      more wire, because a block this small has short nets. The same picture
+      on a large design is what an unroutable block looks like.
+    source: bad_driver against congest
+    fact: ten layers available against three, 3605 micrometres of wire against 3908.
+
+  - id: pa-resizer-name
+    section: routing
+    style: name
+    image: resizer-default.webp
+    caption: gcd on Nangate45, the cells the resizer changed
+    describe: >-
+      The full placement in outline, with scattered cells filled in yellow and
+      a handful in red. Most of the highlighted cells sit along the top and
+      bottom rows and down the left edge.
+    question: What is highlighted here?
+    answer: The cells timing repair resized or inserted.
+    wrong:
+      - The cells on the critical path, end to end.
+      - The cells that failed to legalize and had to be moved.
+      - The cells swapped to a different threshold voltage.
+    explain: >-
+      Repair works where the timing is tight, and on this design much of that
+      is near the boundary, because the port paths are given a fifth of the
+      period as external delay and have to cross the block in what remains.
+      A map like this one is the quickest way to see where the tool spent its
+      effort, which is usually where the design needs attention.
+    source: bad_driver
+    fact: 68 repair buffers among 1086 cells.
+
+  - id: pa-sky-dense
+    section: placement
+    style: name
+    image: sky-placement.webp
+    caption: gcd on sky130 high density, the cells after detailed placement
+    describe: >-
+      Rows packed end to end with almost no gaps, like a brick wall, filling
+      the whole core.
+    question: What does this floorplan leave no room for?
+    answer: Anything the tools still need to insert.
+    wrong:
+      - The clock tree, which must be routed over the cells.
+      - The power grid, which needs space between the rows.
+      - The filler cells, which complete the rows at the end.
+    explain: >-
+      This is 92 percent utilization. Repair buffers, hold fixes, and late
+      engineering changes all need free sites, and at this density there are
+      none nearby, so the legalizer has to push cells around to make space.
+      Most flows aim for 60 to 80 percent for exactly this reason. The clock
+      tree and the grid live above the cells and are not the constraint.
+    source: sky_signoff
+    fact: 92 percent utilization, against 62 on the Nangate45 version.
+
+  - id: pa-bigdie-spot
+    section: placement
+    style: spot
+    image: bigdie-placement.webp
+    caption: gcd on Nangate45 at an 8 percent utilization target
+    describe: >-
+      Cells gathered in a loose cloud in the middle and upper left, with the
+      right-hand fifth of the die and the top-left corner completely bare.
+    question: Click one of the empty margins, where no cell was placed at all.
+    targets:
+      - {x: 0.84, y: 0.15, w: 0.08, h: 0.55}
+      - {x: 0.06, y: 0.15, w: 0.09, h: 0.25}
+      - {x: 0.10, y: 0.86, w: 0.30, h: 0.08}
+      - {x: 0.06, y: 0.06, w: 0.10, h: 0.09}
+    explain: >-
+      Empty silicon is paid for twice: once in area, and again in the wire
+      needed to cross it. The placer is not at fault here, since it spread the
+      design as evenly as its density target allowed. The floorplan is what
+      needs changing, and the give-away is that the empty space is at the
+      edges rather than in pockets.
+    source: big_die
+    fact: 9 percent utilization, 6099 micrometres of wire against 3605 on a sensible die.
+
+  - id: pa-worstpath-name
+    section: paths
+    style: name
+    image: worstpath-gcd.webp
+    caption: gcd on Nangate45, the worst timing path drawn on the layout
+    describe: >-
+      The placement in faint outline, with a red route running down the right
+      of the block, a cyan route wandering through the middle and lower half,
+      and magenta boxes marking cells along the way. A legend in the corner
+      names capture, launch, signal, instance and terminal.
+    question: What are the two coloured routes?
+    answer: The data, and the clock that launches and captures it.
+    wrong:
+      - The setup path and the hold path through the same logic.
+      - The path before repair and the same path after it.
+      - Two paths with equally bad slack, drawn together.
+    explain: >-
+      A timing check is a race between two things, and this picture draws both:
+      the data working its way from one register to another, and the clock
+      arriving at each end. The clock route is usually the longer of the two on
+      screen, because it comes from the root of the tree rather than from a
+      neighbouring cell. The cells on the path are boxed, which is how you spot
+      a path that runs through more logic than you expected.
+    source: bad_driver
+    fact: this run closes at 0.46 nanoseconds with no violations.
+
+  - id: pa-worstpath-aes
+    section: paths
+    style: name
+    image: worstpath-aes.webp
+    caption: aes on Nangate45, the worst timing path on a design of about 15800 cells
+    describe: >-
+      A dense grey block with a red route that leaves the middle, runs down to
+      the bottom edge, along it, and back up the right side, with green and
+      cyan clock routes crossing the upper half.
+    question: What does the shape of the red route tell you?
+    answer: The path runs most of the way across the block.
+    wrong:
+      - The path stays inside one of the repeated units.
+      - The path starts and ends at the same register.
+      - The path follows the clock tree's own route.
+    explain: >-
+      A path that crosses the die is usually dominated by wire rather than by
+      logic, and no amount of resizing fixes distance: the answer is to move
+      the two ends closer together. This is why the worst path is worth looking
+      at on the layout rather than only in a report, where it is a list of
+      cells with no geometry at all.
+    source: aes_tight
+    fact: 275000 micrometres of wire in the design, and a 0.82 nanosecond target.
+
+  - id: pa-sky-congest-pair
+    section: congestion
+    style: pair
+    images:
+      a: default-congestion.webp
+      b: sky-congestion.webp
+    caption: the same design on two platforms, congestion after global routing
+    describe: >-
+      On the left, mostly green and olive with four small deep-red tiles. On
+      the right, deep-red tiles everywhere, joined into ribbons across the
+      middle of the block, with green only at the edges.
+    question: Which of these is the harder block to route?
+    answer: b
+    explain: >-
+      The right-hand one is the same design on sky130 at 92 percent
+      utilization, against 62 on the left. Packing a block leaves the router
+      fewer tracks between the cells, and the map fills with tiles at capacity.
+      Two things differ here, the process and the density, and the density is
+      what dominates: a design packed this hard is hard to route on any
+      process.
+    source: bad_driver against sky_signoff
+    fact: 62 percent utilization against 92, for the same source design.
+
+  - id: pa-sky-congest-spot
+    section: congestion
+    style: spot
+    image: sky-congestion.webp
+    caption: gcd on sky130 high density, packed to 92 percent utilization
+    describe: >-
+      Deep-red tiles spread across the whole core, joined into ribbons through
+      the middle, with a green margin at the edges.
+    question: Click a tile where the routing demand has reached the capacity.
+    targets:
+      - {x: 0.450, y: 0.170, w: 0.055, h: 0.055}
+      - {x: 0.750, y: 0.190, w: 0.055, h: 0.055}
+      - {x: 0.290, y: 0.250, w: 0.055, h: 0.055}
+      - {x: 0.610, y: 0.330, w: 0.055, h: 0.055}
+      - {x: 0.710, y: 0.330, w: 0.055, h: 0.055}
+      - {x: 0.210, y: 0.350, w: 0.055, h: 0.055}
+    explain: >-
+      There are dozens to choose from here, against four on the same design at
+      a sensible density, and they run together rather than sitting apart. A
+      handful of scattered tiles is a detour; a connected region is a block
+      the router may not finish. The shape of the red matters as much as how
+      much of it there is.
+    source: sky_signoff
+    fact: 92 percent utilization, 10967 micrometres of wire.
+
+  - id: pa-whole-design
+    section: routing
+    style: name
+    image: whole-design.webp
+    caption: gcd on Nangate45, everything drawn at once at the end of the run
+    describe: >-
+      A dense weave of coloured wires over the whole core, crossed by three
+      wide pink bands running left to right and three running top to bottom,
+      with regular blue horizontal lines behind everything.
+    question: What are the wide pink bands?
+    answer: The power grid's straps on the upper metal layers.
+    wrong:
+      - The clock tree, routed with wider wire than the signals.
+      - Buses, kept together by the router as a group.
+      - Blockages the router was told to avoid.
+    explain: >-
+      The straps are wide because they carry current, and they run in both
+      directions on two upper layers so the grid is a mesh rather than a comb.
+      The evenly spaced blue lines underneath are the rails that feed each row
+      of cells. Signals weave around all of it, which is why a heavy grid and
+      a congested design fight each other.
+    source: bad_driver
+    fact: the grid is built on metal1, metal4 and metal7, at a 6.5 micrometre pitch.
+
+  - id: pa-bigdie-congestion
+    section: congestion
+    style: name
+    image: bigdie-congestion.webp
+    caption: gcd on Nangate45 at an 8 percent utilization target, congestion after global routing
+    describe: >-
+      A green field with a cluster of red and orange tiles in the middle where
+      the cells are, and a faint regular scatter of orange across the empty
+      area around it.
+    question: Why is the congestion only in the middle?
+    answer: That is where the cells are; the rest is empty.
+    wrong:
+      - The router was told to keep the wires near the centre.
+      - A macro in the middle forces every net to detour around it.
+      - The clock tree crosses the centre and blocks the tracks there.
+    explain: >-
+      Spreading a design over a larger die does not spread its connections.
+      The cells stayed in a cloud and the traffic stayed with them, so a bigger
+      die is not a fix for a congested block: it moves the same problem into a
+      smaller fraction of a larger picture. Congestion follows cells, not area.
+    source: big_die
+    fact: 9 percent utilization, and 6099 micrometres of wire against 3605 on a sensible die.
+
+  - id: pa-aes-placement
+    section: placement
+    style: name
+    image: aes-placement.webp
+    caption: aes on Nangate45, the cells after detailed placement
+    describe: >-
+      A dense field of cells with darker bands weaving between clusters of
+      roughly equal size, repeating across the block, and pins along all four
+      edges.
+    question: What are the clusters, and the darker bands between them?
+    answer: The design's repeated units, and the gaps between them.
+    wrong:
+      - Macros, with the routing channels left around them.
+      - Regions the placer could not legalize, left half empty.
+      - Voltage domains, separated by their boundary rows.
+    explain: >-
+      This cipher is built from identical parallel units, and the placer keeps
+      each one together because the connectivity inside a unit is far denser
+      than between them. The same pattern appears in this design's congestion
+      map, which is the useful part: architecture shows up in more than one
+      view, and recognizing it stops you hunting for a fault that is not there.
+    source: aes_tight
+    fact: about 15800 cells that are not filler, 562 registers, 275000 micrometres of wire.
+
+  - id: pa-ir-pair-sky
+    section: power
+    style: pair
+    images:
+      a: sky-ir.webp
+      b: thin-ir.webp
+    caption: two designs on two processes, voltage drop across the core
+    describe: >-
+      Both show deep red bands through the middle on a cooler background. The
+      left legend runs to 845 microvolts, the right to 13.921 millivolts.
+    question: Which of these supplies is in better shape?
+    answer: a
+    explain: >-
+      The left one is sixteen times healthier and looks every bit as alarming,
+      because each map stretches its colours across its own range. On its 1.8
+      volt supply, 845 microvolts is five hundredths of a percent, while the
+      right is 1.14 percent of 1.1 volts. Two maps of different designs on
+      different processes cannot be compared by colour at all: only the
+      numbers beside them mean anything.
+    source: sky_gcd against thin_pdn
+    fact: 0.05 percent of the supply against 1.14 percent.
+
+  - id: pa-a7-congest-read
+    section: congestion
+    style: name
+    image: a7-congestion.webp
+    caption: gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), routing congestion
+    describe: >-
+      A coarse grid of tiles over the core, green and olive through the middle
+      with a dozen orange and dark red tiles scattered through it, and a cool
+      teal band around the outside.
+    question: >-
+      Global routing reported zero overflow and detailed routing finished with
+      zero violations. So what are the warm tiles?
+    answer: Demand against capacity in each tile, none of it past the limit.
+    wrong:
+      - Nets global routing gave up on and left to the detailed router.
+      - The tiles where the design rule check later found errors.
+      - Cell density, so the warm tiles are where the placer packed hardest.
+    explain: >-
+      The colour in each tile is how much of that tile's wiring capacity the
+      router asked for, and the scale stretches over whatever range the map
+      happens to contain, so a block with nothing wrong still fills out the
+      palette. The log settles it: the busiest layer, M2, is at 28.37 percent,
+      the whole block uses 12.73 percent of its routing resource, and the
+      maximum horizontal and vertical congestion is zero on every layer. Warm
+      colours on a small block mean the scale is doing its job, not that the
+      block is in trouble.
+    source: a7_gcd
+    fact: 306 instances on 46 square micrometres, 778 micrometres of wire, zero routing violations.
+
+  - id: pa-a7-worstpath
+    section: paths
+    style: name
+    image: a7-worstpath.webp
+    caption: gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), the worst setup path
+    describe: >-
+      A chain of highlighted cells steps down and to the right across the
+      core, joined by short red data wires, while the cyan launch clock runs
+      out to the left edge of the die and back.
+    question: >-
+      This path misses by 42.82 picoseconds on a 310 picosecond clock. Where
+      is the time going?
+    answer: Into the gates, fourteen of them in a row.
+    wrong:
+      - Into the wires, which is why the path is drawn across the whole core.
+      - Into the launch clock, which walks to the die edge before it arrives.
+      - Into the one buffer, inserted too late in the flow to help.
+    explain: >-
+      Read the stage delays in the timing report and the answer is not close.
+      Every gate on the path costs between 10 and 30 picoseconds, and every
+      net between them costs between 0.03 and 0.35 picoseconds. On a die 46
+      square micrometres across there is no wire long enough to matter. The
+      picture is misleading in exactly the way a plan view always is: it shows
+      distance, and distance is not what this path is spending. The reported
+      minimum period is 331.69 picoseconds against the 310 asked for, so no
+      amount of moving cells or rerouting closes it. Fewer logic levels or a
+      slower clock will.
+    source: a7_gcd
+    fact: worst slack -42.82 picoseconds, total negative slack -106.13 picoseconds.
+
+  - id: pa-a7-clock-clusters
+    section: clock
+    style: name
+    image: a7-clock.webp
+    caption: gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), the clock tree drawn on the cells it feeds
+    describe: >-
+      A magenta wire enters from the clock pin on the left edge and runs to
+      the middle of the core, where the tree splits into four coloured
+      branches: yellow over the top left, red over the top right, orange over
+      the bottom left, green over the bottom right. Each branch ends on the
+      flip-flops under it.
+    question: What decided which flip-flops share a colour?
+    answer: Where they sit. Each branch takes the ones nearest it.
+    wrong:
+      - Which of the four voltage domains each one belongs to.
+      - Which bit of the datapath each one holds, kept together by the placer.
+      - Which of the block's four clocks each one runs on.
+    explain: >-
+      Clock tree synthesis groups sinks by position, because the cost it is
+      trying to hold down is wire, and wire is distance. Four quadrants of
+      flip-flops get four buffers sitting near the middle of each quadrant.
+      The names confirm the shape: one root buffer at the pin and four leaf
+      buffers, five in all, feeding 34 sinks, and the tree came out with 3.30
+      picoseconds of setup skew. Nothing about the logic entered into it. Two
+      flip-flops in the same byte of the same register land on different
+      colours if they were placed apart.
+    source: a7_gcd
+    fact: five clock buffers, 34 sinks, 3.30 picoseconds of setup skew.
+
+  - id: pa-sky-route-direction
+    section: routing
+    style: name
+    image: sky-routing.webp
+    caption: gcd on the Skywater 130 nanometre high density library, every routed wire on every layer
+    describe: >-
+      The core is solid with metal. Long wires in one colour run only up and
+      down, long wires in two other colours run only left and right, and the
+      short stubs that join them sit at the crossings.
+    question: Why does no long wire on this picture turn a corner?
+    answer: Each layer runs one way, so a turn has to change layer.
+    wrong:
+      - The colours are nets, and this block happens to have no diagonal ones.
+      - The router forbids corners on a block this full to keep the density even.
+      - One colour is power and the other ground, and supply wires never turn.
+    explain: >-
+      Routing layers alternate their preferred direction, horizontal then
+      vertical then horizontal, so a wire that needs to go around a corner
+      goes up a layer through a via, travels the other way, and comes back
+      down. Two consequences follow, and both matter more than the picture
+      does. Adding one layer to a stack adds capacity in one direction only,
+      which is why layers are worth counting in pairs. And every corner costs
+      a via, so the vias, not the metal, are usually what runs out first in a
+      congested block. This one is packed at 92 percent utilization on five
+      routing layers and still came out clean, though the detailed router
+      needed three passes to get there: 131 violations, then 86, then none.
+    source: sky_gcd
+    fact: 5400 square micrometres at 92 percent utilization, met2 the busiest layer at 48 percent.
+
+  - id: pa-rocket-halo
+    section: placement
+    style: name
+    image: rocket-placement.webp
+    caption: tinyRocket on Nangate45, the cells and the two macros after placement
+    describe: >-
+      Standard cells fill most of the core. Two tall rectangles sit near the
+      bottom corners, each one surrounded by empty black space with a dashed
+      line running through it, and the cells stop at that line rather than at
+      the rectangle.
+    question: What is the empty band between each macro and the nearest cell?
+    answer: A keep-out halo. Cells are not allowed inside it.
+    wrong:
+      - Cells that would not legalize there, so the placer moved them out.
+      - Space the power grid reserved for the macro's own supply straps.
+      - The macro's filler, drawn dark because it holds no logic.
+    explain: >-
+      The macro placer was given a halo of 22.4 by 15.12 micrometres and
+      treats it as part of the macro. The cost is easy to underrate. These two
+      macros are 2481 square micrometres of silicon and 11928 square
+      micrometres once the halos are counted, which is close to five times the
+      area, on a block whose whole design area is 55855 square micrometres.
+      What it buys is room at the macro edge, where every one of the macro's
+      connections has to land, and a strip of quiet routing for nets that pass
+      by. A floorplan that looks wasteful around its macros is usually paying
+      that bill on purpose. The halo is a knob, not a law, and shrinking it is
+      a normal thing to try.
+    source: n45_rocket
+    fact: two macros, 2481 square micrometres of silicon, 11928 with halos.
+
+  - id: pa-rocket-macro-congest
+    section: congestion
+    style: name
+    image: rocket-congestion.webp
+    caption: tinyRocket on Nangate45, routing congestion over a floorplan with two macros
+    describe: >-
+      Deep red over most of the cell area. The two macros at the bottom read
+      red as well, and a cool green channel runs around each of them,
+      separating them from the red field above.
+    question: The macros hold no standard cells. Why do they read red?
+    answer: They block the tracks, and a blocked track reads as a used one.
+    wrong:
+      - Wires crossing them, because a macro is the short way over a block.
+      - The map has no value to draw there, so it paints the top of the scale.
+      - Their pins all sit on one edge, and the map charges the whole shape for the crowd.
+    explain: >-
+      A macro is an obstruction, not empty ground. Its own metal fills the
+      lower layers across the whole footprint, the router's grid marks those
+      tracks unusable, and a tile with nothing left to give sits at the top of
+      the scale whether or not a single signal ever goes there. The routing
+      view of this same run settles that last part: almost nothing crosses
+      these two macros. One wire clips a corner and the rest of the traffic
+      goes around. The cool channel beside each macro is the other half of the
+      story. That is the halo, with no cells to wire and every track free, so
+      it reads as cool as anything inside the core. Neither colour is a fault.
+      Global routing finished with zero overflow on all ten layers, at 62.40
+      percent on metal2 and 35.51 percent overall.
+    source: n45_rocket
+    fact: 500952 micrometres of routed wire, zero overflow, zero routing violations.
+
+  - id: pa-rocket-clock-voids
+    section: clock
+    style: name
+    image: rocket-clocks.webp
+    caption: tinyRocket on Nangate45, the clock net drawn with the cells it reaches
+    describe: >-
+      Thousands of small boxes scattered across the core, wired together in
+      red, green and yellow, with several large black voids between them and
+      the two macros outlined at the bottom.
+    question: The placement view of this block has cells everywhere. Why is this one full of holes?
+    answer: Only the clocked cells are drawn, and most of the block is logic.
+    wrong:
+      - The voids are the macro halos, where no cell is allowed.
+      - The clock tree could not reach those regions, so they run on a second clock.
+      - Those regions are clock gated, and the view leaves a gated cell out.
+    explain: >-
+      This block has 3913 sequential cells out of 27315 instances, so about
+      one cell in seven is drawn here and the voids are solid combinational
+      logic. Two things are worth taking from that. A clock view is not a
+      floorplan and reading it as one will have you hunting for empty space
+      that is not empty. And the tree that feeds those 3913 sinks needed 621
+      buffers of its own, cells that exist only to carry the clock and that
+      burn power on every edge whether the logic does anything or not.
+    source: n45_rocket
+    fact: 3913 sinks, 621 clock buffers, 27315 instances.
+
+  - id: pa-ibex-uneven
+    section: placement
+    style: name
+    image: ibex-placement.webp
+    caption: ibex on Nangate45, the cells after detailed placement
+    describe: >-
+      Cells cover most of the die in a ragged blob, thinning out towards the
+      bottom right, where a wedge of the core is left bare. Pins run along all
+      four edges.
+    question: The rows are half full and a corner is bare. Is that a fault?
+    answer: No. Even spreading was never the goal.
+    wrong:
+      - Yes. The placer ran out of time and never finished that corner.
+      - Yes. The corner is a blockage the floorplan forgot to declare.
+      - Yes. Those rows are held back for the power grid to cross.
+    explain: >-
+      A placer minimizes wire length and pays a penalty only when a region
+      gets too dense. At 51 percent utilization that penalty almost never
+      bites, so the cells gather wherever the connectivity pulls them and the
+      ground nobody needs stays bare. Compare it with the block on the
+      oversized die, where the design sits in a small cloud in the middle and
+      every net is longer for it. The difference is not how square the blob
+      looks, it is what the shape cost: this run wired 262811 micrometres,
+      overflowed no layer, and finished with zero routing violations. If you
+      wanted the fill even you could ask for it, and you would pay in wire.
+    source: n45_ibex
+    fact: 14871 instances at 51 percent utilization, zero routing violations.
+
+  - id: pa-ir-pair-same-process
+    section: power
+    style: pair
+    images:
+      a: ibex-ir.webp
+      b: rocket-ir.webp
+    caption: two designs on Nangate45, both on the same 1.1 volt supply, drop on the ground net
+    describe: >-
+      Both are banded, cool at the edges and deep red in a broad stripe across
+      the middle. The left legend runs to 8.866 millivolts, the right to
+      14.419 millivolts.
+    question: These two share a process and a supply. Which one is worse?
+    answer: b
+    explain: >-
+      This is the case the other voltage pair does not cover. When the process
+      and the supply match, the legends are in the same units against the same
+      1.1 volts, so the numbers compare directly: 0.81 percent on the left
+      against 1.31 percent on the right. The colours still do not compare,
+      because each map stretches its palette over its own range, and the two
+      deepest reds here stand for readings that differ by a factor of 1.6. So
+      the rule survives intact. Read the legend, then decide. One more thing
+      worth knowing about these maps: they are drawn on the ground net, so
+      what they show is the ground rising under the cells rather than the
+      supply sagging above them. The same runs report 0.83 and 1.54 percent on
+      the supply, and a cell that sits in both hot spots loses from both ends.
+    source: n45_ibex against n45_rocket
+    fact: 8.87 millivolts against 14.4 millivolts, both on 1.1 volts.
+
+  - id: pa-rocket-route-macro
+    section: routing
+    style: name
+    image: rocket-routing.webp
+    caption: tinyRocket on Nangate45, every signal wire, with the power and ground nets hidden
+    describe: >-
+      Wire covers the core edge to edge. The two macros near the bottom are
+      pale rectangles with their own vertical stripes inside and almost
+      nothing laid across them, and a band of bare rows surrounds each one.
+    question: Why does the wiring stop at the two macros instead of crossing them?
+    answer: It did not have to cross. Going around was cheaper.
+    wrong:
+      - Crossing a macro is forbidden, so the router has no choice.
+      - Nothing on one side of a macro connects to anything on the other.
+      - A wire over a macro would couple into it and break its timing model.
+    explain: >-
+      Routing over a macro is allowed and routinely done, but only on the
+      layers above the ones the macro's own metal occupies, and those are the
+      same upper layers the power grid and the long global nets want. So the
+      router treats it as expensive and takes it only when the detour costs
+      more. Here there is room to go around, and it does: one wire clips a
+      corner and everything else turns. Two things follow. When a floorplan
+      gets tight, over-the-macro routing is a lever you can pull, at the cost
+      of upper-layer resource. And the bare rows around each macro are the
+      halo, which is why the same run's congestion map reads cold in exactly
+      that ring.
+    source: n45_rocket
+    fact: 500952 micrometres of routed wire, next to none of it over a macro.
+
+  - id: pa-rocket-worstpath-scope
+    section: paths
+    style: name
+    image: rocket-worstpath.webp
+    caption: tinyRocket on Nangate45, the worst setup path on a block of 27315 cells
+    describe: >-
+      The launch clock, the data path and the capture clock all sit inside the
+      top left corner of the die. The rest of the block, including both
+      macros, is untouched grey.
+    question: The failure is in one corner. How much of the block needs work?
+    answer: Far more than this. One path is one endpoint.
+    wrong:
+      - That corner and no more. The worst path is where the trouble is.
+      - None of it. A single failing path is inside the usual margin.
+      - The clock tree, since the launch and capture clocks are both drawn here.
+    explain: >-
+      The worst path is the single deepest hole, and a plan view of it tells
+      you nothing about how many other holes there are. The number that does
+      is the total negative slack, which came to -47.93 nanoseconds against a
+      worst path of -0.13. No endpoint can contribute more than the worst one,
+      so at least 369 endpoints are failing, and they are not all in this
+      corner. This is the most common misread of a worst-path view. Fix what
+      it shows and the report comes back with a different path, sometimes
+      hundreds of times over. Look at the worst path to understand the shape
+      of the problem, and at the total to understand the size of it.
+    source: n45_rocket
+    fact: worst slack -0.13 nanoseconds, total negative slack -47.93, 9075 endpoints checked.
+
+  - id: pa-ibex-congest-wedge
+    section: congestion
+    style: name
+    image: ibex-congestion.webp
+    caption: ibex on Nangate45, routing congestion after global routing
+    describe: >-
+      A warm orange and red field over most of the core, with an even green
+      wedge along the bottom right and a green band round the outside. The
+      warm area has a ragged edge.
+    question: The green wedge has capacity to spare. Why does the router not use it?
+    answer: Nothing is placed there, so no wire has any reason to go.
+    wrong:
+      - It is a routing blockage the floorplan declared.
+      - The upper layers are switched off over that part of the die.
+      - The router holds it back as margin for later engineering changes.
+    explain: >-
+      Congestion follows demand and demand follows cells. Put the placement
+      view of this run beside this one and the ragged warm edge traces the
+      ragged edge of the cell blob exactly, which is worth knowing on its own:
+      a congestion map hands you the floorplan for free. Spare capacity over
+      bare silicon cannot be lent to the crowded middle. The only way to use
+      it is to move cells into it, and that trades congestion for wire length
+      on every net you stretch. Whether the trade is worth making is what the
+      two maps together are for.
+    source: n45_ibex
+    fact: 29.04 percent of routing resource used overall, 60.43 on metal2, zero overflow.
+
+  - id: pa-ibex-grid
+    section: power
+    style: name
+    image: ibex-all.webp
+    caption: ibex on Nangate45, every wire on the block including the supply nets
+    describe: >-
+      Dense signal routing in green, yellow and red, crossed by thick pink
+      stripes that run the full width of the die at a regular spacing. A dark
+      blue region at the bottom right has the stripes but almost nothing else.
+    question: What are the thick stripes crossing the whole die?
+    answer: The power grid, laid over everything else.
+    wrong:
+      - The clock trunk on its way out to the branches.
+      - The widest signal buses, drawn thicker because they carry more nets.
+      - The boundaries between cell rows.
+    explain: >-
+      The supply comes in as a grid of wide straps on the upper layers,
+      dropping through vias to the rails that run along every cell row. The
+      spacing is a real design choice: closer straps mean less voltage drop
+      and less routing resource left for signals. Two things in the drill are
+      worth checking against this picture. The voltage map from this same run
+      is banded, and the bands share this pitch, because how far a cell sits
+      from a strap is most of what sets its drop. And the routing view of the
+      same run is this picture with the supply nets switched off, which is the
+      only difference between them.
+    source: n45_ibex
+    fact: worst drop 0.83 percent of a 1.1 volt supply.
+
+  - id: pa-a7-resizer-colours
+    section: routing
+    style: name
+    image: a7-resizer.webp
+    caption: gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), the cells timing work added
+    describe: >-
+      The placement in outline with two kinds of cell filled in. Yellow ones
+      line the top edge and both sides, more than forty of them. Red ones,
+      eight in all, sit scattered in the interior.
+    question: Both colours were added by the tools. What separates them?
+    answer: Yellow went in on the ports before placement. Red is repair.
+    wrong:
+      - Yellow cells were inserted and red cells were resized in place.
+      - Yellow is setup repair and red is hold repair.
+      - Red cells are on the critical path and yellow cells are not.
+    explain: >-
+      The yellow ones are the port buffers, 35 on the inputs and 18 on the
+      outputs, and they went in before placement started, one on every port,
+      as a matter of course rather than in response to anything. That is why
+      they sit around the edge. The red ones are rebuffering from setup
+      repair, added later and only where the timing asked. So the colour tells
+      you routine work from real work, and the useful habit is to look at the
+      interior. Forty-odd cells around the rim of a block is the flow saying
+      hello. Eight in the middle is the flow saying it had to try.
+    source: a7_gcd
+    fact: 53 port buffers before placement, 7 buffers and 9 resizes during repair.
+
+  - id: pa-a7-fill-hidden
+    section: placement
+    style: name
+    image: a7-placement.webp
+    caption: gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), the cells after detailed placement
+    describe: >-
+      Rows of outlined cells across the core, broken by black gaps of every
+      size, including one wide one near the middle.
+    question: The flow placed 327 fill cells here. Where are they?
+    answer: Left out. This view does not draw them.
+    wrong:
+      - Packed along the edges of the core, where the tool collects them.
+      - Only in the rows that look solid, which is why the others have gaps.
+      - Not placed yet. Fill goes in after routing, and this is from before.
+    explain: >-
+      The placement view switches off physical cells on purpose, and that is
+      the more useful picture. What you see is the design, and what you do not
+      see is the slack: the black is free row space, which is where repair
+      buffers, hold fixes and any late change have to fit. This block is 76
+      percent utilized, so a quarter of the rows are open and there is room
+      almost everywhere. Hold that against the Skywater block in this drill,
+      which looks like a brick wall because at 92 percent it nearly is, and
+      has almost nowhere left to put anything.
+    source: a7_gcd
+    fact: 306 instances and 327 fill cells, 76 percent utilization.
+
+  - id: pa-a7-resizer-spot
+    section: routing
+    style: spot
+    image: a7-resizer.webp
+    caption: gcd on ASAP7 (Arizona State University 7 nanometre predictive process design kit), the cells timing work added
+    describe: >-
+      Two kinds of highlighted cell over the placement outline. Several dozen
+      yellow ones around the rim of the core, and nine red ones out in the
+      middle of the block.
+    question: Click a cell that timing repair had to add.
+    targets:
+      - {x: 0.352, y: 0.413, w: 0.060, h: 0.060}
+      - {x: 0.203, y: 0.220, w: 0.092, h: 0.115}
+      - {x: 0.649, y: 0.220, w: 0.060, h: 0.060}
+      - {x: 0.738, y: 0.496, w: 0.060, h: 0.060}
+      - {x: 0.274, y: 0.689, w: 0.060, h: 0.060}
+      - {x: 0.379, y: 0.523, w: 0.060, h: 0.060}
+      - {x: 0.572, y: 0.827, w: 0.060, h: 0.060}
+    explain: >-
+      The red ones. Those are the rebuffering cells, added during repair and
+      only where the timing asked for them. The yellow crowd around the edge
+      is the port buffers, 53 of them, put in before placement had even
+      started because every port gets one whether it needs help or not. So the
+      two colours answer two different questions. Yellow tells you where the
+      block's boundary is. Red tells you where it hurt.
+    source: a7_gcd
+    fact: nine rebuffer cells against 53 port buffers.
+
+  - id: pa-rocket-halo-spot
+    section: congestion
+    style: spot
+    image: rocket-congestion.webp
+    caption: tinyRocket on Nangate45, routing congestion over a floorplan with two macros
+    describe: >-
+      A hot orange and red field over the cells. Both macros read red, and
+      beside each one, on its outer side, a band of green tiles separates it
+      from everything else.
+    question: Click a band of green that a macro keep-out cleared.
+    targets:
+      - {x: 0.045, y: 0.662, w: 0.076, h: 0.232}
+      - {x: 0.879, y: 0.704, w: 0.069, h: 0.172}
+    explain: >-
+      The halo is the quietest routing on the block for the simple reason that
+      there are no cells in it to wire. Two things are worth taking from that.
+      Capacity in the halo is not free capacity, because nets only go where
+      their cells are, and a cool band beside a hot block is not relief. And
+      the width of that band is a number you chose. Shrink the halo and the
+      green shrinks with it, the cells move closer to the macro, and the
+      crowding at the macro edge is yours to deal with.
+    source: n45_rocket
+    fact: halos of 22.4 by 15.12 micrometres around each macro.
+
+  - id: pa-congest-uniform-pair
+    section: congestion
+    style: pair
+    images:
+      a: congest-congestion.webp
+      b: a7-congestion.webp
+    caption: the same design on two processes, routing congestion after global routing
+    describe: >-
+      The left one is one warm colour almost everywhere, near the top of its
+      scale, with a cool margin. The right one is green and olive with a dozen
+      hot tiles scattered through it.
+    question: One of these runs was starved of routing layers. Which?
+    answer: a
+    explain: >-
+      The shape of the heat tells you which kind of problem you have. A
+      shortage that applies to the whole block, such as taking its upper
+      layers away, raises every tile at once and paints one flat colour. Local
+      crowding leaves the background cool and puts peaks on top of it. So
+      before reading any single tile, ask whether the map is flat or spiky.
+      Flat sends you to the resources, the layer count, the track pitch, the
+      die size. Spiky sends you to the placement. The left run was held to the
+      lowest three layers and routed anyway, because the design is small. The
+      right one had seven and used 12.73 percent of them.
+    source: congest against a7_gcd
+    fact: three layers against seven.
+
+  - id: pa-room-pair
+    section: placement
+    style: pair
+    images:
+      a: a7-placement.webp
+      b: sky-placement.webp
+    caption: the same design on two processes, cells after detailed placement, fill cells hidden
+    describe: >-
+      The left one has black gaps of every size between the cells. The right
+      one is a brick wall with hardly a gap in it.
+    question: Repair needs a free site for one more buffer. Which block has it?
+    answer: a
+    explain: >-
+      Both views leave the fill cells out, so the black is honest free row
+      space and the comparison is fair even across two processes, because what
+      you are reading is a fraction and not a size. The left block is 76
+      percent utilized and has open sites almost everywhere. The right is 92
+      percent, and a buffer that has to go in at a particular place has
+      nowhere near it to go, so the legalizer starts shoving neighbours along
+      the row to make space, which moves cells that were fine where they were.
+      Density is not only an area number. It is how much freedom every later
+      stage has.
+    source: a7_gcd against sky_signoff
+    fact: 76 percent utilization against 92.
+
+  - id: pa-ibex-reset-path
+    section: paths
+    style: name
+    image: ibex-worstpath.webp
+    caption: ibex on Nangate45, the worst path in a block that closes timing, starting at the reset port
+    describe: >-
+      A red path that sprawls over half the block, branching into stubs and
+      dead ends rather than running from one place to another. The launch
+      clock enters from the left edge, and green capture branches sit near the
+      middle and bottom.
+    question: Why does one path cover half the block?
+    answer: It follows the reset, and the reset goes everywhere.
+    wrong:
+      - The router detoured it a long way round the congestion.
+      - It is the scan chain, stitched together in placement order.
+      - The view draws the whole path group, not one path.
+    explain: >-
+      The red is the net the path runs on, and this path starts at the reset
+      port, so the net drawn is the reset tree with its whole fan-out to the
+      register file. A single logical path lights up half the die. Two things
+      are worth keeping. A high fan-out control net is one of the hardest
+      things in a block to time, because one driver has to reach everywhere
+      and every load waits for the slowest. And the check here is not the one
+      most people picture: this is a recovery check, asking that the reset go
+      inactive early enough before a clock edge, in a path group of its own
+      called asynchronous. The block passes it with 0.02 nanoseconds in hand
+      on a 2.2 nanosecond clock, which is as close as closure gets.
+    source: n45_ibex
+    fact: worst slack +0.02 nanoseconds, total negative slack zero.
+
+  - id: pa-rocket-insertion
+    section: clock
+    style: name
+    image: rocket-clocktree.webp
+    caption: tinyRocket on Nangate45, the whole clock tree drawn on the block it feeds
+    describe: >-
+      A red mesh of clock wiring covering the entire core, thousands of small
+      cells hanging off it, with one branch picked out in orange running from
+      the clock pin at the top left down to the bottom right.
+    question: >-
+      The clock needs 0.30 nanoseconds to get from the pin to a flip-flop, a
+      quarter of the 1.2 nanosecond period. What does that cost a path from
+      one of those flip-flops to another?
+    answer: Nothing. Both ends of the path wait the same 0.30 nanoseconds.
+    wrong:
+      - A quarter of the period, because the logic only gets what is left.
+      - Half of it, since the launch pays it and the capture pays it again.
+      - It depends on the skew, which is this same number under another name.
+    explain: >-
+      Insertion delay is common to the launch and the capture flip-flop, so on
+      a path between two of them it subtracts out and only the difference
+      between the two arrivals, the skew, is left. That is the arithmetic, and
+      it is why a deep tree does not obviously hurt. What it does cost is
+      everything that has nothing to cancel against. A path to or from a port
+      is measured against the port, which waits for nobody. A reset release is
+      checked against a clock edge that arrived late. And a longer chain of
+      buffers has more places for variation to accumulate, so the skew you
+      budgeted grows with the depth you allowed. Shallow trees are not about
+      the delay. They are about everything that does not cancel.
+    source: n45_rocket
+    fact: 621 clock buffers, 3913 sinks, 0.30 nanoseconds from pin to flip-flop.

@@ -1,0 +1,1353 @@
+# Timing reports flash-card deck (OpenSTA reporting commands).
+#
+# Card fields are the same as sdc.yaml. A report-reading card (section
+# `reading`) also has:
+#   question  the question asked, in place of "What does this command do?"
+#   excerpt   real report text, shown in place of the command
+# Excerpts come from OpenROAD runs of the gcd example design (nangate45) in the
+# openroad/orfs Docker image. The scripts, the raw output, and the generator
+# for the reading cards are in timing_reports_src/ (see gen_reading.py).
+
+deck: timing-reports
+title: Timing reports
+reference: https://github.com/parallaxsw/OpenSTA/blob/master/doc/Commands.md
+basis:
+  tool: OpenSTA
+  tool_url: https://github.com/parallaxsw/OpenSTA
+  doc_title: OpenSTA command reference
+  note: >-
+    These cards follow the reporting commands of OpenSTA, the open-source
+    static timing analyzer used by OpenROAD, and each answer links to that
+    command in the OpenSTA command reference. Report commands are not a
+    standard: other timers name and format their reports differently. The
+    report excerpts are real OpenSTA output from the gcd example design.
+
+sections:
+  - id: paths
+    title: Path reports
+    blurb: Reporting individual timing paths, and choosing which paths and how much detail.
+    commands: [report_checks, find_timing_paths]
+  - id: summary
+    title: Summary numbers
+    blurb: One number, or one line per check type, for the health of the whole design.
+    commands: [report_wns, report_tns, report_worst_slack, report_check_types]
+  - id: pins
+    title: Pin-level timing
+    blurb: Slack, arrival, and required times at a single pin.
+    commands: [report_slack, report_arrival, report_required]
+  - id: clocks
+    title: Clock reports
+    blurb: Skew, latency, the fastest achievable period, and clock definitions.
+    commands: [report_clock_skew, report_clock_latency, report_clock_min_period, report_clock_properties]
+  - id: constraints
+    title: Checking the constraints
+    blurb: Finding missing or broken constraints before trusting any slack.
+    commands: [check_setup, report_disabled_edges]
+  - id: detail
+    title: Delay and electrical detail
+    blurb: Why a stage has the delay it has, down to nets, pins, and library tables.
+    commands: [report_dcalc, report_slews, report_net, report_instance, report_edges, report_lib_cell, report_units]
+  - id: annotation
+    title: Annotation and power
+    blurb: Whether parasitics, delays, and switching activity were loaded, and the power they give.
+    commands: [report_parasitic_annotation, report_annotated_delay, report_annotated_check,
+               report_activity_annotation, report_power]
+  - id: mcmm
+    title: Corners, modes, and scenes
+    blurb: Analysing more than one library and one constraint set in a single session.
+    commands: [define_scene, set_scene, get_scenes, set_mode, get_modes, define_corners]
+  - id: reading
+    title: Reading a report
+    blurb: Questions about real report output, line by line.
+    commands: [report_checks, report_wns, report_tns, report_check_types, check_setup,
+               report_clock_skew, report_clock_min_period, report_parasitic_annotation, report_slack]
+
+cards:
+
+  # ---------------------------------------------------------------- Path reports
+
+  - id: p-default
+    section: paths
+    command: report_checks
+    hint: "Three defaults decide what you get: which analysis, how much detail per path, and how many paths per group."
+    answer: Reports the worst setup path in each path group, in full detail.
+    wrong:
+      - Reports every failing path in the design, both setup and hold.
+      - Reports the worst setup path and the worst hold path together.
+      - Reports one summary line of worst slack for each clock.
+    explain: >-
+      With no options, `-path_delay` is `max` (setup), `-format` is `full`, and
+      one path is reported per path group. Paths are grouped by the clock that
+      captures them, with separate groups for unclocked and unconstrained
+      paths.
+    source: report_checks
+
+  - id: p-min
+    section: paths
+    command: report_checks -path_delay min
+    hint: "In a timing tool, min and max name the two analyses, not the size of anything."
+    answer: Reports the worst hold path in each path group.
+    wrong:
+      - Reports the path with the least setup slack in each group.
+      - Reports the path through the fewest cells in each group.
+      - Reports the smallest clock period each group could run at.
+    explain: >-
+      `min` uses the earliest arrivals, which are checked against hold
+      requirements; `max` uses the latest arrivals, checked against setup.
+    source: report_checks
+
+  - id: p-minmax
+    section: paths
+    command: report_checks -path_delay min_max
+    hint: "Read it as min plus max: the two analyses in one report."
+    answer: Reports both the worst setup path and the worst hold path in each group.
+    wrong:
+      - Reports paths whose delay lies between a minimum and a maximum limit.
+      - Reports only the paths that fail both setup and hold at once.
+      - Reports the average of the min and max delays on every path.
+    explain: >-
+      `min_max` runs both analyses in one report: the setup (max) paths and the
+      hold (min) paths.
+    source: report_checks
+
+  - id: p-group-count
+    section: paths
+    command: report_checks -group_path_count 10
+    hint: "There are two counts in this command: one per path group, one per endpoint. This is the first."
+    answer: Reports up to 10 of the worst paths in each path group.
+    wrong:
+      - Reports 10 paths in total, spread across all path groups.
+      - Reports 10 different paths into each failing endpoint.
+      - Reports only path groups that have at least 10 failing paths.
+    explain: >-
+      The default is 1 per group. Because `-endpoint_path_count` defaults to 1,
+      each endpoint contributes at most one path, so these are the 10 worst
+      endpoints of each group.
+    source: report_checks
+
+  - id: p-endpoint-count
+    section: paths
+    command: report_checks -group_path_count 5 -endpoint_path_count 3
+    hint: "The group count caps the whole group; the endpoint count only decides how those paths may be shared out."
+    answer: Reports 5 paths per group, allowing up to 3 different paths into one endpoint.
+    wrong:
+      - Reports 3 paths into each of 5 endpoints, 15 paths per group in total.
+      - Reports the 5 worst endpoints, each with its 3 slowest stages shown.
+      - Reports only the endpoints that have at least 3 failing paths.
+    explain: >-
+      `-group_path_count` caps the paths per group; `-endpoint_path_count` caps
+      how many of them may end at the same endpoint. Many of those paths can
+      differ only in rise and fall edges; `-unique_paths_to_endpoint` keeps one
+      path per set of pins.
+    source: report_checks
+
+  - id: p-format-end
+    section: paths
+    command: report_checks -format end -group_path_count 20
+    hint: "The end of a path is its endpoint, and the format keeps only that."
+    answer: Lists the 20 worst endpoints per group, one line per endpoint.
+    wrong:
+      - Prints the last stage of each of the 20 worst paths in full detail.
+      - Lists the start points of the 20 worst paths in each group.
+      - Stops the report after 20 paths, wherever the list has reached.
+    explain: >-
+      The `end` format drops the stage-by-stage detail and keeps one line per
+      path end: required time, arrival, and slack. It is the usual way to see how many endpoints fail and by how
+      much.
+    source: report_checks
+
+  - id: p-format-clock
+    section: paths
+    command: report_checks -format full_clock
+    hint: "The default report compresses each clock into a single `clock network delay` line. Ask what expanding it shows."
+    answer: Reports the data path plus the launch and capture clock paths, stage by stage.
+    wrong:
+      - Reports only the launch and capture clock paths, without the data path.
+      - Reports the worst path of every clock defined in the design.
+      - Reports the data path with every delay given as a fraction of the period.
+    explain: >-
+      The default `full` format shows the clock network delay as a single
+      line. `full_clock` expands it into the clock buffers on both sides, which
+      shows where skew comes from. `full_clock_expanded` also shows the path
+      from a generated clock's source.
+    source: report_checks
+
+  - id: p-fields
+    section: paths
+    command: report_checks -fields {slew cap fanout}
+    hint: "Fields add columns to each stage; they do not filter which paths are reported."
+    answer: Adds slew, capacitance, and fanout columns to every stage of the path.
+    wrong:
+      - Reports only the paths that have slew, capacitance, or fanout violations.
+      - Sorts the reported paths by their slew, capacitance, and fanout.
+      - Replaces the delay column with slew, capacitance, and fanout columns.
+    explain: >-
+      The extra columns explain a slow stage: a large load, a high fanout, or
+      a slow input slew. `input_pin` and `net` add the input pins and the nets
+      as rows.
+    source: report_checks
+
+  - id: p-slack-max
+    section: paths
+    command: report_checks -slack_max 0 -group_path_count 100
+    hint: "Read `-slack_max` as an upper bound on the slack of the paths you want listed."
+    answer: Reports up to 100 paths per group with slack below 0, the failing ones.
+    wrong:
+      - Reports up to 100 paths per group with slack of at most 100.
+      - Reports up to 100 paths per group with slack above 0, the passing ones.
+      - Sets 0 as the largest slack allowed on any path in the design.
+    explain: >-
+      `-slack_max` keeps paths with less slack than the value, and
+      `-slack_min` keeps paths with more. Together with a large path count,
+      `-slack_max 0` lists the failing paths.
+    source: report_checks
+
+  - id: p-through
+    section: paths
+    command: report_checks -through [get_pins u_alu/sum*]
+    hint: "`-from`, `-through`, and `-to` mean here what they mean in a timing exception."
+    answer: Reports the worst path that passes through one of the pins u_alu/sum*.
+    wrong:
+      - Reports the worst path that starts at one of the pins u_alu/sum*.
+      - Reports the worst path that ends at one of the pins u_alu/sum*.
+      - Reports the worst path that avoids every pin u_alu/sum*.
+    explain: >-
+      `-from`, `-through`, and `-to` narrow the report the same way they narrow
+      a timing exception: from start points, through intermediate pins, to
+      endpoints.
+    source: report_checks
+
+  - id: p-unconstrained
+    section: paths
+    command: report_checks -unconstrained
+    hint: "A path with no requirement has no slack, so ask where such paths are normally put."
+    answer: Also reports paths that have no timing requirement at all.
+    wrong:
+      - Reports only the paths that fail their timing requirement.
+      - Removes every constraint and reports the raw path delays.
+      - Reports only the paths removed by a false-path exception.
+    explain: >-
+      They are reported in their own group. Without this option the
+      unconstrained group is not reported at all. An
+      unconstrained path usually means a constraint is missing, for example an
+      output port with no output delay.
+    source: report_checks
+
+  - id: p-sort
+    section: paths
+    command: report_checks -group_path_count 5 -sort_by_slack
+    hint: "By default paths are listed group by group, sorted inside each group."
+    answer: Reports the paths in slack order across all groups, not group by group.
+    wrong:
+      - Sorts the stages inside each reported path by their slack.
+      - Reports only the 5 paths with the most slack in each group.
+      - Reports the path groups in alphabetical order of their names.
+    explain: >-
+      By default paths are listed group by group, worst first within each
+      group. `-sort_by_slack` merges the groups into one list ordered by slack.
+    source: report_checks
+
+  - id: p-path-group
+    section: paths
+    command: report_checks -path_group core_clock
+    hint: "A path's group is the clock that captures it, unless `group_path` moved it."
+    answer: Reports only the paths in the path group named core_clock.
+    wrong:
+      - Creates a path group named core_clock for later reports.
+      - Reports every path launched by core_clock, in any group.
+      - Reports the clock tree of core_clock, buffer by buffer.
+    explain: >-
+      A path's default group is the clock that captures it, so this reports
+      paths captured by core_clock. Groups made with `group_path` are selected
+      the same way.
+    source: report_checks
+
+  - id: p-find
+    section: paths
+    command: set paths [find_timing_paths -path_delay max -group_path_count 10]
+    hint: "The name says find, not report. Ask what a script would want back."
+    answer: Stores the 10 worst setup paths as path objects in a variable, printing nothing.
+    wrong:
+      - Prints the 10 worst setup paths, then also stores their text in paths.
+      - Writes the 10 worst setup paths to a file named paths.
+      - Stores the names of the 10 worst endpoints as plain strings.
+    explain: >-
+      `find_timing_paths` takes the same selection options as `report_checks`
+      but returns objects for a script. `get_property` reads their fields, such
+      as `slack`, `startpoint`, and `endpoint`.
+    source: find_timing_paths
+
+  # ---------------------------------------------------------------- Summary numbers
+
+  - id: s-wns
+    section: summary
+    command: report_wns
+    hint: "The N in WNS (Worst Negative Slack) is negative. Ask what it can report when nothing is negative."
+    answer: Prints the worst negative setup slack, or 0 if every setup check passes.
+    wrong:
+      - Prints the worst setup slack, whether it is positive or negative.
+      - Prints the negative setup slacks of all endpoints added together.
+      - Prints the number of endpoints that fail their setup check.
+    explain: >-
+      WNS (Worst Negative Slack) never reports a positive number; a design that
+      passes shows 0. `report_worst_slack` shows the actual worst slack,
+      positive or negative. `-min` switches to hold.
+    source: report_wns
+
+  - id: s-tns
+    section: summary
+    command: report_tns
+    hint: "The T is total. Ask what it is totalled over."
+    answer: Prints the negative slacks of the failing endpoints added together.
+    wrong:
+      - Prints the worst negative slack times the number of failing endpoints.
+      - Prints the sum of every endpoint's slack, positive and negative.
+      - Prints the number of timing paths that fail in the design.
+    explain: >-
+      TNS (Total Negative Slack) measures how widespread the failures are, and
+      WNS (Worst Negative Slack) how deep the worst one is. A small WNS (Worst Negative Slack) with a
+      large TNS (Total Negative Slack) means many endpoints fail by a little.
+    source: report_tns
+
+  - id: s-worst-min
+    section: summary
+    command: report_worst_slack -min
+    hint: "Compare it with `report_wns`: only one of the two can report a positive number. `-min` selects hold."
+    answer: Prints the worst hold slack in the design, even if it is positive.
+    wrong:
+      - Prints the worst setup slack in the design, even if it is positive.
+      - Prints the worst hold slack, or 0 if every hold check passes.
+      - Prints the smallest clock period at which hold still passes.
+    explain: >-
+      `report_worst_slack` reports the actual value, so a passing design shows
+      its margin. `report_wns -min` would show 0 for the same design.
+    source: report_worst_slack
+
+  - id: s-check-types
+    section: summary
+    command: report_check_types
+    hint: "Types means kinds of check: setup and hold, but also slew, capacitance, fanout, and pulse width."
+    answer: Reports the worst slack of each kind of timing and design-rule check.
+    wrong:
+      - Reports only the checks that are violated, one line per violation.
+      - Lists the kinds of timing check that the library defines.
+      - Checks the constraints for missing clocks and input delays.
+    explain: >-
+      The kinds include setup, hold, recovery, removal, clock-gating, maximum
+      slew, capacitance, fanout, minimum pulse width, and minimum period. Each
+      can be requested alone with its option.
+    source: report_check_types
+
+  - id: s-violators
+    section: summary
+    command: report_check_types -violators
+    hint: "A violator is any check with negative slack, not only a timing path."
+    answer: Lists every violated check of every kind, from setup to maximum slew.
+    wrong:
+      - Lists only the setup and hold checks that are violated.
+      - Lists the cells that must be resized to fix the violations.
+      - Counts the violations of each kind without listing them.
+    explain: >-
+      This is the sign-off question in one command: is anything violated, of
+      any kind? Timing and design-rule violations are listed together.
+    source: report_check_types
+
+  - id: s-drv
+    section: summary
+    command: report_check_types -max_slew -max_capacitance -max_fanout
+    hint: "All three options name design rules, so the report is narrowed to those."
+    answer: Reports only the slew, capacitance, and fanout design-rule checks.
+    wrong:
+      - Sets new slew, capacitance, and fanout limits for the design.
+      - Reports the timing paths whose delay depends on slew and load.
+      - Fixes slew, capacitance, and fanout violations by buffering.
+    explain: >-
+      These are the electrical design rules, reported separately from timing
+      slack. Reporting changes nothing; repair is a separate step.
+    source: report_check_types
+
+  # ---------------------------------------------------------------- Pin-level timing
+
+  - id: pin-slack
+    section: pins
+    command: report_slack u1/D
+    hint: "It reports at one pin, so no path is walked. Ask which numbers exist at a pin."
+    answer: Prints the rise and fall, min and max slack at u1/D per clock.
+    wrong:
+      - Prints the full worst path through u1/D, stage by stage.
+      - Prints the slack of the path that starts at u1/D only.
+      - Sets the slack that pin u1/D must meet during optimization.
+    explain: >-
+      Pin-level commands print numbers at one pin, without a path. They answer
+      "how much margin is there here?" quickly, and `report_checks -through`
+      then shows the path.
+    source: report_slack
+
+  - id: pin-arrival
+    section: pins
+    command: report_arrival u1/D
+    hint: "Arrival is when the data gets there, as opposed to when it is needed."
+    answer: Prints the earliest and latest arrival times at pin u1/D, per clock.
+    wrong:
+      - Prints the time the clock edge arrives at the register u1.
+      - Prints the required times at u1/D for setup and hold.
+      - Prints the delay of the cell u1 from its inputs to its output.
+    explain: >-
+      The arrival is when data reaches the pin. Min and max arrivals feed the
+      hold and setup checks respectively.
+    source: report_arrival
+
+  - id: pin-required
+    section: pins
+    command: report_required u1/D
+    hint: "Required is the limit that the arrival is compared against; slack is the difference."
+    answer: Prints the required times that arrivals at u1/D are checked against.
+    wrong:
+      - Prints the earliest and latest arrival times of data at u1/D.
+      - Prints the library setup and hold times of the cell u1.
+      - Prints which constraints and exceptions apply to the pin u1/D.
+    explain: >-
+      For setup, data must arrive before the max required time; for hold,
+      after the min required time. Slack is the difference between required
+      and arrival.
+    source: report_required
+
+  # ---------------------------------------------------------------- Clock reports
+
+  - id: c-skew
+    section: clocks
+    command: report_clock_skew
+    hint: "Skew matters only between registers with a path between them, so ask which pairs are compared."
+    answer: Reports the largest clock-arrival difference between registers that share a path.
+    wrong:
+      - Reports the largest clock-arrival difference between any two registers.
+      - Reports the skew target that clock tree synthesis aimed for.
+      - Reports the difference between the rise and fall of each clock.
+    explain: >-
+      Skew only matters between registers connected by a timing path, so only
+      those pairs are compared. `-setup` and `-hold` choose which check's view
+      of skew to report.
+    source: report_clock_skew
+
+  - id: c-latency
+    section: clocks
+    command: report_clock_latency
+    hint: "Latency is the delay from a clock's source to where the clock is used."
+    answer: Reports the delay from each clock's source to its registers.
+    wrong:
+      - Reports only the values given with set_clock_latency.
+      - Reports the delay of the data paths between the registers.
+      - Reports the period and the edge times of each clock.
+    explain: >-
+      With propagated clocks this is the computed delay through the built
+      clock tree; with ideal clocks it reflects the latency set in the
+      constraints.
+    source: report_clock_latency
+
+  - id: c-min-period
+    section: clocks
+    command: report_clock_min_period
+    hint: "Ask what the smallest period is that the paths in the design would still meet."
+    answer: Reports the smallest period each clock could run at.
+    wrong:
+      - Reports the period each clock was given in create_clock.
+      - Reports the shortest pulse width allowed on each clock.
+      - Reports the period at which hold checks would start to fail.
+    explain: >-
+      It also prints the matching highest frequency. It is found from the
+      worst register-to-register paths on the same clock edge. Paths between clocks or edges, latch paths, and paths with
+      multicycle or maximum-delay exceptions are ignored.
+    source: report_clock_min_period
+
+  - id: c-props
+    section: clocks
+    command: report_clock_properties
+    hint: "Properties here means how each clock was defined, not what was measured on it."
+    answer: Lists every defined clock with its period and edge times.
+    wrong:
+      - Lists the buffers and inverters in each clock tree.
+      - Lists the skew and latency measured on each clock.
+      - Lists the ports on which each clock enters the design.
+    explain: >-
+      It is a quick check that the clocks were defined as intended, before any
+      path is examined.
+    source: report_clock_properties
+
+  # ---------------------------------------------------------------- Checking the constraints
+
+  - id: k-check-setup
+    section: constraints
+    command: check_setup -verbose
+    hint: "The name is about checking the setup of the constraints, not about setup timing."
+    answer: Checks the constraints for problems and names each offender.
+    wrong:
+      - Reports every timing path that fails its setup check.
+      - Checks the library's setup times against the constraints.
+      - Checks the constraints and prints only a count of each problem.
+    explain: >-
+      The checks cover inputs with no input delay, outputs with no output
+      delay, registers with no clock or several clocks, unconstrained
+      endpoints, combinational loops, and generated clocks without a source
+      clock. Without `-verbose` only counts are printed.
+    source: check_setup
+
+  - id: k-unconstrained
+    section: constraints
+    command: check_setup -unconstrained_endpoints
+    hint: "An endpoint is unconstrained when nothing checks it: no timing check and no output delay."
+    answer: Warns about endpoints that no timing check covers.
+    wrong:
+      - Lists the endpoints whose setup check currently fails.
+      - Lists the input ports that have no input delay set.
+      - Removes the endpoints that have no timing requirement.
+    explain: >-
+      An unconstrained endpoint is never checked, so it can hide a real
+      failure. Input ports without input delay are a separate check,
+      `-no_input_delay`.
+    source: check_setup
+
+  - id: k-script
+    section: constraints
+    command: if {![check_setup]} { exit 1 }
+    hint: "The command returns a value. Ask what a flow would do with it."
+    answer: Stops the script when any constraint check produces a warning.
+    wrong:
+      - Stops the script when any setup path has negative slack.
+      - Runs check_setup only when the design has no warnings yet.
+      - Stops the script unless every endpoint is unconstrained.
+    explain: >-
+      `check_setup` returns 1 when there are no warnings, so a flow can refuse
+      to continue with broken constraints.
+    source: check_setup
+
+  - id: k-disabled
+    section: constraints
+    command: report_disabled_edges
+    hint: "A disabled arc carries no timing at all. Ask what could have disabled one."
+    answer: Lists the disabled timing arcs and the reason for each.
+    wrong:
+      - Lists the timing arcs that have negative slack in the design.
+      - Lists the die edges that have no pins placed on them.
+      - Re-enables every timing arc that a constraint disabled.
+    explain: >-
+      The reason is constraint, constant, or loop. Arcs can be disabled by `set_disable_timing`, by constants from case
+      analysis, or automatically to break combinational loops. Unexpected
+      entries often explain paths that are missing from reports.
+    source: report_disabled_edges
+
+  # ---------------------------------------------------------------- Delay and electrical detail
+
+  - id: d-dcalc
+    section: detail
+    command: report_dcalc -from u1/A -to u1/Z
+    hint: "dcalc is delay calculation: it shows the working behind one arc's delay."
+    answer: Shows how the delay of the arc from u1/A to u1/Z was calculated.
+    wrong:
+      - Recalculates every delay in the design from the start.
+      - Reports the slack of the worst path through u1/A and u1/Z.
+      - Sets the delay of the arc from u1/A to u1/Z to a fixed value.
+    explain: >-
+      It shows the inputs to the library lookup, the input slew and the output
+      load, and the delay and slew that result. It is used to debug a delay
+      that looks wrong.
+    source: report_dcalc
+
+  - id: d-slews
+    section: detail
+    command: report_slews u1/Z
+    hint: "A slew is a transition time, reported at one pin."
+    answer: Prints the rise and fall slews at pin u1/Z, for min and max analysis.
+    wrong:
+      - Prints the maximum slew allowed at pin u1/Z by the design rules.
+      - Prints the slews at every pin of the instance u1.
+      - Prints the delay of the arc that drives pin u1/Z.
+    explain: >-
+      A slow slew at a pin slows the cells it drives. The limit it is checked
+      against is reported by `report_check_types -max_slew`.
+    source: report_slews
+
+  - id: d-net
+    section: detail
+    command: report_net n42
+    hint: "A net joins a driver to its loads and carries capacitance."
+    answer: Lists the pins net n42 connects, with its pin and wire capacitance.
+    wrong:
+      - Lists the timing paths that pass through net n42.
+      - Prints the routing of net n42, layer by layer.
+      - Prints the resistance of net n42 between each pair of pins.
+    explain: >-
+      It shows the driver and the loads on the net and how much capacitance
+      they and the wire contribute, which explains a slow driver.
+    source: report_net
+
+  - id: d-instance
+    section: detail
+    command: report_instance u1
+    hint: "An instance is one placed cell. Ask what is specific to it rather than to its cell type."
+    answer: Lists the library cell of instance u1 and the net on each of its pins.
+    wrong:
+      - Lists the timing arcs defined for the library cell of u1.
+      - Reports the worst slack of any path through the instance u1.
+      - Reports the placement location and orientation of the instance u1.
+    explain: >-
+      It shows how one instance is connected. The timing arcs of its cell
+      come from `report_lib_cell`.
+    source: report_instance
+
+  - id: d-edges
+    section: detail
+    command: report_edges -from u1/A -to u1/Z
+    hint: "An edge is one arc of the timing graph, with a delay on it."
+    answer: Lists the timing arcs from u1/A to u1/Z with their delays.
+    wrong:
+      - Shows how each delay from u1/A to u1/Z was calculated.
+      - Lists the nets connected between u1/A and u1/Z.
+      - Reports the worst path that passes through u1/A and u1/Z.
+    explain: >-
+      An edge is one arc in the timing graph, with rise and fall delays. For
+      the calculation behind each delay, use `report_dcalc`.
+    source: report_edges
+
+  - id: d-lib-cell
+    section: detail
+    command: report_lib_cell NangateOpenCellLibrary/BUF_X1
+    hint: "The name includes a library, so this is about a cell definition, not a placed instance."
+    answer: Describes the library cell BUF_X1, its pins and their properties.
+    wrong:
+      - Lists every instance of BUF_X1 used in the design.
+      - Reports the worst slack through any instance of BUF_X1.
+      - Loads the library cell BUF_X1 from its library file.
+    explain: >-
+      It shows the library definition, not the design. The name includes the
+      library, as in `NangateOpenCellLibrary/BUF_X1`.
+    source: report_lib_cell
+
+  - id: d-units
+    section: detail
+    command: report_units
+    hint: "Numbers in commands and reports carry no units of their own."
+    answer: Prints the units used for values in commands and reports.
+    wrong:
+      - Converts the design's timing values into different units.
+      - Sets the time and capacitance units for the analysis.
+      - Lists the unit of every attribute in the library.
+    explain: >-
+      Numbers in commands and reports carry no units of their own, so this is
+      the way to confirm that 0.46 means nanoseconds and not picoseconds.
+    source: report_units
+
+  # ---------------------------------------------------------------- Annotation and power
+
+  - id: a-spef
+    section: annotation
+    command: report_parasitic_annotation -report_unannotated
+    hint: "Annotation means data loaded from a file; SPEF (Standard Parasitic Exchange Format) carries parasitics."
+    answer: Reports parasitic coverage and lists the nets that lack it.
+    wrong:
+      - Extracts parasitics for every net that does not have them yet.
+      - Reports how many timing arcs received delays from an SDF (Standard Delay Format) file.
+      - Lists the nets with the highest wire capacitance in the design.
+    explain: >-
+      Delays computed without parasitics on some nets are optimistic, so the
+      coverage of the SPEF (Standard Parasitic Exchange Format) file is
+      checked before sign-off timing is trusted.
+    source: report_parasitic_annotation
+
+  - id: a-sdf-delay
+    section: annotation
+    command: report_annotated_delay -report_unannotated
+    hint: "SDF (Standard Delay Format) carries delays. Ask what this reports about them."
+    answer: Summarizes SDF (Standard Delay Format) delay coverage and lists unannotated arcs.
+    wrong:
+      - Reports how many nets have parasitics from a SPEF (Standard Parasitic Exchange Format) file.
+      - Writes the computed delays out to an SDF (Standard Delay Format) file.
+      - Lists the arcs whose calculated delay exceeds the delay in the file.
+    explain: >-
+      An SDF (Standard Delay Format) file gives delays directly instead of
+      having them calculated. Arcs to and from top-level ports are included
+      only with `-from_in_ports` and `-to_out_ports`.
+    source: report_annotated_delay
+
+  - id: a-sdf-check
+    section: annotation
+    command: report_annotated_check
+    hint: "The same idea as the delay report, but for timing checks rather than delays."
+    answer: Summarizes how many timing checks received values from an SDF (Standard Delay Format) file.
+    wrong:
+      - Summarizes how many timing arcs received delays from an SDF (Standard Delay Format) file.
+      - Checks that the SDF (Standard Delay Format) file matches the netlist before reading it.
+      - Reports the setup and hold slack of every annotated check.
+    explain: >-
+      Timing checks (setup, hold, recovery, removal) can be annotated from an
+      SDF (Standard Delay Format) file separately from delays, so their
+      coverage is reported separately.
+    source: report_annotated_check
+
+  - id: a-activity
+    section: annotation
+    command: report_activity_annotation
+    hint: "Activity is how often pins switch, which is what a power calculation needs."
+    answer: Summarizes which pins have annotated switching activity.
+    wrong:
+      - Reports the toggle rate of every net, computed from timing.
+      - Reports the power of every pin that has switching activity.
+      - Reads switching activity from a simulation file on disk.
+    explain: >-
+      Activity comes from simulation (`read_vcd`, `read_saif`) or from
+      `set_power_activity`. Power depends on how often nets switch. Without annotated activity,
+      default input activity is propagated, which is only an estimate.
+    source: report_activity_annotation
+
+  - id: a-power
+    section: annotation
+    command: report_power
+    hint: "Power splits into internal, switching, and leakage, reported per kind of cell."
+    answer: Reports internal, switching, and leakage power by cell group.
+    wrong:
+      - Reports only the leakage power of the design, by cell group.
+      - Reports the voltage drop on the power grid at each cell.
+      - Reports the power consumed in each clock domain separately.
+    explain: >-
+      The groups are sequential, combinational, clock, macro, and pad, in watts.
+      Without simulation activity, an input activity of 0.1 and duty of 0.5
+      are assumed and propagated through the logic.
+    source: report_power
+
+  # ---------------------------------------------------------------- Reading a report
+
+  - id: r-type
+    section: reading
+    question: "Which kind of check does this path report?"
+    excerpt: |2-
+      Startpoint: dpath.b_reg.out[4]$_DFFE_PP_
+                  (rising edge-triggered flip-flop clocked by core_clock)
+      Endpoint: dpath.b_reg.out[4]$_DFFE_PP_
+                (rising edge-triggered flip-flop clocked by core_clock)
+      Path Group: core_clock
+      Path Type: min
+         ...
+         0.00    0.00   clock core_clock (rise edge)
+         0.07    0.07   clock network delay (propagated)
+         0.15    0.22   clock uncertainty
+         0.00    0.22   clock reconvergence pessimism
+                 0.22 ^ dpath.b_reg.out[4]$_DFFE_PP_/CK (DFF_X1)
+         0.00    0.22   library hold time
+                 0.22   data required time
+      ---------------------------------------------------------
+                 0.22   data required time
+                -0.19   data arrival time
+      ---------------------------------------------------------
+                -0.04   slack (VIOLATED)
+    hint: "Look at the Path Type line, and at which library time the capture side uses."
+    answer: "A hold check: the path type is min, with a library hold time."
+    wrong:
+      - "A setup check: the path ends at the D pin of a flip-flop."
+      - "A setup check: the path starts and ends at the same register."
+      - "A minimum pulse width check on the register's clock pin."
+    explain: "`Path Type: max` is a setup check and `Path Type: min` a hold check. The capture side confirms it: a setup report subtracts `library setup time`, a hold report adds `library hold time`. A path from a register back to itself is common in hold reports."
+    source: report_checks
+
+  - id: r-slack
+    section: reading
+    question: "How is the slack of -0.06 obtained?"
+    excerpt: |2-
+         0.38    0.38   clock core_clock (rise edge)
+         0.07    0.45   clock network delay (propagated)
+         0.00    0.45   clock reconvergence pessimism
+                 0.45 ^ dpath.a_reg.out[9]$_DFFE_PP_/CK (DFF_X1)
+        -0.03    0.42   library setup time
+                 0.42   data required time
+      ---------------------------------------------------------
+                 0.42   data required time
+                -0.48   data arrival time
+      ---------------------------------------------------------
+                -0.06   slack (VIOLATED)
+    hint: "The two lines just above the final rule are the two numbers being compared."
+    answer: "The data required time, 0.42, minus the data arrival time, 0.48."
+    wrong:
+      - "The data arrival time, 0.48, minus the data required time, 0.42."
+      - "The clock period, 0.38, minus the data arrival time, 0.48, plus 0.04."
+      - "The data required time, 0.42, minus the setup time, 0.03, minus 0.45."
+    explain: "Setup slack is required minus arrival: the data must arrive before the required time, so a later arrival gives a negative slack. For a hold check the order reverses, arrival minus required."
+    source: report_checks
+
+  - id: r-required
+    section: reading
+    question: "Why is the data required time 0.42 when the clock period is 0.38?"
+    excerpt: |2-
+         0.38    0.38   clock core_clock (rise edge)
+         0.07    0.45   clock network delay (propagated)
+         0.00    0.45   clock reconvergence pessimism
+                 0.45 ^ dpath.a_reg.out[9]$_DFFE_PP_/CK (DFF_X1)
+        -0.03    0.42   library setup time
+                 0.42   data required time
+    hint: "Follow the capture side down: the edge time, then the clock tree, then the library time."
+    answer: "The capture clock reaches the register 0.07 late, and setup takes back 0.03."
+    wrong:
+      - "The 0.03 setup time is added to the period, and pessimism adds 0.01."
+      - "Clock reconvergence pessimism adds 0.04 to the capture edge."
+      - "The launch register's clock-to-output delay is added to the period."
+    explain: "The capture edge occurs at 0.38 at the clock source, but it arrives at the register's clock pin through the clock tree, 0.07 later, at 0.45. The data must arrive the setup time before that: 0.45 minus 0.03 is 0.42."
+    source: report_checks
+
+  - id: r-network
+    section: reading
+    question: "Both clock edges show a clock network delay of 0.07. What does that mean for this path?"
+    excerpt: |2-
+         0.00    0.00   clock core_clock (rise edge)
+         0.07    0.07   clock network delay (propagated)
+         0.00    0.07 ^ dpath.a_reg.out[2]$_DFFE_PP_/CK (DFF_X1)
+         0.10    0.17 ^ dpath.a_reg.out[2]$_DFFE_PP_/Q (DFF_X1)
+         ...
+         0.38    0.38   clock core_clock (rise edge)
+         0.07    0.45   clock network delay (propagated)
+         0.00    0.45   clock reconvergence pessimism
+                 0.45 ^ dpath.a_reg.out[9]$_DFFE_PP_/CK (DFF_X1)
+    hint: "Compare the launch side and the capture side line by line."
+    answer: "The clock reaches both registers equally late, so no skew."
+    wrong:
+      - "The path loses 0.14 ns to the clock tree, 0.07 on each side."
+      - "The clocks are still ideal, so the tree delay is only an estimate."
+      - "The path is launched and captured by two different clocks."
+    explain: "The launch side adds 0.07 to the arrival and the capture side adds 0.07 to the required time, so the two cancel. `(propagated)` means the delay was computed through the built clock tree; an estimate would read `(ideal)`."
+    source: report_checks
+
+  - id: r-stage
+    section: reading
+    question: "Which logic gate, after the launching flip-flop, adds the most delay, and why?"
+    excerpt: |2-
+      Fanout     Cap    Slew   Delay    Time   Description
+      -----------------------------------------------------------------------------
+                                0.00    0.00   clock core_clock (rise edge)
+                                0.07    0.07   clock network delay (propagated)
+                        0.01    0.00    0.07 ^ dpath.a_reg.out[2]$_DFFE_PP_/CK (DFF_X1)
+           4    7.49    0.02    0.10    0.17 ^ dpath.a_reg.out[2]$_DFFE_PP_/Q (DFF_X1)
+           3    6.51    0.02    0.03    0.20 v _520_/ZN (NAND2_X1)
+           1    2.04    0.01    0.02    0.22 ^ _551_/ZN (NAND2_X1)
+           2    3.48    0.01    0.02    0.24 v _553_/ZN (NAND2_X1)
+           1    5.86    0.01    0.03    0.27 v place79/Z (BUF_X1)
+           2    7.97    0.01    0.02    0.29 ^ _554_/ZN (NAND2_X4)
+           1    5.90    0.01    0.01    0.30 v _722_/ZN (NAND2_X4)
+           2    8.76    0.01    0.01    0.32 ^ _724_/ZN (NAND2_X4)
+          14   35.04    0.02    0.03    0.34 v _755_/ZN (NAND2_X4)
+          16   35.73    0.05    0.07    0.41 ^ _854_/ZN (AOI21_X4)
+           1    2.51    0.02    0.03    0.44 v _891_/ZN (NAND2_X1)
+           1    1.71    0.01    0.02    0.46 ^ _894_/ZN (NAND3_X1)
+           1    1.72    0.01    0.01    0.47 v _896_/ZN (NAND2_X1)
+           1    1.44    0.01    0.01    0.48 ^ _897_/ZN (INV_X1)
+                        0.01    0.00    0.48 ^ dpath.a_reg.out[9]$_DFFE_PP_/D (DFF_X1)
+                                        0.48   data arrival time
+    hint: "The Delay column is per stage, and the Cap and Fanout columns say why a stage is slow."
+    answer: "_854_, the AOI21_X4, at 0.07: it drives a fanout of 16 and 35.73 fF."
+    wrong:
+      - "_755_, the NAND2_X4, at 0.03: it drives the most fanout, 14 pins."
+      - "place79, the BUF_X1, at 0.03: every buffer adds delay by design."
+      - "_897_, the INV_X1, at 0.01: the last gate sets the arrival time."
+    explain: "The Delay column shows each stage's contribution, and the Cap and Fanout columns explain it: _854_ drives the largest load in the path, and its output slew of 0.05 is also the slowest, which slows the next stage. Capacitance here is in femtofarads, the unit this library uses."
+    source: report_checks
+
+  - id: r-hold-unc
+    section: reading
+    question: "What makes this hold check fail?"
+    excerpt: |2-
+         0.00    0.00   clock core_clock (rise edge)
+         0.07    0.07   clock network delay (propagated)
+         0.00    0.07 ^ dpath.b_reg.out[4]$_DFFE_PP_/CK (DFF_X1)
+         0.09    0.16 v dpath.b_reg.out[4]$_DFFE_PP_/Q (DFF_X1)
+         0.02    0.18 ^ _825_/ZN (INV_X1)
+         0.01    0.19 v _826_/ZN (OAI21_X2)
+         0.00    0.19 v dpath.b_reg.out[4]$_DFFE_PP_/D (DFF_X1)
+                 0.19   data arrival time
+
+         0.00    0.00   clock core_clock (rise edge)
+         0.07    0.07   clock network delay (propagated)
+         0.15    0.22   clock uncertainty
+         0.00    0.22   clock reconvergence pessimism
+                 0.22 ^ dpath.b_reg.out[4]$_DFFE_PP_/CK (DFF_X1)
+         0.00    0.22   library hold time
+                 0.22   data required time
+      ---------------------------------------------------------
+                 0.22   data required time
+                -0.19   data arrival time
+      ---------------------------------------------------------
+                -0.04   slack (VIOLATED)
+    hint: "Work out what the required time would be without the extra line in the middle."
+    answer: "The 0.15 clock uncertainty pushes the required time past the 0.19 arrival."
+    wrong:
+      - "The data path is too slow to reach the register before the clock edge."
+      - "The register's hold time is too large for a path this short."
+      - "Clock reconvergence pessimism adds 0.15 to the required time."
+    explain: "For hold, the data must arrive after the required time. Without uncertainty the required time would be 0.07 and the check would pass; the 0.15 of hold uncertainty moves it to 0.22. A hold violation is fixed by adding delay to the data path, not by speeding it up."
+    source: report_checks
+
+  - id: r-crpr
+    section: reading
+    question: "What does the clock reconvergence pessimism line of 0.00 mean here?"
+    excerpt: |2-
+         0.00    0.00   clock core_clock (rise edge)
+         0.07    0.07   clock network delay (propagated)
+         0.15    0.22   clock uncertainty
+         0.00    0.22   clock reconvergence pessimism
+                 0.22 ^ dpath.b_reg.out[4]$_DFFE_PP_/CK (DFF_X1)
+         0.00    0.22   library hold time
+                 0.22   data required time
+    hint: "CRPR (Clock Reconvergence Pessimism Removal) credits back pessimism on the shared clock path. Ask what would create pessimism in the first place."
+    answer: "There was no early and late difference on the shared clock path to remove."
+    wrong:
+      - "Clock reconvergence pessimism removal is turned off for this run."
+      - "The two registers share no part of their clock tree at all."
+      - "The clock arrives at the register with zero delay from its source."
+    explain: "CRPR (Clock Reconvergence Pessimism Removal) credits back the difference between late and early delay on the part of the clock tree that launch and capture share, since one buffer cannot be early and late at once. With no derating or variation in this run, early and late delays are equal and the credit is 0."
+    source: report_checks
+
+  - id: r-end
+    section: reading
+    question: "What does this report tell you about the number of failing endpoints?"
+    excerpt: |2-
+      % report_checks -format end -group_path_count 6
+      max_delay/setup group core_clock
+
+                                           Required  Actual
+      Endpoint                               Delay   Delay   Slack
+      ------------------------------------------------------------
+      dpath.a_reg.out[9]$_DFFE_PP_/D (DFF_X1)    0.42    0.48   -0.06 (VIOLATED)
+      dpath.a_reg.out[4]$_DFFE_PP_/D (DFF_X1)    0.42    0.48   -0.06 (VIOLATED)
+      dpath.a_reg.out[8]$_DFFE_PP_/D (DFF_X1)    0.42    0.48   -0.06 (VIOLATED)
+      dpath.a_reg.out[10]$_DFFE_PP_/D (DFF_X1)    0.42    0.48   -0.06 (VIOLATED)
+      dpath.a_reg.out[6]$_DFFE_PP_/D (DFF_X1)    0.42    0.48   -0.06 (VIOLATED)
+      dpath.a_reg.out[0]$_DFFE_PP_/D (DFF_X1)    0.42    0.48   -0.06 (VIOLATED)
+
+      max_delay/setup group vclk_core_clock
+
+                                           Required  Actual
+      Endpoint                               Delay   Delay   Slack
+      ------------------------------------------------------------
+      resp_msg[14] (output)                   0.36    0.42   -0.06 (VIOLATED)
+      resp_msg[13] (output)                   0.36    0.42   -0.06 (VIOLATED)
+      resp_msg[11] (output)                   0.36    0.42   -0.06 (VIOLATED)
+      resp_msg[12] (output)                   0.36    0.42   -0.06 (VIOLATED)
+      resp_msg[9] (output)                    0.36    0.41   -0.05 (VIOLATED)
+      resp_msg[15] (output)                   0.36    0.41   -0.05 (VIOLATED)
+    hint: "Look at the command line at the top: something there limits how many rows appear."
+    answer: "At least 6 fail in each group; the list stops at the count asked for."
+    wrong:
+      - "Exactly 6 endpoints fail setup in each group, and no others do."
+      - "12 endpoints fail hold, the worst of them by 0.06 ns."
+      - "Each endpoint listed needs 0.42 ns more time to pass setup."
+    explain: "`-group_path_count 6` limits the list to 6 per group, so it cannot show how many fail in total. `report_tns`, or `-slack_max 0` with a large count, answers that."
+    source: report_checks
+
+  - id: r-wns-tns
+    section: reading
+    question: "What do these two numbers tell you together?"
+    excerpt: |2-
+      % report_wns
+      wns max -0.06
+
+      % report_tns
+      tns max -2.18
+    hint: "One number is the worst single failure and the other is a sum. Divide one by the other."
+    answer: "The worst failure is small, but at least 37 endpoints fail."
+    wrong:
+      - "One endpoint fails setup by 2.18 ns and the rest by 0.06 ns."
+      - "The design fails setup by 2.18 ns on average at each endpoint."
+      - "Setup passes everywhere; only the hold checks fail."
+    explain: "WNS (Worst Negative Slack) is the deepest failure and TNS (Total Negative Slack) the sum over failing endpoints. No endpoint fails by more than 0.06, so a total of 2.18 needs at least 2.18 / 0.06, about 37, failing endpoints. Both lines say `max`, so these are setup numbers."
+    source: report_tns
+
+  - id: r-check-setup
+    section: reading
+    question: "What does this output say must be fixed before the slack can be trusted?"
+    excerpt: |2-
+      % check_setup -verbose
+      Warning: There is 1 input port missing set_input_delay.
+        req_msg[5]
+      Warning: There are 18 output ports missing set_output_delay.
+        req_rdy
+        resp_msg[0]
+        resp_msg[10]
+         ...
+        resp_val
+      Warning: There are 18 unconstrained endpoints.
+        req_rdy
+        resp_msg[0]
+    hint: "These are warnings about missing constraints, not about failing timing."
+    answer: "An input delay on req_msg[5] and output delays on 18 ports are missing."
+    wrong:
+      - "18 output ports fail their setup checks and need faster paths."
+      - "18 registers have no clock reaching their clock pins."
+      - "The design contains 18 combinational loops that break timing."
+    explain: "Ports with no input or output delay are not timed, so their paths never appear in slack reports; a clean `report_wns` can hide them. The 18 unconstrained endpoints are the same 18 output ports."
+    source: check_setup
+
+  - id: r-check-types
+    section: reading
+    question: "This first table lists each group twice. Which lines are hold and which are setup?"
+    excerpt: |2-
+      % report_check_types
+      Group                                  Slack
+      --------------------------------------------
+      core_clock                             -0.04
+      vclk_core_clock                         0.22
+      core_clock                             -0.06
+      vclk_core_clock                        -0.06
+    hint: "Compare the four slack values with the worst hold and worst setup slack from the path reports."
+    answer: "The first core_clock and vclk_core_clock lines are hold; the second pair is setup."
+    wrong:
+      - "The first core_clock and vclk_core_clock lines are setup; the second pair is hold."
+      - "The first pair is rising-edge checks and the second falling-edge checks."
+      - "The first pair is the clocks' own paths and the second inter-clock paths."
+    explain: "The table has no labels, so compare it with the path reports: -0.04 is the worst hold slack from `report_checks -path_delay min`, and -0.06 is the worst setup slack. Min (hold) is printed first, then max (setup)."
+    source: report_check_types
+
+  - id: r-skew
+    section: reading
+    question: "What does this clock skew report show?"
+    excerpt: |2-
+      % report_clock_skew
+      Clock core_clock
+         0.07 source latency dpath.a_reg.out[12]$_DFFE_PP_/CK ^
+        -0.07 target latency dpath.b_reg.out[9]$_DFFE_PP_/CK ^
+         0.00 CRPR
+      --------------
+        -0.00 setup skew
+
+      Clock vclk_core_clock
+      No launch/capture paths found.
+    hint: "Skew is a difference. Look at the two latency lines and at what sits between them."
+    answer: "Both clock pins see the same 0.07 latency, so setup skew is 0."
+    wrong:
+      - "Setup skew is 0.14 ns, the sum of source and target latency."
+      - "The clock tree is not built yet, so skew is 0 by assumption."
+      - "The virtual clock has a skew problem, since no paths were found."
+    explain: "Skew is the target latency minus the source latency, adjusted by CRPR (Clock Reconvergence Pessimism Removal). The virtual clock reaches no registers, so it has no register pairs to compare, which is normal."
+    source: report_clock_skew
+
+  - id: r-min-period
+    section: reading
+    question: "The clock is defined with a 0.38 ns period. What does this report tell you?"
+    excerpt: |2-
+      % report_clock_min_period
+      core_clock period_min = 0.44 fmax = 2267.21
+      vclk_core_clock period_min = 0.00 fmax = inf
+    hint: "Compare the period reported here with the 0.38 ns the clock was given."
+    answer: "Its register paths need 0.44 ns, so 0.38 cannot be met yet."
+    wrong:
+      - "The design meets 0.38 ns with 0.06 ns of margin to spare."
+      - "The clock's minimum pulse width is 0.44 ns at the registers."
+      - "The fmax value of 2267.21 is the frequency in kilohertz."
+    explain: "The minimum period comes from the worst same-edge register-to-register paths. fmax is its inverse, in megahertz: 1 / 0.441 ns is about 2267 MHz (megahertz). The virtual clock has no register paths, so it shows 0 and infinity."
+    source: report_clock_min_period
+
+  - id: r-parasitics
+    section: reading
+    question: "What does this output tell you about the parasitics that were read?"
+    excerpt: |2-
+      % report_parasitic_annotation
+      Found 22 unannotated drivers.
+      Found 0 partially unannotated drivers.
+    hint: "Annotation comes from the parasitics file, so ask what those 22 drivers are missing."
+    answer: "22 driver nets have no parasitics, so their wires are ignored."
+    wrong:
+      - "22 driver cells are missing from the netlist that was read."
+      - "22 cells have no timing data in the library that was read."
+      - "22 nets have parasitics but were never routed in the layout."
+    explain: "These nets got nothing from the SPEF (Standard Parasitic Exchange Format) file. A net without parasitics is timed with pin capacitance only, which is optimistic. `-report_unannotated` lists the nets, so they can be checked before the timing is trusted."
+    source: report_parasitic_annotation
+
+  - id: r-pin-slack
+    section: reading
+    question: "report_slack on the D pin of dpath.a_reg.out[9] prints this. What is the setup slack for rising data on core_clock?"
+    excerpt: |2-
+      (core_clock ^) r 0.15:0.02 f 0.15:0.04
+      (vclk_core_clock ^) r 0.16:0.26 f 0.18:0.24
+    hint: "Each pair is two numbers separated by a colon: min first, then max."
+    answer: "0.02: each pair is printed min:max, and max is the setup check."
+    wrong:
+      - "0.15: each pair is printed setup:hold, so setup comes first."
+      - "0.04: the f value is the setup slack and r the hold slack."
+      - "0.26: the largest max value on the pin is the setup slack."
+    explain: "`r` and `f` are rising and falling data; each gives min:max slack. Min is the hold check and max the setup check, so rising data has 0.15 of hold slack and 0.02 of setup slack, matching the 0.02 in the path report for this endpoint."
+    source: report_slack
+
+  # ---------------------------------------------------------------- Corners, modes, and scenes
+
+  - id: tr-define-scene
+    section: mcmm
+    command: define_scene slow_func -mode func -liberty ss_0p72v_125c -spef gcd_max.spef
+    hint: "Three things are named. Ask what each one contributes to an analysis."
+    answer: "Defines one analysis combination of mode, library, and parasitics."
+    wrong:
+      - Defines a timing corner, which the constraints are then applied to.
+      - Defines the slow library and its parasitics as the current ones.
+      - Defines a scenario to be run later, once every scene is defined.
+    explain: >-
+      The mode brings the constraints, the library the cell timing, and the
+      SPEF (Standard Parasitic Exchange Format) file the wires. A design is
+      signed off at several such combinations: each pairs an operating
+      condition (the library and parasitics) with a mode (the constraints that
+      apply in it). A scene names one such combination, so reports can cover
+      several at once. Scenes are defined after the libraries and parasitics
+      are read.
+    source: define_scene
+
+  - id: tr-set-mode
+    section: mcmm
+    command: |-
+      set_mode func
+      create_clock -name clk -period 2.0 [get_ports clk]
+      set_mode test
+      create_clock -name clk -period 20.0 [get_ports clk]
+    hint: "The same clock is created twice with different periods. Ask why that is not a conflict."
+    answer: Puts each set of constraints in its own mode, so both can exist at once.
+    wrong:
+      - Replaces the first clock definition with the second, slower one.
+      - Defines two clocks on the same port, as -add would.
+      - Applies the first clock to functional paths and the second to test paths.
+    explain: >-
+      A chip is constrained differently in different modes: functional, scan
+      shift, at-speed test. Modes keep those constraint sets apart, and a
+      scene then says which mode is analysed with which library. Creating the
+      first mode removes the default one.
+    source: set_mode
+
+  - id: tr-set-scene
+    section: mcmm
+    command: set_scene slow_func
+    hint: "Ask what the commands typed after it now refer to."
+    answer: Makes that scene the one later commands report on.
+    wrong:
+      - Runs the analysis for that scene and reports its results.
+      - Adds the scene to the set that reports cover by default.
+      - Defines the scene, creating it if it does not yet exist.
+    explain: >-
+      Reporting commands work on the current scene unless `-scenes` names
+      others. Switching scenes is how one session compares the same path at
+      the slow and the fast condition. `get_scenes` lists what is defined.
+    source: set_scene
+
+  - id: tr-scenes-option
+    section: mcmm
+    command: report_checks -scenes {slow_func fast_func} -format end
+    hint: "Ask what the report covers that the current scene alone would not."
+    answer: Reports the paths across both scenes rather than only the current one.
+    wrong:
+      - Reports the paths of whichever of the two scenes is worse.
+      - Reports the two scenes one after the other, in separate reports.
+      - Compares the two scenes and reports where they disagree.
+    explain: >-
+      Most reporting commands take `-scenes`, and the default is every scene.
+      Sign-off timing is the worst result across all of them, since setup
+      usually fails slow and hold fails fast.
+    source: report_checks
+
+  - id: tr-define-corners
+    section: mcmm
+    command: define_corners slow fast
+    hint: "Check whether this is the current way to do it."
+    answer: The older way of declaring corners, now deprecated in favour of scenes.
+    wrong:
+      - The current way of declaring corners, before libraries are read.
+      - A shorthand that defines one scene per corner automatically.
+      - A command that reports which corners are currently defined.
+    explain: >-
+      It is kept so older scripts still run, and it is used before
+      `read_liberty`, which is what distinguishes it. New flows use
+      `define_scene`, which ties a mode, a library, and parasitics together
+      rather than naming a corner alone.
+    source: define_corners
+
+  - id: tr-get-scenes
+    section: mcmm
+    command: get_scenes -modes func
+    hint: "Ask what a mode can have several of."
+    answer: Returns the scenes that use the functional mode's constraints.
+    wrong:
+      - Returns the modes that the functional scenes were defined with.
+      - Returns the scene currently selected for the functional mode.
+      - Returns the libraries that the functional mode is analysed with.
+    explain: >-
+      One mode is usually paired with several operating conditions, so a
+      script iterates the scenes of a mode to report each. Like the other
+      object-access commands, it accepts `-filter`.
+    source: get_scenes
+
+  - id: tr-format-summary
+    section: paths
+    command: report_checks -format summary -group_path_count 10
+    hint: "Between the full path and one line per end, there is a middle."
+    answer: Prints one line per path with its start point, end point, and slack.
+    wrong:
+      - Prints one line per path group, summarizing its worst slack.
+      - Prints the path ends with their required and arrival times.
+      - Prints a count of paths per group, with no individual paths.
+    explain: >-
+      `summary` keeps the start point, which `end` drops, and omits the
+      required and arrival columns that `end` shows. It is the quickest way to
+      see which registers the failing paths run between.
+    source: report_checks
+
+  - id: tr-format-short
+    section: paths
+    command: report_checks -path_delay min_max -format short
+    hint: "Ask what remains when the stages and the numbers are both dropped."
+    answer: "Prints only each path's header, with no stages and no numbers."
+    wrong:
+      - Prints a shortened path, with the slowest stages only.
+      - Prints each path's slack without its start and end points.
+      - Prints the first and last stage of each path, with delays.
+    explain: >-
+      What is left is the start point, end point, path group, and path type.
+      That alone answers which paths would be reported, which is how a
+      selection is checked before a long report is run. Confirm it by reading
+      the header lines: the path type says whether it is a setup or a hold
+      path.
+    source: report_checks
+
+  - id: tr-format-json
+    section: paths
+    command: report_checks -format json > paths.json
+    hint: "Ask who reads this one."
+    answer: Writes the paths in a machine-readable form, ignoring the field options.
+    wrong:
+      - Writes the paths in a compact text form, for smaller files.
+      - Writes the paths with every field, since JSON has no field limit.
+      - Writes the report and a JSON summary of its totals alongside.
+    explain: >-
+      A script that post-processes timing should not parse the human report,
+      whose layout changes between versions. The JSON (JavaScript Object
+      Notation) form is stable, and `-fields` is ignored because every field
+      is present.
+    source: report_checks
+
+  - id: tr-check-setup-flags
+    section: constraints
+    command: check_setup -no_clock -unconstrained_endpoints -loops
+    hint: "Three separate checks are named. Ask what running all of them at once would take."
+    answer: Runs only those three checks, rather than the whole set.
+    wrong:
+      - Runs the whole set of checks and reports only those three kinds.
+      - Runs the three checks and stops at the first one that fails.
+      - Adds those three checks to the default set that is run.
+    explain: >-
+      With no keywords every check runs: missing input and output delays,
+      registers with no clock or several clocks, unconstrained endpoints,
+      combinational loops, and generated clocks whose source is not a clock.
+      Naming a few narrows a long run, or focuses a script on what it cares
+      about.
+    source: check_setup
+
+  # ---------------------------------------------------------------- Name the command
+
+  - id: tr-rev-worst-slack
+    section: summary
+    style: reverse
+    prompt: >-
+      You want one number for the worst slack in the design, tracked run over
+      run, and it must keep reporting the margin once every path passes.
+    hint: "One of these reports zero as soon as nothing is failing."
+    answer: report_worst_slack
+    wrong:
+      - report_wns
+      - report_tns
+      - report_check_types
+    explain: >-
+      Worst negative slack is clamped at zero, so a design that closes reports
+      the same number however much margin it has. The worst slack keeps
+      counting upward, which is what makes it the better number to plot across
+      runs.
+    source: report_worst_slack
+
+  - id: tr-rev-clock-skew
+    section: clocks
+    style: reverse
+    prompt: >-
+      A path is failing and you suspect the clock reaches its two registers at
+      different times. You want that difference, for the register pairs that
+      share a path.
+    hint: "Two of these describe the clock network, but only one compares two ends of a path."
+    answer: report_clock_skew
+    wrong:
+      - report_clock_latency
+      - report_clock_properties
+      - report_clock_min_period
+    explain: >-
+      Latency is how long the clock takes to reach one register, which largely
+      cancels within a clock. Skew is the difference between two of them on the
+      same path, which does not cancel and is what eats the budget.
+    source: report_clock_skew
+
+  - id: tr-rev-check-setup
+    section: constraints
+    style: reverse
+    prompt: >-
+      Before trusting any number, you want to know whether the constraints
+      themselves are sound: unclocked registers, endpoints nothing checks,
+      ports with no delay.
+    hint: "The others report timing; this one reports whether timing means anything."
+    answer: check_setup
+    wrong:
+      - report_checks -unconstrained
+      - report_disabled_edges
+      - report_check_types
+    explain: >-
+      A design with half its registers unclocked reports beautiful timing,
+      because nothing is checked. This is the command that says so, and it is
+      the first thing to run on a new constraints file. Listing unconstrained
+      paths is useful too, but it answers a narrower question.
+    source: check_setup
+
+  # ---------------------------------------------------------------- Fill the gap
+
+  - id: tr-blank-path-delay
+    section: paths
+    style: blank
+    command: report_checks ____ min -digits 3
+    hint: "The report wanted here is the hold report."
+    answer: "-path_delay"
+    wrong:
+      - "-delay_type"
+      - "-slack_min"
+      - "-corner"
+    explain: >-
+      Minimum delay paths are the hold checks and maximum delay paths the setup
+      checks, and `min_max` asks for both. Other timers spell the same option
+      `-delay_type`, which is why a script moved between tools trips here
+      rather than anywhere more interesting.
+    source: report_checks
+
+  - id: tr-blank-format
+    section: paths
+    style: blank
+    question: Which format prints every cell of the clock network as well as the data path?
+    command: report_checks -format ____
+    hint: "Two of these show the clock. Only one expands it cell by cell."
+    answer: "full_clock_expanded"
+    wrong:
+      - "full_clock"
+      - "full"
+      - "end"
+    explain: >-
+      The plain full format shows the data path with the clock arrival as a
+      single number. Adding the clock shows the clock edges, and expanding it
+      shows every buffer in the tree, which is what you need when the skew
+      itself is the suspect.
+    source: report_checks
+
+  - id: tr-blank-group-count
+    section: paths
+    style: blank
+    question: Which option asks for ten paths in total from each path group?
+    command: report_checks ____ 10 -path_group reg2reg
+    hint: "The other counting option limits how many paths may share one endpoint."
+    answer: "-group_path_count"
+    wrong:
+      - "-endpoint_path_count"
+      - "-unique_paths_to_endpoint"
+      - "-slack_max"
+    explain: >-
+      By default one path is reported per endpoint and a handful per group.
+      Raising the group count gives a longer list of the worst paths; raising
+      the endpoint count gives several paths through the same endpoint, which
+      is what you want when one register is failing for more than one reason.
+    source: report_checks

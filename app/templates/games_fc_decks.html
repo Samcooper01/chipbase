@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / {{ game.title }}</div>
+  <h1 class="lab-title">{{ game.title }}</h1>
+  <p class="gm-intro">
+    Each card shows one command, variable, or piece of a real report, and asks
+    what it means; pick the answer from four options. {{ total }} cards, grouped
+    by what they cover.
+  </p>
+
+  {% for g in groups %}
+  <section class="gm-group">
+    <div class="gm-group-head">
+      <h2 class="gm-group-title">{{ g.title }}</h2>
+      <p class="gm-group-blurb">{{ g.blurb }}</p>
+    </div>
+    <div class="gm-grid gm-grid-auto">
+      {% for d in g.decks %}
+      {% if d.live %}<a class="gm-tile" href="/games/flash-cards/{{ d.id }}">{% else %}<div class="gm-tile is-off">{% endif %}<div class="gm-tile-body">
+        <h3 class="gm-title">{{ d.title }}</h3>
+        <p class="gm-blurb">{{ d.blurb }}</p>
+        <div class="gm-tile-foot">
+          {% if d.live %}
+          <span class="gm-count">{{ d.cards }} cards &middot; {{ d.sections }} sections</span>
+          <span class="chip diff-easy">play</span>
+          {% else %}
+          <span class="gm-count">not built yet</span>
+          <span class="chip chip-soon">planned</span>
+          {% endif %}
+        </div>
+      </div>{% if d.live %}</a>{% else %}</div>{% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</article>
+{% endblock %}

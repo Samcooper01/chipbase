@@ -1,0 +1,883 @@
+# Over / under: guess where a metric lands, then see the real number.
+#
+# Every value here is measured, not estimated. The runs are the gcd and aes
+# designs in the openroad/orfs container (OpenROAD 26Q3) on Nangate45 and
+# sky130 high density, each with one thing changed from the default. See
+# overunder_scope.md for the runs and how to add more.
+
+game: over-under
+title: Call the number
+reference: https://openroad.readthedocs.io/en/latest/main/README.html
+basis:
+  tool: OpenROAD-flow-scripts
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts
+  tag: measured, not estimated
+  doc_title: the OpenROAD documentation
+  note: >-
+    Each summary describes a real run, and the number revealed afterwards is
+    what that run produced. Guessing the direction is the point: a physical
+    designer who knows roughly what a metric should be is the one who notices
+    when a run has gone wrong.
+
+sections:
+  - id: area
+    title: Area and utilization
+    blurb: How much silicon a design ends up occupying, and what changes it.
+    kinds: [cell area, utilization, repair growth]
+  - id: wires
+    title: Wires and routing
+    blurb: How much metal it takes to connect a design, and what makes it more.
+    kinds: [wire length, layers, spread]
+  - id: power
+    title: Power and voltage drop
+    blurb: What a design draws, and what the grid does with it.
+    kinds: [total power, voltage drop, grid]
+
+  - id: counts
+    title: Counts and the cell mix
+    blurb: How many cells a design really ends up with, and what they all are.
+    kinds: [instance count, fill, clock buffers, repair]
+  - id: timing
+    title: Speed
+    blurb: How fast a block can actually run, and what changes that.
+    kinds: [minimum period, maximum frequency, slack]
+
+items:
+  - id: ou-gcd-wire
+    section: wires
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 521 instances in the netlist, 1071 cells placed
+      note: the platform's default settings, a run that closed cleanly
+    question: Is the total routed wire length over 5000 micrometres?
+    threshold: 5000
+    value: 3605
+    unit: micrometres
+    hint: "About a thousand cells in a core of roughly 36 by 36 micrometres."
+    explain: >-
+      3605 micrometres for 648 nets is an average of about 5.6 micrometres a
+      net, which is the right order for a block this small: most nets connect
+      neighbours. Wire length scales with the square root of the area for a
+      given cell count, so it is one of the easier numbers to estimate once
+      you know the die.
+    source: detailed_route
+
+  - id: ou-bigdie-wire
+    section: wires
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: the same 521 instances
+      note: utilization target dropped from 55 percent to 8 percent, so the core is seven times larger
+    question: Is the total routed wire length over 5000 micrometres?
+    threshold: 5000
+    value: 6099
+    unit: micrometres
+    hint: "The cells are the same. Only the distance between them changed."
+    explain: >-
+      The same netlist routes 3605 micrometres at the default utilization and
+      6099 here. Spreading a design out lengthens every net, which costs delay
+      and power and forces repair to add buffers. Empty space is not free.
+    source: global_placement
+
+  - id: ou-congest-wire
+    section: wires
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: the same 521 instances
+      note: routing restricted to metal1 through metal3, out of ten available layers
+    question: Is the total routed wire length over 4500 micrometres?
+    threshold: 4500
+    value: 3908
+    unit: micrometres
+    hint: "Fewer layers means more detours. Ask how much more, on a block this small."
+    explain: >-
+      Taking away seven layers added only 8 percent of wire, and the design
+      still routed with no violations. On a small block the router has room to
+      detour; the same restriction on a dense design is what makes routing
+      fail. Knowing which designs are sensitive is the useful part.
+    source: detailed_route
+
+  - id: ou-tight-area
+    section: area
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.30 nanoseconds, against the 0.46 the design closes at
+      size: 521 instances in the netlist
+      note: an unreachable target, so repair upsized and buffered until it gave up
+    question: Is the final cell area over 900 square micrometres?
+    threshold: 900
+    value: 945
+    unit: square micrometres
+    hint: "The same design closes at 716 square micrometres when the target is reachable."
+    explain: >-
+      Chasing 0.30 nanoseconds cost 32 percent more area and never met the
+      constraint. This is the shape of an over-constrained block: the area
+      climbs, the slack barely moves, and the run still fails. The area is the
+      evidence that the target, not the implementation, is wrong.
+    source: repair_timing
+
+  - id: ou-sky-area
+    section: area
+    design:
+      name: gcd, the same source
+      platform: sky130 high density, 130 nanometre
+      clock: 1.10 nanoseconds
+      size: 222 instances after synthesis for this library
+      note: the Nangate45 version synthesizes to 521 instances and finishes at 716 square micrometres
+    question: Is the final cell area over 3000 square micrometres?
+    threshold: 3000
+    value: 5400
+    unit: square micrometres
+    hint: "Compare the two process nodes before comparing the designs."
+    explain: >-
+      The same source occupies 7.5 times the area at 130 nanometres that it
+      does at 45, and that is not purely the node: synthesis produced a
+      different netlist for this library, 222 instances against 521. Both
+      effects push the same way, and neither can be separated from the other
+      by looking at the total. A figure quoted without its process and its
+      netlist says almost nothing.
+    source: report_design_area
+
+  - id: ou-thinpdn-drop
+    section: power
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 1071 cells, 2.6 milliwatts of total power
+      note: power straps narrowed from 1.4 to 0.2 micrometres and spread from a 6.5 to a 40 micrometre pitch
+    question: Is the worst voltage drop over 2 percent of the supply?
+    threshold: 2
+    value: 1.14
+    unit: percent of the supply
+    hint: "The default grid on this design drops 0.38 percent."
+    explain: >-
+      Starving the grid tripled the drop and it is still comfortable, because
+      this design draws milliwatts. Voltage drop follows current, and a small
+      block does not pull enough to trouble even a thin grid. The same change
+      on a design drawing amperes is a different story.
+    source: analyze_power_grid
+
+  - id: ou-aes-drop
+    section: power
+    design:
+      name: aes
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 nanoseconds
+      size: about 15000 instances, 0.47 watts of total power
+      note: the platform's default power grid, and a control run with nothing changed at all
+    question: Is the worst voltage drop over 5 percent of the supply?
+    threshold: 5
+    value: 9.9
+    unit: percent of the supply
+    hint: "This design draws 180 times the power of the gcd block on the same grid."
+    explain: >-
+      Nearly 10 percent is past what most projects allow, and it is the
+      current that does it: a control run of the same design with nothing
+      changed drops 9.28 percent, against 9.9 with restricted routing. Half a
+      watt is a different regime from the milliwatts the small block draws.
+      Voltage drop is analysed per design for exactly this reason: the same
+      grid is generous for one block and inadequate for the next.
+    source: analyze_power_grid
+
+  - id: ou-aes-wire
+    section: wires
+    design:
+      name: aes
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 nanoseconds
+      size: about 15000 instances, 19835 square micrometres of cells
+      note: the gcd block on the same platform routes 3605 micrometres of wire
+    question: Is the total routed wire length over 100000 micrometres?
+    threshold: 100000
+    value: 274995
+    unit: micrometres
+    hint: "The design has roughly 28 times the cells. Wire length does not scale linearly with that."
+    explain: >-
+      275000 micrometres is 76 times the gcd figure for 28 times the cells,
+      because a larger block has longer average nets as well as more of them.
+      This superlinear growth is the reason wire delay dominates at scale and
+      why hierarchy exists.
+    source: detailed_route
+
+  - id: ou-gcd-cells
+    section: counts
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 521 instances in the synthesized netlist
+      note: a default run, counted after filling, in the final layout
+    question: Is the final cell count over 1000?
+    threshold: 1000
+    value: 1086
+    unit: cells
+    hint: "Ask what is in a finished layout that was never in the netlist."
+    explain: >-
+      The netlist had 521 instances and the layout holds 1086. The difference
+      is 458 filler cells, 48 well taps, 68 buffers added by timing repair, and
+      the clock tree. A cell count quoted without saying which stage it came
+      from can be out by a factor of two.
+    source: report_design_area
+
+  - id: ou-gcd-fill
+    section: counts
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 1086 cells in the final layout, at 62 percent utilization
+      note: the count includes everything the flow inserted
+    question: Are more than 500 of those cells filler?
+    threshold: 500
+    value: 458
+    unit: filler cells
+    hint: "At 62 percent utilization, think about what occupies the other 38."
+    explain: >-
+      Filler is 458 cells, 42 percent of the count, and contributes no logic.
+      It exists to keep the rows continuous, and the emptier the design, the
+      more of it there is. This is why counting cells is a poor measure of a
+      design and why area and utilization are quoted instead.
+    source: detailed_placement
+
+  - id: ou-gcd-clkbuf
+    section: counts
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 35 registers to clock, in a core of about 36 by 36 micrometres
+      note: the tree the tool built with its default settings
+    question: Did the clock tree need more than 10 buffers?
+    threshold: 10
+    value: 5
+    unit: clock buffers
+    hint: "One buffer can drive several sinks. Ask how many, at this size."
+    explain: >-
+      Five buffers, two deep at the shallowest point, for 35 registers. A tree
+      is mostly about balance rather than drive at this scale, and a block
+      this small barely needs levels at all. The count grows with sinks, but
+      much more slowly than one to one.
+    source: clock_tree_synthesis
+
+  - id: ou-aes-clkbuf
+    section: counts
+    design:
+      name: aes
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 nanoseconds
+      size: 562 registers to clock, 16 times the gcd block
+      note: the same tool, the same default settings
+    question: Did this clock tree need more than 150 buffers?
+    threshold: 150
+    value: 107
+    unit: clock buffers
+    hint: "The gcd block used 5 buffers for 35 registers. Scale it and see."
+    explain: >-
+      107 buffers for 562 sinks is about one for every five, against one for
+      every seven on the small block, so the tree grew a little faster than
+      the sink count but nothing like as fast as a guess of one per register
+      would suggest. The minimum depth went from two levels to three.
+    source: clock_tree_synthesis
+
+  - id: ou-aes-repair
+    section: counts
+    design:
+      name: aes
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 nanoseconds
+      size: 35514 cells in the final layout, of which 562 are registers
+      note: routing was restricted to metal1 through metal4, which lengthens nets
+    question: Did timing repair insert more than 1000 buffers?
+    threshold: 1000
+    value: 3771
+    unit: repair buffers
+    hint: "Compare with the 10739 combinational cells that do the design's work."
+    explain: >-
+      3771 buffers, a third as many as the cells doing the logic. On a design
+      pushed for speed, repair is not a finishing touch: it is a large part of
+      what ends up on the die, and it is the first place to look when the area
+      comes back bigger than synthesis promised.
+    source: repair_timing
+
+  - id: ou-gcd-fmax
+    section: timing
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: asked for 0.46 nanoseconds, and it closed
+      size: 521 instances, 35 registers
+      note: the smallest period the timer says this design could run at
+    question: Is the smallest period this design can hold over 0.50 nanoseconds?
+    threshold: 0.50
+    value: 0.46
+    unit: nanoseconds
+    hint: "The run closed with no violations at 0.46. What does that bound?"
+    explain: >-
+      Closing at 0.46 with no slack to spare means the minimum period is 0.46,
+      which is 2.2 gigahertz. Small blocks reach frequencies that a whole chip
+      never will, because they have short paths and no interface to speak of.
+      Quoting a block's frequency as though it were the chip's is a classic
+      mistake.
+    source: report_clock_min_period
+
+  - id: ou-congest-fmax
+    section: timing
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 521 instances
+      note: routing restricted to metal1 through metal3, out of the ten available
+    question: Is the smallest period now over 0.50 nanoseconds?
+    threshold: 0.50
+    value: 0.46
+    unit: nanoseconds
+    hint: "Losing seven layers added 8 percent of wire length. Ask what that did to delay."
+    explain: >-
+      Nothing moved. The design still closes at 0.46 nanoseconds, because a
+      block this small has short nets whichever layers it uses. Layer count
+      matters through congestion and through the resistance of long wires, and
+      neither bites here. On a large block the same restriction is severe.
+    source: report_clock_min_period
+
+  - id: ou-sky-period
+    section: timing
+    design:
+      name: gcd, the same source
+      platform: sky130 high density, 130 nanometre
+      clock: 1.10 nanoseconds, the platform's default for this design
+      size: the same design, 5400 square micrometres of cells
+      note: the Nangate45 version of this design holds 0.46 nanoseconds
+    question: Is the smallest period it can hold over 2 nanoseconds?
+    threshold: 2
+    value: 2.56
+    unit: nanoseconds
+    hint: "The process is roughly three times the feature size. Delay does not scale as kindly as area."
+    explain: >-
+      2.56 nanoseconds, against 0.46 at 45 nanometres: five and a half times
+      slower for three times the feature size. It also means this run misses
+      its 1.10 nanosecond target badly, which the flow reports as a worst slack
+      of -1.46. A default configuration is not a promise that the design closes.
+    source: report_clock_min_period
+
+  - id: ou-sky-instances
+    section: counts
+    design:
+      name: gcd, the same source file
+      platform: sky130 high density, 130 nanometre
+      clock: 1.10 nanoseconds
+      size: synthesized fresh for this library
+      note: the same source on Nangate45 at 0.46 nanoseconds gives 521 instances
+    question: Does it synthesize to more than 400 instances here?
+    threshold: 400
+    value: 222
+    unit: instances
+    hint: "Two libraries, two clock targets. Ask whether the netlist can be the same."
+    explain: >-
+      222 against 521, from identical source. A relaxed clock target needs
+      less parallel structure, and a different library maps the same logic
+      onto different cells. Comparing two platforms is never comparing one
+      design: it is comparing two netlists that happen to share a source file.
+    source: yosys
+
+  - id: ou-sky-power
+    section: power
+    design:
+      name: gcd
+      platform: sky130 high density, 130 nanometre, on a 1.8 volt supply
+      clock: 1.10 nanoseconds
+      size: 222 instances, 5400 square micrometres
+      note: the Nangate45 version, on 1.1 volts at 0.46 nanoseconds, draws 2.62 milliwatts
+    question: Does this version draw more than 7.9 milliwatts, three times the Nangate45 figure?
+    threshold: 7.9
+    value: 9.38
+    unit: milliwatts
+    hint: "Switching power goes with the square of the supply. Compare 1.8 volts against 1.1."
+    explain: >-
+      9.38 milliwatts, three and a half times as much, despite running at a
+      third of the frequency. The supply ratio alone squares to 2.7, and the
+      larger transistors and longer wires carry more capacitance. This is the
+      whole argument for moving to a smaller node, in one number.
+    source: report_power
+
+  - id: ou-aes-area-per-cell
+    section: area
+    design:
+      name: aes against gcd, both on Nangate45
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 and 0.46 nanoseconds
+      size: aes has 15784 cells that are not filler, in 19835 square micrometres
+      note: gcd has 628 such cells in 716 square micrometres
+    question: Is the area per cell more than 50 percent larger on the big design?
+    threshold: 50
+    value: 10
+    unit: percent larger
+    hint: "Work out both ratios before answering. One is 1.26, the other is 1.14."
+    explain: >-
+      1.26 square micrometres a cell against 1.14, which is 10 percent. Cell
+      area is a property of the library and the mix of cells, not of the size
+      of the design, so it stays put as a design grows. Wire length is the
+      thing that grows superlinearly, which is why interconnect, not cells,
+      is what limits large blocks.
+    source: report_design_area
+
+  - id: ou-tight-power
+    section: power
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.30 nanoseconds, a target it never met
+      size: 945 square micrometres after repair gave up
+      note: the same design at its workable 0.46 nanoseconds draws 2.62 milliwatts
+    question: Did chasing the unreachable target more than double the power?
+    threshold: 5.24
+    value: 5.60
+    unit: milliwatts
+    hint: "Bigger cells and more buffers, all switching at a higher frequency."
+    explain: >-
+      5.60 milliwatts against 2.62, for a design that still failed timing.
+      Upsizing raises capacitance, repair buffers add more, and the clock they
+      all hang off runs faster. Pushing a block past what it can do costs area
+      and power together, and buys nothing.
+    source: report_power
+
+  - id: ou-thinpdn-wire
+    section: wires
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: 521 instances, the default floorplan
+      note: power straps narrowed seven times over and spread six times further apart
+    question: Did the thinner power grid change the signal wire length by more than 5 percent?
+    threshold: 5
+    value: 0.2
+    unit: percent
+    hint: "Ask what the signal router gains when the grid takes up less room."
+    explain: >-
+      3599 micrometres against 3605, a fifth of a percent. At this density the
+      grid was never what the signals were routing around. On a dense block
+      with a heavy grid the two do compete, which is the trade a power plan
+      makes: enough metal to hold the voltage, not so much that the signals
+      cannot get through.
+    source: detailed_route
+
+  - id: ou-bigdie-power
+    section: power
+    design:
+      name: gcd
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds
+      size: the same 521 instances in a core seven times larger
+      note: at the default utilization this design draws 2.62 milliwatts and routes 3605 micrometres of wire
+    question: Did spreading the design out raise the power by more than a quarter?
+    threshold: 25
+    value: 9.5
+    unit: percent
+    hint: "The wire length went up by 69 percent. Ask what fraction of the power is wire."
+    explain: >-
+      2.87 milliwatts against 2.62, under ten percent, from 69 percent more
+      wire. Most of the power here is the cells and the clock rather than the
+      interconnect, so lengthening the wires moves the total far less than it
+      moves the delay. The cost of a loose floorplan is timing first, power
+      second.
+    source: report_power
+
+  - id: ou-aes-drt-first
+    section: wires
+    design:
+      name: aes
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 nanoseconds
+      size: about 15800 cells, routing restricted to metal1 through metal4
+      note: the run finished with no violations at all
+    question: Did the detailed router ever see more than 1000 violations at once?
+    threshold: 1000
+    value: 5434
+    unit: violations, in its first pass
+    hint: "The router works in passes. Ask what the first one leaves behind."
+    explain: >-
+      5434 after the first pass, then 2304, 1925, 100, and zero. A large count
+      early is normal and says nothing on its own; what matters is whether
+      each pass clears most of what the last one left. A count that stops
+      falling is the one to worry about.
+    source: detailed_route
+
+  - id: ou-ibex-period
+    section: timing
+    design:
+      name: ibex, a RISC-V (Reduced Instruction Set Computer, fifth generation) core
+      platform: Nangate45, 45 nanometre
+      clock: 2.20 nanoseconds, and it closed
+      size: 14871 instances, 1938 registers
+      note: the gcd block on the same platform holds 0.46 nanoseconds
+    question: Is the smallest period this core can hold over 1.5 nanoseconds?
+    threshold: 1.5
+    value: 2.18
+    unit: nanoseconds
+    hint: "A real core has deeper logic between registers than a two-register toy does."
+    explain: >-
+      2.18 nanoseconds, 460 megahertz, against 2.2 gigahertz for the gcd block
+      on the same process. Frequency is set by the longest path between
+      registers, and a processor's decode and arithmetic paths are far deeper
+      than anything in a small block. This is why a process is quoted with a
+      design, and why block-level frequencies never survive integration.
+    source: report_clock_min_period
+
+  - id: ou-ibex-clkbuf
+    section: counts
+    design:
+      name: ibex
+      platform: Nangate45, 45 nanometre
+      clock: 2.20 nanoseconds
+      size: 1938 registers, in 29158 square micrometres of cells
+      note: gcd used 5 buffers for 35 registers, and aes used 107 for 562
+    question: Did this clock tree need more than 300 buffers?
+    threshold: 300
+    value: 424
+    unit: clock buffers
+    hint: "The ratio has been creeping up: one buffer per seven sinks, then per five."
+    explain: >-
+      424 buffers for 1938 registers, about one for every 4.6, continuing a
+      trend from one in seven on the small block. Bigger designs need more
+      levels and longer runs, so the tree grows faster than the sink count.
+      At 509 square micrometres it is 1.7 percent of the cell area, and a good
+      deal more of the power.
+    source: clock_tree_synthesis
+
+  - id: ou-ibex-wire
+    section: wires
+    design:
+      name: ibex
+      platform: Nangate45, 45 nanometre
+      clock: 2.20 nanoseconds
+      size: 14871 instances, 51 percent utilization
+      note: aes on the same platform, at a similar cell count, routes 275000 micrometres
+    question: Does this core route more than 200000 micrometres of wire?
+    threshold: 200000
+    value: 262811
+    unit: micrometres
+    hint: "Two designs of similar size on the same process. Ask how much function matters."
+    explain: >-
+      262811 micrometres against 275000 for aes, within five percent, for two
+      designs that do entirely different things. Wire length follows the cell
+      count and the floorplan far more than it follows what the logic
+      computes, which is what makes it estimable at all.
+    source: detailed_route
+
+  - id: ou-ibex-power
+    section: power
+    design:
+      name: ibex
+      platform: Nangate45, 45 nanometre
+      clock: 2.20 nanoseconds, so 455 megahertz
+      size: 14871 instances, 262811 micrometres of wire
+      note: aes, a similar size on the same platform, runs at 0.82 nanoseconds and draws 472 milliwatts
+    question: Does this core draw more than 100 milliwatts?
+    threshold: 100
+    value: 31
+    unit: milliwatts
+    hint: "The two designs are a similar size. Compare what they are clocked at."
+    explain: >-
+      31 milliwatts against 472, a factor of fifteen, for a similar amount of
+      silicon. Most of that is the clock: aes runs 2.7 times faster, and its
+      pipeline toggles far more of itself each cycle. Power is a statement
+      about activity and frequency, not about size, which is why a power
+      figure without its operating point means nothing.
+    source: report_power
+
+  - id: ou-a7-area
+    section: area
+    design:
+      name: gcd, the same source again
+      platform: ASAP7, a 7 nanometre predictive kit, on a 0.77 volt supply
+      clock: 310 picoseconds, which is how this platform writes its constraints
+      size: 306 instances after synthesis for this library
+      note: the same source is 716 square micrometres on Nangate45 and 5400 on sky130
+    question: Is the cell area over 100 square micrometres?
+    threshold: 100
+    value: 46
+    unit: square micrometres
+    hint: "Three nodes, three answers. The ratio between them is not linear in the node name."
+    explain: >-
+      46 square micrometres, against 716 at 45 nanometres and 5400 at 130. The
+      whole block fits in a square about seven micrometres on a side. Scaling
+      is the reason a design that was a chip in one generation is a corner of
+      a chip in the next, and why area comparisons across nodes are close to
+      meaningless without both numbers.
+    source: report_design_area
+
+  - id: ou-a7-power
+    section: power
+    design:
+      name: gcd
+      platform: ASAP7, 7 nanometre, on a 0.77 volt supply
+      clock: 310 picoseconds
+      size: 306 instances, 46 square micrometres, 778 micrometres of wire
+      note: on Nangate45 at 1.1 volts this design draws 2.62 milliwatts, and on sky130 at 1.8 volts, 9.38
+    question: Does it draw more than 2 milliwatts here?
+    threshold: 2
+    value: 1.45
+    unit: milliwatts
+    hint: "It runs faster than either of the others. Ask what the supply and the capacitance are doing."
+    explain: >-
+      1.45 milliwatts, the lowest of the three, while running at three
+      gigahertz. Lower supply, smaller transistors, and shorter wires all cut
+      switching power faster than the frequency raises it. Leakage is the part
+      that does not improve, which is why modern nodes fight it with threshold
+      choice and power gating.
+    source: report_power
+
+  - id: ou-a7-period
+    section: timing
+    design:
+      name: gcd
+      platform: ASAP7, 7 nanometre
+      clock: written as 310 in the constraints file
+      size: 306 instances, 34 registers
+      note: this platform's constraints are written in picoseconds, not nanoseconds
+    question: Is the clock target more than 1 nanosecond?
+    threshold: 1
+    value: 0.31
+    unit: nanoseconds
+    hint: "Read the units of the platform, not the units you are used to."
+    explain: >-
+      310 picoseconds is 0.31 nanoseconds, so the target is over three
+      gigahertz. Every platform declares its own time unit, and a number read
+      in the wrong one is out by a thousand. The run reaches 331.69
+      picoseconds, so it misses its target slightly, which is invisible if you
+      read the constraint as nanoseconds and think it passed by miles.
+    source: report_units
+
+  - id: ou-jpeg-wire
+    section: wires
+    design:
+      name: jpeg, an image encoder
+      platform: Nangate45, 45 nanometre
+      clock: 1.00 nanosecond
+      size: 56230 instances, 85 percent utilization, the largest design measured here
+      note: ibex, at 14871 instances on the same platform, routes 262811 micrometres
+    question: Does it route more than 500000 micrometres of wire?
+    threshold: 500000
+    value: 568656
+    unit: micrometres
+    hint: "Four times the cells of the core. Wire does not scale quite linearly with that."
+    explain: >-
+      568656 micrometres, 2.2 times the ibex figure for 3.8 times the cells.
+      Wire length per cell actually falls here, because this design is packed
+      at 85 percent utilization against 51 and its logic is more local. Density
+      buys short wires, and pays for them in congestion and in voltage drop.
+    source: detailed_route
+
+  - id: ou-jpeg-drop
+    section: power
+    design:
+      name: jpeg
+      platform: Nangate45, 45 nanometre
+      clock: 1.00 nanosecond
+      size: 56230 instances at 85 percent utilization, drawing 585 milliwatts
+      note: this is the platform's standard power grid, not a modified one
+    question: Is the worst voltage drop over 5 percent of the supply?
+    threshold: 5
+    value: 6.9
+    unit: percent of the supply
+    hint: "Half a watt through a grid designed without knowing this design existed."
+    explain: >-
+      6.9 percent on the default grid, past what most projects allow. Density
+      and current work together here: the same grid that is generous for a
+      milliwatt block cannot feed a packed half-watt one. This is why the
+      power plan is a design decision rather than a platform setting.
+    source: analyze_power_grid
+
+  - id: ou-jpeg-inverters
+    section: counts
+    design:
+      name: jpeg
+      platform: Nangate45, 45 nanometre
+      clock: 1.00 nanosecond
+      size: 82780 cells in the final layout, 4384 of them registers
+      note: 36222 are multiple-input combinational cells doing the logic
+    question: Are there more than 10000 inverters in the layout?
+    threshold: 10000
+    value: 12618
+    unit: inverters
+    hint: "Count what a mapper and a repair pass both reach for when they need drive."
+    explain: >-
+      12618 inverters, over a third as many as the combinational cells that do
+      the work, plus 5358 repair buffers and 934 clock buffers on top. A large
+      fraction of a finished design exists only to carry signals far enough,
+      fast enough, which is the same story as wire length told in cells.
+    source: report_design_area
+
+  - id: ou-jpeg-period
+    section: timing
+    design:
+      name: jpeg
+      platform: Nangate45, 45 nanometre
+      clock: 1.00 nanosecond, the target it was given
+      size: 56230 instances at 85 percent utilization
+      note: ibex on this platform closes at its 2.20 nanosecond target
+    question: Is the smallest period it can hold over 1 nanosecond?
+    threshold: 1
+    value: 1.11
+    unit: nanoseconds
+    hint: "The question is really whether this run met its target."
+    explain: >-
+      1.11 nanoseconds against a target of 1.00, so it misses by 11 percent.
+      A design packed to 85 percent has little room for repair to work in, and
+      the same target with a looser floorplan may well close. Missing by a
+      tenth is the ordinary state of a design in progress, not a disaster.
+    source: report_clock_min_period
+
+  - id: ou-sky-aes-regs
+    section: counts
+    design:
+      name: aes, the same source as the Nangate45 run
+      platform: sky130 high density, 130 nanometre
+      clock: 3.60 nanoseconds
+      size: 11141 instances after synthesis for this library
+      note: the Nangate45 version has 562 registers among its 15784 non-filler cells
+    question: Does this version have more than 700 registers?
+    threshold: 700
+    value: 562
+    unit: registers
+    hint: "Ask which parts of a netlist come from the library and which come from the source."
+    explain: >-
+      562 on both platforms, exactly. Registers are written in the source, so
+      the count survives any library and any target: what changes between
+      platforms is the combinational logic, which the mapper rebuilds from
+      scratch. The register count is one of the few numbers that travels.
+    source: yosys
+
+  - id: ou-sky-aes-area
+    section: area
+    design:
+      name: aes
+      platform: sky130 high density, 130 nanometre
+      clock: 3.60 nanoseconds
+      size: 11141 instances, 58 percent utilization
+      note: the Nangate45 version of this design occupies 19835 square micrometres
+    question: Is the cell area over 100000 square micrometres?
+    threshold: 100000
+    value: 126974
+    unit: square micrometres
+    hint: "The gcd block came out 7.5 times larger on this process. Apply that."
+    explain: >-
+      126974 square micrometres, 6.4 times the Nangate45 figure, close to the
+      7.5 the small block showed. The ratio between two processes is stable
+      enough across designs to estimate with, which is what makes these
+      comparisons worth learning rather than looking up each time.
+    source: report_design_area
+
+  - id: ou-sky-aes-period
+    section: timing
+    design:
+      name: aes
+      platform: sky130 high density, 130 nanometre
+      clock: 3.60 nanoseconds, the target it was given
+      size: 11141 instances, 562 registers
+      note: the Nangate45 version is constrained at 0.82 nanoseconds
+    question: Is the smallest period it can hold over 3 nanoseconds?
+    threshold: 3
+    value: 3.74
+    unit: nanoseconds
+    hint: "The gcd block was five and a half times slower on this process than on Nangate45."
+    explain: >-
+      3.74 nanoseconds, 4.6 times the Nangate45 constraint, and it misses its
+      own 3.60 target by four percent. Both the gcd and aes comparisons put
+      this process in the range of four to five times slower, which is the
+      sort of rule of thumb worth carrying: it is how you sanity-check a
+      schedule before anyone has run anything.
+    source: report_clock_min_period
+
+  - id: ou-sweep-area
+    section: area
+    design:
+      name: gcd, run three times
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds each time
+      size: 521 instances, finishing at 33, 62 and 79 percent utilization
+      note: the only thing changed between the runs is the utilization target
+    question: Do the three runs differ in final cell area by more than 5 percent?
+    threshold: 5
+    value: 2
+    unit: percent, largest against smallest
+    hint: "Ask what utilization changes: the cells, or the space around them."
+    explain: >-
+      723, 716 and 709 square micrometres, a spread of two percent, and the
+      loosest run is the largest because repair had longer wires to drive.
+      Utilization sets how much empty space surrounds the cells, not how many
+      there are. Within the normal range the knob does far less than people
+      expect, which is worth knowing before spending a day sweeping it.
+    source: report_design_area
+
+  - id: ou-sweep-wire
+    section: wires
+    design:
+      name: gcd, run three times
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds each time
+      size: the same 521 instances at 33, 62 and 79 percent utilization
+      note: at 9 percent utilization, a fourth run routed 6099 micrometres
+    question: Is the spread in wire length across these three over 30 percent?
+    threshold: 30
+    value: 22
+    unit: percent, largest against smallest
+    hint: "4193 at the loosest, 3448 at the tightest. The extreme run is not one of the three."
+    explain: >-
+      4193, 3605 and 3448 micrometres: 22 percent from end to end, and
+      monotonic, so packing tighter does shorten wires. The effect is real but
+      mild compared with the extreme case, where dropping to 9 percent
+      utilization added 69 percent. Most of the damage lives outside the range
+      anyone would actually choose.
+    source: detailed_route
+
+  - id: ou-sweep-period
+    section: timing
+    design:
+      name: gcd, run three times
+      platform: Nangate45, 45 nanometre
+      clock: 0.46 nanoseconds each time
+      size: the same 521 instances at 33, 62 and 79 percent utilization
+      note: wire length varies by 22 percent across the three
+    question: Does the smallest period vary by more than 10 percent across them?
+    threshold: 10
+    value: 4.5
+    unit: percent
+    hint: "22 percent more wire on a block this small. Ask how much of the delay is wire."
+    explain: >-
+      0.44, 0.46 and 0.44 nanoseconds, under five percent apart, from 22
+      percent of wire length. On a small block at 45 nanometres the delay is
+      mostly cells, so interconnect changes move it very little. The same
+      sweep on a large block at an advanced node would tell a different story,
+      which is the point: rules of thumb carry a scale with them.
+    source: report_clock_min_period
+
+  - id: ou-aes-layers-wire
+    section: wires
+    design:
+      name: aes, run twice
+      platform: Nangate45, 45 nanometre
+      clock: 0.82 nanoseconds both times
+      size: about 15800 cells, 36 percent utilization
+      note: one run used all ten metal layers and routed 222438 micrometres; the other was held to metal1 through metal4
+    question: Did the four-layer run route more than 260000 micrometres?
+    threshold: 260000
+    value: 274995
+    unit: micrometres
+    hint: "The same restriction cost the small gcd block 8 percent. Ask whether that scales."
+    explain: >-
+      274995 against 222438, 24 percent more wire for the same design, where
+      the gcd block paid only 8 percent. A bigger design has more long nets,
+      and long nets are the ones that need the upper layers, so the cost of a
+      thin stack grows with the block. Both runs still closed, which says more
+      about how much slack this design had than about the restriction.
+    source: detailed_route

@@ -1,0 +1,1132 @@
+# Layout and parasitic file formats flash-card deck: LEF (Library Exchange Format), DEF (Design Exchange Format), SPEF (Standard Parasitic Exchange Format), SDF (Standard Delay Format).
+#
+# The LEF (Library Exchange Format) cards quote the Nangate45 technology and macro files shipped with
+# OpenROAD-flow-scripts. The DEF (Design Exchange Format), SPEF (Standard Parasitic Exchange Format), and SDF (Standard Delay Format) cards follow the formats as
+# OpenROAD and OpenSTA read and write them. See formats_scope.md.
+
+deck: formats
+title: Layout and parasitic formats
+reference: https://github.com/parallaxsw/OpenSTA/blob/master/doc/Commands.md
+default_question: "What does this part of the file say?"
+basis:
+  tool: the open flow
+  tool_url: https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/master/flow/platforms/nangate45
+  tag: read against real files
+  doc_title: the OpenSTA command reference
+  note: >-
+    Four formats carry a design between tools: LEF (Library Exchange Format)
+    for the technology and the cells, DEF (Design Exchange Format) for the
+    layout, SPEF (Standard Parasitic Exchange Format) for extracted wires, and
+    SDF (Standard Delay Format) for annotated delays. The LEF (Library Exchange Format) excerpts here are
+    quoted from the Nangate45 files that OpenROAD-flow-scripts ships; the rest
+    follow the formats as OpenROAD and OpenSTA read them.
+
+sections:
+  - id: lef-tech
+    title: LEF (Library Exchange Format) technology
+    blurb: Layers, their electrical properties, and the rules the router obeys.
+    commands: [LAYER, TYPE, WIDTH, SPACING, PITCH, DIRECTION, RESISTANCE, SPACINGTABLE, VIA, SITE]
+  - id: lef-macro
+    title: LEF (Library Exchange Format) macros
+    blurb: What a cell or a hard macro looks like from the outside.
+    commands: [MACRO, CLASS, SIZE, SYMMETRY, ORIGIN, PIN, PORT, OBS, ANTENNAGATEAREA]
+  - id: def
+    title: DEF (Design Exchange Format)
+    blurb: "The design's own layout: area, rows, instances, pins, and wires."
+    commands: [UNITS, DIEAREA, ROW, TRACKS, COMPONENTS, PINS, NETS, SPECIALNETS, VIAS, REGIONS]
+  - id: spef
+    title: SPEF (Standard Parasitic Exchange Format)
+    blurb: "Extracted parasitics: the resistance and capacitance of every net."
+    commands: [D_NET, CONN, CAP, RES, coupling, name-map, triplets]
+  - id: sdf
+    title: SDF (Standard Delay Format)
+    blurb: Delays and checks handed from one tool to another.
+    commands: [CELL, IOPATH, SETUP, HOLD, INTERCONNECT, COND, triplets]
+  - id: gds
+    title: "GDSII (Graphic Design System II) and mask data"
+    blurb: The binary layout the foundry is sent, and how it relates to everything above it.
+    commands: [structure, boundary, layer, datatype, layer map, OASIS, XOR]
+  - id: netlist
+    title: Netlists
+    blurb: The connectivity itself, at gate level for the tools and transistor level for the checks.
+    commands: [module, instance, escaped names, bus bits, CDL, subcircuit]
+  - id: together
+    title: How they fit together
+    blurb: Which file answers which question, and what happens when one disagrees.
+    commands: [read_lef, read_def, read_spef, read_sdf, write_def, write_spef]
+
+cards:
+
+  # ---------------------------------------------------------------- LEF (Library Exchange Format) technology
+
+  - id: fmt-lef-layer
+    section: lef-tech
+    command: |-
+      LAYER metal1
+        TYPE ROUTING ;
+        SPACING 0.065 ;
+        WIDTH 0.07 ;
+        PITCH 0.14 ;
+        DIRECTION HORIZONTAL ;
+    hint: "Compare WIDTH, SPACING, and PITCH: two of them add up to the third."
+    answer: The minimum width and spacing, and the pitch that follows.
+    wrong:
+      - The layer's drawn width, the gap to the next layer, and its thickness.
+      - The width of a track, the space between tracks, and their count.
+      - The minimum and maximum width, and the spacing between wire centres.
+    explain: >-
+      Width and spacing are minimums for the layer, and the pitch follows
+      from them: 0.14 is the minimum width of 0.07 plus the minimum
+      spacing of 0.065, rounded to the manufacturing grid. `DIRECTION` gives
+      the preferred routing direction, which alternates up the stack so
+      crossing wires can meet at vias.
+    source: report_layer_rc
+
+  - id: fmt-lef-rc
+    section: lef-tech
+    command: |-
+        RESISTANCE RPERSQ 0.38 ;
+        CAPACITANCE CPERSQDIST 7.7161e-05 ;
+        EDGECAPACITANCE 2.7365e-05 ;
+        THICKNESS 0.13 ;
+    hint: "Ask which tool reads these, given that they are not geometric rules."
+    answer: The layer's electrical properties, used to estimate wire delay.
+    wrong:
+      - The layer's manufacturing tolerances, used by the rule checker.
+      - The values the extractor writes back after routing a net.
+      - The limits on resistance and capacitance a net may reach.
+    explain: >-
+      Resistance per square and capacitance per unit area are what turn a
+      wire's geometry into an RC (Resistance-Capacitance) delay, which is what
+      `set_layer_rc` overrides and `estimate_parasitics` uses. Edge
+      capacitance accounts for the sidewalls, which dominate at small
+      geometries.
+    source: report_layer_rc
+
+  - id: fmt-lef-spacingtable
+    section: lef-tech
+    command: |-
+        SPACINGTABLE
+          PARALLELRUNLENGTH    0.0000     2.7000     4.0000
+            WIDTH 0.0000       0.8000     0.8000     0.8000
+            WIDTH 0.9000       0.8000     0.9000     0.9000
+            WIDTH 1.5000       0.8000     0.9000     1.5000 ;
+    hint: "Two axes. Ask what makes the required spacing grow along each."
+    answer: Required spacing keyed by wire width and how far two wires run alongside.
+    wrong:
+      - Required spacing keyed by wire width and the length of the wire.
+      - Required width keyed by the spacing available and the run length.
+      - Required spacing between tracks, keyed by width and by layer.
+    explain: >-
+      Two wide wires running beside each other for a long distance need more
+      space than a short narrow pair, both for manufacturing and for coupling.
+      This is the table form of the wide-metal spacing rule, and it is why a
+      non-default rule that widens a net must widen its spacing too.
+    source: report_layer_rc
+
+  - id: fmt-lef-site
+    section: lef-tech
+    command: |-
+      SITE FreePDK45_38x28_10R_NP_162NW_34O
+        CLASS CORE ;
+        SIZE 0.19 BY 1.4 ;
+      END
+    hint: "Ask what a row is built from, and what every cell's width is a multiple of."
+    answer: "The placement unit that rows and cell widths are built from."
+    wrong:
+      - The smallest cell in the library, which rows are sized from.
+      - The placement grid that cells are snapped to during legalization.
+      - The area one standard cell occupies, including its padding.
+    explain: >-
+      Rows are one site tall and cell widths are whole multiples of one, which
+      is what makes legalization possible: every legal position is a
+      site, and every legal cell width is a multiple of one.
+      `initialize_floorplan -site` names it, and a library belongs to a site
+      as much as to a process.
+    source: ifp
+
+  # ---------------------------------------------------------------- LEF (Library Exchange Format) macros
+
+  - id: fmt-lef-macro
+    section: lef-macro
+    command: |-
+      MACRO INV_X1
+        CLASS core ;
+        ORIGIN 0 0 ;
+        SYMMETRY X Y ;
+        SITE FreePDK45_38x28_10R_NP_162NW_34O ;
+        SIZE 0.38 BY 1.4 ;
+    hint: "One of these lines is what lets a placer flip the cell."
+    answer: The cell's outline and the flips it allows, on the site it belongs to.
+    wrong:
+      - The cell's outline and the rotations it may be placed at.
+      - The cell's origin and size in database units rather than microns.
+      - The cell's size and the area of silicon it consumes.
+    explain: >-
+      `SYMMETRY X Y` says the cell may be mirrored about either axis, which is
+      what `optimize_mirroring` uses and what lets rows alternate orientation
+      and share rails. `CLASS core` marks it a standard cell; a hard macro is
+      `CLASS BLOCK`, and a pad is `CLASS PAD`.
+    source: odb
+
+  - id: fmt-lef-pin
+    section: lef-macro
+    command: |-
+        PIN A
+          DIRECTION INPUT ;
+          PORT
+            LAYER metal1 ;
+              POLYGON 0.06 0.525 0.165 0.525 0.165 0.7 0.06 0.7 ;
+          END
+        END A
+    hint: "Ask what the router needs to know about a pin beyond its name."
+    answer: The pin's direction and the shapes the router must reach.
+    wrong:
+      - The pin's direction and the area reserved around it for access.
+      - The pin's position, given as a point on the named layer.
+      - The pin's direction and the net it is connected to inside the cell.
+    explain: >-
+      The layer is named with the shapes. A pin can have several ports and
+      several shapes, which is why a router
+      computes access points rather than aiming at a coordinate. Everything
+      the outside world may touch is here; the cell's insides are not in LEF
+      (Library Exchange Format) at all.
+    source: drt
+
+  - id: fmt-lef-obs
+    section: lef-macro
+    command: |-
+        OBS
+          LAYER metal1 ;
+            RECT 0.0 0.0 0.38 1.4 ;
+        END
+    hint: "It is inside the macro but is not a pin. Ask what it forbids."
+    answer: "Blocked area: metal inside the cell that routing must avoid."
+    wrong:
+      - "Obstruction of placement: no other cell may overlap this area."
+      - The cell's boundary, drawn so the router knows its extent.
+      - Metal reserved for the cell's power rails, which routing may cross.
+    explain: >-
+      The cell's internal wiring already occupies parts of the lower layers,
+      so the router must know where it cannot put its own. On a hard macro,
+      obstructions over several layers are what force routing to go around or
+      above it.
+    source: drt
+
+  - id: fmt-lef-antenna
+    section: lef-macro
+    command: |-
+          ANTENNAGATEAREA 0.05225 ;
+          ANTENNAPARTIALMETALAREA 0.018375 LAYER metal1 ;
+    hint: "Ask which check needs a ratio between two areas."
+    answer: The gate and metal areas the antenna check compares.
+    wrong:
+      - The areas of the cell that the density check counts.
+      - The gate area used to compute the pin's input capacitance.
+      - The metal area of the pin, used to estimate its resistance.
+    explain: >-
+      The ratio between them is what the rule limits: metal area against the
+      gate area it connects to,
+      so the library has to declare the gate area behind each pin and the
+      metal the cell itself already contributes. `check_antennas` adds the
+      routed metal to these.
+    source: ant
+
+  # ---------------------------------------------------------------- DEF (Design Exchange Format)
+
+  - id: fmt-def-units
+    section: def
+    command: UNITS DISTANCE MICRONS 2000 ;
+    hint: "Ask what a coordinate of 1000 means after this line."
+    answer: Coordinates are integers of one two-thousandth of a micron.
+    wrong:
+      - Coordinates are in microns, with two thousand digits of precision.
+      - The design is two thousand microns across in each direction.
+      - Distances are rounded to the nearest two thousandth of a micron.
+    explain: >-
+      DEF (Design Exchange Format) stores coordinates as integers in database
+      units to avoid rounding, so 1000 here is 0.5 microns. The factor also
+      sets the manufacturing grid a tool will snap to, which is why a mismatch
+      between files is a real problem.
+    source: odb
+
+  - id: fmt-def-diearea-rows
+    section: def
+    command: |-
+      DIEAREA ( 0 0 ) ( 200000 200000 ) ;
+      ROW ROW_0 FreePDK45_38x28_10R_NP_162NW_34O 380 2800 N DO 520 BY 1 STEP 380 0 ;
+    hint: "The row line ends with a repetition. Ask what it describes."
+    answer: The die outline, and a row repeated across 520 sites.
+    wrong:
+      - The die outline, and a row 520 microns long starting at a point.
+      - The core outline, and 520 rows stepping across the die.
+      - The die outline, and one row per site, repeated 520 times in y.
+    explain: >-
+      The row is 520 sites across, stepping in x.
+      `DO ... BY ... STEP` is how DEF (Design Exchange Format) repeats a row without listing every
+      site: 520 sites across, one row deep, stepping by one site width. `N` is
+      the orientation, which alternates between rows so neighbouring rows
+      share power rails.
+    source: odb
+
+  - id: fmt-def-components
+    section: def
+    command: |-
+      COMPONENTS 1250 ;
+        - _123_ INV_X1 + PLACED ( 12540 28000 ) N ;
+        - _124_ DFF_X1 + FIXED ( 15200 28000 ) FS ;
+      END COMPONENTS
+    hint: "Two instances, two different status words. Ask what the difference means to a tool."
+    answer: Instances with cell, location, and whether they may be moved.
+    wrong:
+      - Instances with their cells and locations; one is placed and one is routed.
+      - Instances with their cells; one is a standard cell and one a macro.
+      - Instances with their locations; one is legal and one is not yet.
+    explain: >-
+      The status word decides whether a tool may move it: `PLACED` means yes,
+      `FIXED` means no, which is
+      how macros and pre-placed cells are protected. `UNPLACED` has no
+      coordinates. The orientation, `N` or `FS` here, matters because it
+      decides which way the cell's rails and pins face.
+    source: odb
+
+  - id: fmt-def-nets
+    section: def
+    command: |-
+      NETS 980 ;
+        - clk ( PIN clk ) ( _124_ CK ) + USE CLOCK
+          + ROUTED metal3 ( 12540 28000 ) ( 12540 45000 )
+            NEW metal4 ( 12540 45000 ) ( 30000 45000 ) ;
+      END NETS
+    hint: "The net lists connections first, then something else. Ask what NEW starts."
+    answer: A net's connections and its routed wire segments.
+    wrong:
+      - A net's connections and the guides the router must follow.
+      - A net's connections, with NEW marking a newly added connection.
+      - A net's pins and the vias that connect them, layer by layer.
+    explain: >-
+      Connections come first, then the wires. A routed net is a list of
+      segments, each with a layer and points;
+      `NEW` begins a segment that does not continue the previous one, which is
+      how branches are written. `USE CLOCK` marks what kind of net it is, so
+      tools can treat clocks specially.
+    source: odb
+
+  - id: fmt-def-specialnets
+    section: def
+    command: |-
+      SPECIALNETS 2 ;
+        - VDD ( * VDD ) + USE POWER
+          + ROUTED metal1 480 + SHAPE FOLLOWPIN ( 0 2800 ) ( 200000 2800 ) ;
+      END SPECIALNETS
+    hint: "Ask what is special: compare the width and the connection list with an ordinary net."
+    answer: Power and ground, whose wires carry an explicit width and shape.
+    wrong:
+      - Nets the router may not change, whatever they carry.
+      - Nets with a non-default rule, such as a widened clock.
+      - Nets connected to every instance, listed with a wildcard.
+    explain: >-
+      Ordinary nets take their width from the layer's rule; supply wires are
+      drawn wide and are written with their own width and a `SHAPE` that says
+      what they are, such as `FOLLOWPIN` for a standard-cell rail. The `( *
+      VDD )` connection means every instance's VDD pin.
+    source: pdn
+
+  - id: fmt-def-pins
+    section: def
+    command: |-
+      PINS 42 ;
+        - clk + NET clk + DIRECTION INPUT + USE SIGNAL
+          + LAYER metal3 ( -70 -70 ) ( 70 70 )
+          + PLACED ( 45000 0 ) N ;
+      END PINS
+    hint: "Two coordinate pairs appear. Ask which is the shape and which the position."
+    answer: "A boundary pin's net, direction, shape, and placement."
+    wrong:
+      - A boundary pin given by two corners of its shape on the die.
+      - A cell pin, with the layer and position the router must reach.
+      - A pin constraint, giving the region where the pin may be placed.
+    explain: >-
+      The shape is relative to the pin's own origin, and `PLACED` puts that
+      origin on the die. The `LAYER` rectangle is the shape, and
+      `PLACED` puts that origin on the die. This is what `place_pins` writes
+      and what a top level reads to know where a block's connections are.
+    source: ppl
+
+  # ---------------------------------------------------------------- SPEF (Standard Parasitic Exchange Format)
+
+  - id: fmt-spef-dnet
+    section: spef
+    command: |-
+      *D_NET *12 0.0342
+      *CONN
+      *I *3:ZN O
+      *L *5:A I
+    hint: "One number on the first line, then a list. Ask what each part is."
+    answer: A net, its total capacitance, and the pins on it.
+    wrong:
+      - A net, its total resistance, and the pins along its route.
+      - A net, its delay, and the instances it connects.
+      - A net, its length, and the layers it is routed on.
+    explain: >-
+      `*I` is an instance pin and `*L` a load pin with its capacitance.
+      SPEF (Standard Parasitic Exchange Format) describes one net at a time:
+      the total capacitance, the connections (`*I` for an instance pin, `*P`
+      for a port), and then the detailed resistance and capacitance network.
+      `*L` gives a load pin's capacitance.
+    source: read_spef
+
+  - id: fmt-spef-name-map
+    section: spef
+    command: |-
+      *NAME_MAP
+      *12 _039_
+      *3 _897_
+    hint: "Ask why a parasitics file would not simply use the names."
+    answer: A number for every name, so the rest of the file can stay compact.
+    wrong:
+      - A mapping from the design's names to the extractor's internal ones.
+      - A list of the nets the file contains, given in order.
+      - A translation between the netlist's names and the layout's.
+    explain: >-
+      A parasitics file for a real design is enormous, and full hierarchical
+      names repeated on every line would dominate it. The map is declared once
+      and the numbers used afterwards, which is why a SPEF (Standard Parasitic
+      Exchange Format) file is unreadable without its header.
+    source: read_spef
+
+  - id: fmt-spef-rc
+    section: spef
+    command: |-
+      *CAP
+      1 *12:1 0.00861
+      2 *12:2 *9:3 0.00234
+      *RES
+      1 *12:1 *12:2 3.7
+    hint: "One capacitance line names two nodes. Ask what that means physically."
+    answer: Capacitance to ground and between nets, and node resistance.
+    wrong:
+      - Capacitance of each segment and the resistance of each via.
+      - Capacitance per layer and the resistance per unit length.
+      - Two capacitance estimates, one optimistic and one pessimistic.
+    explain: >-
+      Resistance runs between the net's internal nodes. A `*CAP` line with one
+      node is capacitance to ground; with two nodes it
+      is coupling capacitance between two nets, which is what crosstalk
+      analysis needs. `*RES` lines build the resistive network between the
+      net's internal nodes, which is why a long net is not a single lump.
+    source: read_spef
+
+  - id: fmt-spef-triplet
+    section: spef
+    command: |-
+      *T_UNIT 1 NS
+      *C_UNIT 1 PF
+      *R_UNIT 1 OHM
+    hint: "Compare it with Liberty: ask what the file would mean without these lines."
+    answer: The units every number in the file is expressed in.
+    wrong:
+      - The precision to which the extractor measured each quantity.
+      - The units the reading tool should convert the values into.
+      - The corner the parasitics were extracted at.
+    explain: >-
+      Like Liberty, SPEF (Standard Parasitic Exchange Format) numbers are bare
+      and the header gives their meaning. A file may also carry triplets,
+      written `min:typ:max`, when one file holds several corners' values at
+      once.
+    source: read_spef
+
+  # ---------------------------------------------------------------- SDF (Standard Delay Format)
+
+  - id: fmt-sdf-iopath
+    section: sdf
+    command: |-
+      (CELL (CELLTYPE "INV_X1") (INSTANCE _897_)
+        (DELAY (ABSOLUTE
+          (IOPATH A ZN (0.012:0.014:0.019) (0.011:0.013:0.017)))))
+    hint: "Two bracketed groups of three numbers. Ask what each group and each number is."
+    answer: The rising and falling delay from A to ZN, as three values.
+    wrong:
+      - The delay from A to ZN at three corners, for two different loads.
+      - The rise and fall delay, each given as a range and an average.
+      - The delay and the transition time, each as min, typical, max.
+    explain: >-
+      The three numbers are minimum, typical, and maximum.
+      SDF (Standard Delay Format) carries computed delays per instance, so
+      another tool can time or simulate without repeating delay calculation.
+      The triplet is the standard min, typical, max form, and the two groups
+      are the output's two directions.
+    source: read_sdf
+
+  - id: fmt-sdf-checks
+    section: sdf
+    command: |-
+      (TIMINGCHECK
+        (SETUP D (posedge CK) (0.031))
+        (HOLD  D (posedge CK) (0.012)))
+    hint: "Ask what these two lines are, given that they are not delays."
+    answer: The setup and hold requirements of that instance, annotated from the file.
+    wrong:
+      - The setup and hold times measured on that instance during simulation.
+      - The margins added to the library's own setup and hold values.
+      - The setup and hold violations found at that instance.
+    explain: >-
+      Checks are annotated separately from delays, which is why OpenSTA
+      reports their coverage separately with `report_annotated_check`. The
+      values replace the library's, so a design timed with an SDF (Standard
+      Delay Format) file may not match one timed from Liberty alone.
+    source: report_annotated_check
+
+  - id: fmt-sdf-interconnect
+    section: sdf
+    command: (INTERCONNECT _897_/ZN _124_/D (0.004:0.005:0.007))
+    hint: "Ask which part of a path this covers, given that IOPATH covers the cells."
+    answer: The wire delay from one instance pin to another.
+    wrong:
+      - The delay of the connection between two cells, including both cells.
+      - The delay of the via stack between the two pins' layers.
+      - The transition time the wire adds between the two pins.
+    explain: >-
+      Cell delays come as `IOPATH` entries and wire delays as `INTERCONNECT`
+      entries, one per driver-to-load pair. Annotating both is how a
+      simulation reproduces exactly the timing the analysis saw.
+    source: read_sdf
+
+  - id: fmt-sdf-cond
+    section: sdf
+    command: |-
+      (COND A2 == 1'b0
+        (IOPATH A1 ZN (0.018:0.021:0.026) (0.016:0.019:0.024)))
+    hint: "Compare it with the same idea in a Liberty file."
+    answer: A delay that applies only while that condition holds.
+    wrong:
+      - A delay that applies only while the named signal is switching.
+      - A condition the simulation must check before applying the delay.
+      - A delay that overrides the library only when the state is reached.
+    explain: >-
+      It matches the library's conditional arc for the same pins. A gate's
+      delay depends on its other inputs, so conditional arcs exist in
+      the library and must survive into the annotation. This is what
+      `sdf_cond` in Liberty is for: it gives the condition in the syntax an
+      SDF (Standard Delay Format) writer needs so the two line up.
+    source: report_annotated_delay
+
+  # ---------------------------------------------------------------- How they fit together
+
+  - id: fmt-which-file
+    section: together
+    command: |-
+      read_lef      nangate45.tech.lef
+      read_lef      nangate45.macro.lef
+      read_verilog  gcd.v
+      read_def      gcd.def
+      read_spef     gcd.spef
+    hint: "Ask what each file adds that the ones before it could not."
+    answer: Technology, cell shapes, netlist, layout, then the wires' cost.
+    wrong:
+      - Technology, then the netlist, then cell shapes, then layout and timing.
+      - Cell timing, then cell shapes, then the netlist, then the layout.
+      - Technology and cells, then the layout, then the netlist it implements.
+    explain: >-
+      In order: what the process allows, what the cells
+      look like, what is connected to what, where everything sits, and what
+      the wires cost. Timing needs one more, the Liberty library, which none
+      of these carry.
+    source: odb
+
+  - id: fmt-lef-vs-def
+    section: together
+    command: LEF (Library Exchange Format) against DEF (Design Exchange Format)
+    hint: "One is per library, the other per design. Ask which is which."
+    answer: One describes the technology and cells, the other one design.
+    wrong:
+      - LEF (Library Exchange Format) describes the cells' timing; DEF (Design Exchange Format) describes their placement.
+      - LEF (Library Exchange Format) describes one design's layout; DEF (Design Exchange Format) describes the technology.
+      - LEF (Library Exchange Format) and DEF (Design Exchange Format) describe the same data in abstract and detailed form.
+    explain: >-
+      LEF (Library Exchange Format) is the library side and DEF (Design
+      Exchange Format) the design side. A LEF (Library Exchange Format) file is written once per technology or
+      library and reused by every design; a DEF (Design Exchange Format) file
+      belongs to one design at one stage. This is why DEF (Design Exchange Format) refers to cells by
+      name and never repeats their shapes.
+    source: odb
+
+  - id: fmt-spef-vs-sdf
+    section: together
+    command: SPEF (Standard Parasitic Exchange Format) against SDF (Standard Delay Format)
+    hint: "Both describe timing. Ask which one has already been through delay calculation."
+    answer: One gives the wires' parasitics, the other computed delays.
+    wrong:
+      - SPEF (Standard Parasitic Exchange Format) gives the wires' delays; SDF (Standard Delay Format) gives the cells' delays.
+      - SPEF (Standard Parasitic Exchange Format) is written before routing and SDF (Standard Delay Format) after it.
+      - SPEF (Standard Parasitic Exchange Format) is for analysis and SDF (Standard Delay Format) for the same analysis at another corner.
+    explain: >-
+      SPEF (Standard Parasitic Exchange Format) holds parasitics and SDF
+      (Standard Delay Format) holds delays. With SPEF (Standard Parasitic Exchange Format) the reading tool computes
+      delays itself, so it can re-time after a change. With SDF (Standard
+      Delay Format) the delays are fixed, which is what a gate-level
+      simulation wants. Handing a simulator SPEF (Standard Parasitic Exchange Format), or a timer SDF (Standard Delay Format), works but
+      answers a different question.
+    source: read_spef
+
+  - id: fmt-db-vs-files
+    section: together
+    command: write_db against write_def
+    hint: "Ask which one another vendor's tool can read, and which keeps everything."
+    answer: The database keeps everything; the other is the portable subset.
+    wrong:
+      - The database is a compressed DEF (Design Exchange Format), holding the same information.
+      - DEF (Design Exchange Format) keeps the whole state and the database only the layout.
+      - The database is written per stage and DEF (Design Exchange Format) only at the end.
+    explain: >-
+      DEF (Design Exchange Format) is the portable one. OpenROAD's own
+      database carries the technology, the netlist, the layout,
+      and tool-specific state together, which is why stages hand it along. DEF
+      (Design Exchange Format) carries what other tools can read, and loses
+      whatever has no representation in the format.
+    source: odb
+
+  # ---------------------------------------------------------------- LEF technology additions
+
+  - id: fmt-lef-units-grid
+    section: lef-tech
+    command: |-
+      UNITS
+        DATABASE MICRONS 2000 ;
+      END UNITS
+
+      MANUFACTURINGGRID 0.0050 ;
+    hint: "Two different grids. One is how finely a number can be written, the other what may be made."
+    answer: The database resolution, and the coarser grid every shape must land on.
+    wrong:
+      - The database resolution, and the smallest shape the process can print.
+      - The units of the file, and the accuracy the tools should round to.
+      - The number of database units per micron, given twice for two uses.
+    explain: >-
+      A resolution of 2000 means one database unit is half a nanometre, so
+      coordinates are integers. The manufacturing grid is 5 nanometres, and a
+      shape off that grid cannot be made, which is why legalization snaps
+      everything to it. The two numbers are independent.
+    source: read_lef
+
+  - id: fmt-lef-busbit
+    section: lef-tech
+    command: |-
+      BUSBITCHARS "[]" ;
+      DIVIDERCHAR "/" ;
+    hint: "Think about how an instance deep in the hierarchy is named in a report."
+    answer: The characters that mark a bus bit and a hierarchy level in names.
+    wrong:
+      - The characters the tools may use when they create new names.
+      - The characters that must be escaped when they appear in a name.
+      - The characters that separate fields in the rest of the file.
+    explain: >-
+      A pin is `out[3]` and an instance inside a block is `core/reg_1`. Tools
+      that disagree about these characters produce names that do not match
+      across files, which is a common cause of a constraint matching nothing.
+      An instance whose real name contains a bracket has to escape it.
+    source: read_lef
+
+  - id: fmt-lef-masterslice
+    section: lef-tech
+    command: |-
+      LAYER poly
+        TYPE MASTERSLICE ;
+      END poly
+    hint: "Compare with a layer declared as ROUTING or CUT."
+    answer: A layer that exists in the process but that the router may not use.
+    wrong:
+      - A layer that carries the cells' internal wiring only.
+      - A layer that is generated by the foundry rather than the design.
+      - A layer reserved for the base cells of a gate array.
+    explain: >-
+      Polysilicon and diffusion appear so that contacts and antenna rules can
+      refer to them, but only `ROUTING` layers carry routes and only `CUT`
+      layers carry vias. Declaring a layer with the wrong type is a quick way
+      to make a router either ignore metal or try to route on diffusion.
+    source: set_routing_layers
+
+  - id: fmt-lef-via-rule
+    section: lef-tech
+    command: |-
+      VIA via1_4 DEFAULT
+        LAYER via1 ;
+          RECT -0.035 -0.035 0.035 0.035 ;
+      END via1_4
+
+      VIARULE Via1Array-0 GENERATE
+        LAYER metal1 ;
+          ENCLOSURE 0.035 0.035 ;
+        LAYER via1 ;
+          SPACING 0.15 BY 0.15 ;
+      END Via1Array-0
+    hint: "One is a finished object, the other a recipe."
+    answer: A fixed via, and a rule for building a via array of any size.
+    wrong:
+      - A single-cut via, and the rule for the multiple-cut version of it.
+      - A default via, and the alternative used when the default does not fit.
+      - A via for signal routing, and one for the power grid.
+    explain: >-
+      The named vias are what a router drops between two routing layers. The
+      generate rule says how to build a larger array, giving the metal
+      enclosure on each side and the spacing between cuts, which is what the
+      power grid uses where it needs many cuts to carry current.
+    source: read_lef
+
+  - id: fmt-lef-cut-resistance
+    section: lef-tech
+    command: |-
+      LAYER via1
+        TYPE CUT ;
+        SPACING 0.08 ;
+        RESISTANCE 5 ;
+      END via1
+    hint: "The number is in ohms, and it is not per unit length."
+    answer: The resistance of one via cut, counted once per cut.
+    wrong:
+      - The resistance of the via layer per square, as for a routing layer.
+      - The maximum resistance a via on this layer may have.
+      - The resistance of the metal enclosing the cut on each side.
+    explain: >-
+      Five ohms a cut is large next to a short wire, which is why extraction
+      counts vias and why a route that changes layer repeatedly is slower than
+      its length suggests. Doubling the cuts halves the resistance, which is
+      what a via array is for.
+    source: extract_parasitics
+
+  # ---------------------------------------------------------------- LEF macro additions
+
+  - id: fmt-lef-size-site
+    section: lef-macro
+    command: |-
+      SITE FreePDK45_38x28_10R_NP_162NW_34O ;
+      SIZE 0.38 BY 1.4 ;
+    hint: "The site is 0.19 by 1.4. Compare that with the size."
+    answer: The cell is one row tall and two sites wide.
+    wrong:
+      - The cell is one row tall and 0.38 microns of that row wide.
+      - The cell occupies two rows and must be placed on an even one.
+      - The cell is 0.38 by 1.4 microns and may sit anywhere on the row.
+    explain: >-
+      Every standard cell is a whole number of sites wide and a whole number of
+      rows tall, which is what lets them abut with the rails lining up. A cell
+      that is two rows tall is a double-height cell, and it must start on a
+      row of the right orientation.
+    source: detailed_placement
+
+  - id: fmt-lef-symmetry-foreign
+    section: lef-macro
+    command: |-
+      FOREIGN INV_X1 0.0 0.0 ;
+      ORIGIN 0 0 ;
+      SYMMETRY X Y ;
+    hint: "One line points outside the file. The other says how the cell may be turned."
+    answer: The layout cell this abstract stands for, and the flips that are legal.
+    wrong:
+      - The cell this one was derived from, and the axes it is symmetric about.
+      - The reference point of the cell, and the directions it may be stretched.
+      - The name used in the netlist, and the orientations already characterized.
+    explain: >-
+      `FOREIGN` names the real cell in the GDSII (Graphic Design System II)
+      file that this abstract represents, so the two can be merged at
+      streamout. `SYMMETRY X Y` says the cell may be mirrored about either
+      axis, which is what lets a placer flip cells so that rails abut.
+    source: detailed_placement
+
+  - id: fmt-lef-class
+    section: lef-macro
+    command: |-
+      CLASS CORE ;
+      CLASS BLOCK ;
+      CLASS PAD ;
+      CLASS CORE SPACER ;
+    hint: "Ask what each one tells the placer to do with the object."
+    answer: What kind of object it is, which decides how it may be placed.
+    wrong:
+      - Which library the cell belongs to, so tools can group them.
+      - Which stage of the flow is allowed to insert the cell.
+      - How much space the tool should reserve around the cell.
+    explain: >-
+      A core cell goes in a row, a block is a hard macro placed by hand or by
+      the macro placer, a pad sits in the ring at the edge of the die, and a
+      spacer is filler. The class also decides whether a cell is counted in
+      the design's area and whether it blocks routing.
+    source: place_macro
+
+  - id: fmt-lef-power-shape
+    section: lef-macro
+    command: |-
+      PIN VDD
+        DIRECTION INOUT ;
+        USE power ;
+        SHAPE ABUTMENT ;
+      END VDD
+    hint: "Ask how this pin gets connected, given that no router ever touches it."
+    answer: A rail that connects by touching its neighbour's rail in the row.
+    wrong:
+      - A rail that the power grid must route down to and connect.
+      - A pin that may be connected either as power or as a signal.
+      - A rail shared with the cell beside it, so only one is needed.
+    explain: >-
+      `SHAPE ABUTMENT` means the shape reaches both edges of the cell, so a row
+      of cells forms a continuous rail with no routing at all. The grid then
+      only has to drop straps onto that rail. A macro's supply pins have no
+      such shape and must be connected explicitly.
+    source: pdngen
+
+  # ---------------------------------------------------------------- GDSII
+
+  - id: fmt-gds-structure
+    section: gds
+    command: |-
+      library GCD
+        structure INV_X1
+          boundary  layer 11  datatype 0  ( ... )
+          path      layer 10  datatype 0  ( ... )
+        structure gcd
+          sref INV_X1  at (12540, 28000)  reflection
+    hint: "One structure refers to another rather than repeating it."
+    answer: A hierarchy of cells built from polygons and references.
+    wrong:
+      - A flat list of every polygon on the die, sorted by layer.
+      - A list of cells, each holding the polygons of its own layer.
+      - A netlist of cells, with the geometry stored separately.
+    explain: >-
+      A boundary is a filled polygon and a path is a wire with a width. A
+      structure reference places another structure at a point, with an optional
+      flip or rotation, and an array reference repeats one on a grid. This is
+      why a full chip stays a manageable file even with billions of shapes.
+    source: write_gds
+
+  - id: fmt-gds-layer-datatype
+    section: gds
+    command: |-
+      metal1 drawing   -> layer 11  datatype 0
+      metal1 pin       -> layer 11  datatype 2
+      metal1 label     -> layer 11  datatype 251
+    hint: "The name on the left is what the tools use. Ask what the foundry uses."
+    answer: Named layers translated into the numbered pairs the file stores.
+    wrong:
+      - Named layers split into the three masks each one needs.
+      - The order in which each layer is written into the file.
+      - The layers that carry a name, a shape, and a connection.
+    explain: >-
+      GDSII (Graphic Design System II) knows only numbers, so a layer map
+      translates each named purpose into a layer and datatype pair. Getting
+      one wrong sends the foundry a file where pins are drawn as metal or
+      labels are missing, and the rule deck reads the same numbers, so the
+      mistake often passes unnoticed until the checks disagree.
+    source: write_gds
+
+  - id: fmt-gds-vs-lef
+    section: gds
+    command: |-
+      INV_X1 in LEF (Library Exchange Format)
+      INV_X1 in GDSII (Graphic Design System II)
+    hint: "One of the two is what the placer and router read all day."
+    answer: The abstract with pins and blockages, against every polygon in the cell.
+    wrong:
+      - The cell's outline, against the cell's internal wiring only.
+      - The cell as placed, against the cell as drawn by its designer.
+      - The cell's timing view, against its physical view.
+    explain: >-
+      The abstract carries only what the tools above need: size, pin shapes,
+      and where routing may not go. The layout carries the transistors. They
+      are merged at the end, when the placed abstracts are replaced by the real
+      cells, which is why the two must agree about pin positions exactly.
+    source: write_gds
+
+  - id: fmt-gds-oasis
+    section: gds
+    command: OASIS (Open Artwork System Interchange Standard)
+    hint: "Both hold the same layout. Ask what changed between the two formats."
+    answer: A newer layout format that stores the same shapes far more compactly.
+    wrong:
+      - A newer layout format that adds connectivity to the shapes.
+      - A text form of the layout, meant to be read and edited.
+      - An archive format that compresses a layout file for transfer.
+    explain: >-
+      The older format's fixed-width records become bulky at modern densities,
+      where fill alone runs to hundreds of gigabytes. The newer one encodes
+      repetition directly and can shrink a file by a factor of ten. Both are
+      accepted, and the choice is the foundry's.
+    source: write_gds
+
+  - id: fmt-gds-xor
+    section: gds
+    command: |-
+      xor  old.gds  new.gds  ->  differences by layer
+    hint: "Ask what an empty result would mean."
+    answer: A shape-by-shape comparison showing only what changed.
+    wrong:
+      - A merge of two layouts, keeping the shapes unique to each.
+      - A check that two layouts obey the same rules.
+      - A check that a layout matches the netlist it came from.
+    explain: >-
+      After a late change, this is how a team proves that only the intended
+      layers moved. A metal-only fix must show differences on the metal and
+      via layers and nothing on the transistor layers, and a fill-only run
+      must show nothing but fill.
+    source: write_gds
+
+  # ---------------------------------------------------------------- Netlists
+
+  - id: fmt-verilog-netlist
+    section: netlist
+    command: |-
+      module gcd (clk, req_msg, resp_msg);
+        input clk;
+        INV_X1 _897_ (.A(_039_), .ZN(_040_));
+        DFF_X1 _898_ (.D(_040_), .CK(clk), .Q(resp_msg[3]));
+      endmodule
+    hint: "There is no always block and no operator anywhere in it."
+    answer: "A gate-level netlist: library cells wired together, and nothing else."
+    wrong:
+      - A structural register-transfer description, before technology mapping.
+      - A simulation model of the design, built from library cells.
+      - A placeholder netlist, with the logic still to be mapped.
+    explain: >-
+      Synthesis turns behaviour into this. Every instance is a cell from the
+      Liberty and LEF (Library Exchange Format) libraries, so the same file
+      can be timed, placed, and routed. It is also what formal equivalence
+      compares against the register-transfer source.
+    source: read_verilog
+
+  - id: fmt-escaped-names
+    section: netlist
+    command: |-
+      \dpath.a_reg[9]$_DFFE_PP_  ( .D(...) );
+    hint: "Note the leading backslash and where the name ends."
+    answer: An escaped name, so characters that normally mean something are literal.
+    wrong:
+      - A hierarchical name, with the backslash separating the levels.
+      - A generated name, which the tool marks with a backslash.
+      - A name too long for the format, continued on the next line.
+    explain: >-
+      A backslash starts an escaped identifier and a space ends it, which is
+      how a name can contain brackets, dots, or a dollar sign. Scripts that
+      build a name by hand and forget the trailing space are a familiar source
+      of a constraint that silently matches nothing.
+    source: get_cells
+
+  - id: fmt-cdl
+    section: netlist
+    command: |-
+      .SUBCKT INV_X1 A ZN VDD VSS
+      M0 ZN A VDD VDD PMOS_VTL W=0.415u L=0.05u
+      M1 ZN A VSS VSS NMOS_VTL W=0.415u L=0.05u
+      .ENDS
+    hint: "The instances are not cells. Ask what they are, and which check needs them."
+    answer: A transistor-level netlist, which the layout is checked against.
+    wrong:
+      - A simulation model of the cell, used to characterize its timing.
+      - The cell's schematic, kept alongside its layout for reference.
+      - A transistor-level netlist, from which the layout is generated.
+    explain: >-
+      Layout versus schematic extracts devices from the polygons and compares
+      them with this file, so a cell library ships one. It is the reason a
+      design hands off both a gate-level netlist and, for the cells and any
+      analog blocks, a transistor-level one.
+    source: read_verilog
+
+  # ---------------------------------------------------------------- Together additions
+
+  - id: fmt-netlist-vs-def
+    section: together
+    command: |-
+      gcd.v   against   gcd.def
+    hint: "Both list the same instances. Ask what each adds to the list."
+    answer: The same instances, with connections in one and positions in the other.
+    wrong:
+      - The design before and after placement, with the same information.
+      - The logical design, against the same design with the wires added.
+      - The instances, against the instances and the cells they use.
+    explain: >-
+      A layout exchange file does carry connectivity, but tools treat the
+      netlist as the authority on it and the layout file as the authority on
+      geometry. That is why a flow reads both, and why an instance renamed in
+      one and not the other breaks the link between them.
+    source: read_def
+
+  - id: fmt-block-handoff
+    section: together
+    command: |-
+      block.lef   block.lib   block.gds   block.v
+    hint: "The level above needs to place, time, and finally merge this block."
+    answer: "The four views a finished block hands up to the level above."
+    wrong:
+      - The four files a block is built from, kept together for reuse.
+      - The four formats a macro must be delivered in to be manufactured.
+      - The abstract, the model, the layout, and the constraints.
+    explain: >-
+      The abstract lets the top level place and route around the block, the
+      Liberty model lets it be timed without its internals, the layout is
+      merged at streamout, and the netlist supports layout versus schematic.
+      A hard macro such as a memory arrives the same way.
+    source: write_abstract_lef
+
+  # ---------------------------------------------------------------- DEF additions
+
+  - id: fmt-def-tracks
+    section: def
+    command: |-
+      TRACKS X 190 DO 193 STEP 380 LAYER metal1 ;
+      TRACKS Y 140 DO 262 STEP 280 LAYER metal1 ;
+    hint: "Three numbers: where they start, how many, and how far apart."
+    answer: "The routing grid: 193 vertical tracks from 190, every 380 database units."
+    wrong:
+      - "The routing grid: tracks 190 to 193, each 380 database units wide."
+      - The wires already routed on metal1, listed as a grid.
+      - The area available for routing on metal1, given as a range.
+    explain: >-
+      With 2000 database units to the micron, the step is 0.19 microns. A
+      router places wire centres on these tracks, so the count is the hard
+      limit on how many wires cross the block on that layer. The two
+      directions are given separately because each layer has a preferred one.
+    source: read_def
+
+  - id: fmt-def-source
+    section: def
+    command: |-
+      - FILLER_0_1 FILLCELL_X32 + SOURCE DIST + PLACED ( 2660 2800 ) N ;
+      - _504_ NAND2_X1 + PLACED ( 12540 28000 ) FS ;
+    hint: "One instance says where it came from, and the other says how it is turned."
+    answer: Which stage created the instance, and the orientation it sits at.
+    wrong:
+      - Which library the cell came from, and the orientation it sits at.
+      - Whether the instance may be moved, and the row it belongs to.
+      - The instance's origin point, and the row orientation it matches.
+    explain: >-
+      `SOURCE DIST` marks a cell added by the tool for distribution, such as
+      filler; the alternatives include netlist, timing, and user. The
+      orientation `FS` is flipped about the horizontal axis, which is how cells
+      in an odd row line their supply rails up with the row below.
+    source: read_def
+
+  - id: fmt-def-ndr
+    section: def
+    command: |-
+      NONDEFAULTRULES 1 ;
+          - CTS_NDR_0
+            + LAYER metal1 WIDTH 140 SPACING 280
+            + LAYER metal4 WIDTH 280 SPACING 560
+          ;
+      - clk ( PIN clk ) ( clkbuf_0_clk A ) + USE CLOCK + NONDEFAULTRULE CTS_NDR_0
+    hint: "Compare the widths and spacings against what the technology allows as a minimum."
+    answer: A rule giving some nets wider wires and more space, here the clock.
+    wrong:
+      - A rule giving some nets a reserved layer, here the clock.
+      - A rule excluding some nets from the usual design rule checks.
+      - A rule that the router applies when the default rule fails.
+    explain: >-
+      Widening a clock wire lowers its resistance, and doubling its spacing
+      cuts coupling from neighbours, which protects the clock from crosstalk it
+      would otherwise pick up. The cost is routing area, so the rule is applied
+      to the nets that need it rather than to everything.
+    source: clock_tree_synthesis
+
+  - id: fmt-def-routing
+    section: def
+    command: |-
+      - _002_ ( _597_ A2 ) ( _595_ A2 ) + USE SIGNAL
+        + ROUTED metal3 ( 31350 49140 ) ( 40090 * )
+        NEW metal2 ( 40850 48860 ) ( * 49140 )
+        NEW metal1 ( 31350 51940 ) via1_4
+    hint: "The asterisk stands for a coordinate. Ask which one."
+    answer: Wire segments, where an asterisk repeats the unchanged coordinate.
+    wrong:
+      - Wire segments, where an asterisk means the router may choose freely.
+      - Wire segments, where an asterisk marks the end of the net.
+      - Wire segments, where an asterisk means the segment is not yet routed.
+    explain: >-
+      A segment runs from one point to another, and because wires are straight
+      only one coordinate changes, so the other is written as an asterisk.
+      `NEW` starts a segment that does not continue from the last one, and a
+      via name in place of an end point drops that via at the point given.
+    source: read_def
+
+  # ---------------------------------------------------------------- SPEF additions
+
+  - id: fmt-spef-coupling
+    section: spef
+    command: |-
+      *CAP
+      3 *1158:QN 0.00013985
+      4 *3:10 0.000151825
+      6 *742:A2 *745:A2 2.94435e-05
+      12 *3:10 *943:A3 0.000127816
+    hint: "Some entries name one node and some name two. Ask what the second node is."
+    answer: Capacitance to ground on one node, or coupling between two nodes.
+    wrong:
+      - Capacitance on one node, or the same capacitance seen from two nodes.
+      - Capacitance of a wire, or of the via joining two wires.
+      - Capacitance at a pin, or between a pin and the wire it is on.
+    explain: >-
+      A two-node entry is the coupling between this net and its neighbour, and
+      it is the raw material of crosstalk analysis. Entry 12 couples an
+      internal node of this net to a pin of another, and it is larger than
+      some of this net's own grounded capacitance.
+    source: read_spef
+
+  - id: fmt-spef-res-network
+    section: spef
+    command: |-
+      *RES
+      1 *1158:QN *3:10 31.1072
+      2 *3:10 *744:A2 10
+      3 *3:10 *742:A2 12.3571
+    hint: "Follow the node names: one of them appears in every line."
+    answer: The net as a resistor network, branching at an internal node.
+    wrong:
+      - The resistance from the driver to each load, listed separately.
+      - The resistance of each wire segment, in routing order.
+      - The total resistance of the net, split across its three pins.
+    explain: >-
+      `*3:10` is an internal node of net 3, where the wire splits toward two
+      loads. The driver reaches it through 31 ohms, and each load hangs off it
+      through its own resistance. A timer solves this network with the
+      capacitances to get a delay to each load, which is why the two loads see
+      different delays.
+    source: read_spef
+
+  # ---------------------------------------------------------------- SDF additions
+
+  - id: fmt-sdf-header
+    section: sdf
+    command: |-
+      (SDFVERSION "3.0")
+      (DESIGN "gcd")
+      (VOLTAGE 1.100::1.100)
+      (PROCESS "1.000::1.000")
+      (TEMPERATURE 25.000::25.000)
+      (TIMESCALE 1ns)
+    hint: "Ask what would have to change for a second file to be needed."
+    answer: The corner the delays hold for, and the unit they are written in.
+    wrong:
+      - The conditions the design must run at, and the unit of the file.
+      - The range of conditions these delays stay valid over.
+      - The corner the design was signed off at, for the record only.
+    explain: >-
+      One file is one corner. A simulation at another voltage or temperature
+      needs its own, which is why a regression annotates a different file for
+      each corner it runs. The timescale sets what a bare number means, so
+      reading a file that assumes nanoseconds as picoseconds is silently wrong.
+    source: write_sdf
+
+  - id: fmt-sdf-triplet
+    section: sdf
+    command: |-
+      (IOPATH A1 ZN (0.023::0.023) (0.022::0.022))
+      (SETUP (posedge D) (posedge CK) (0.030::0.032))
+    hint: "Count the numbers in each bracket, and count the brackets."
+    answer: Minimum and maximum for each value, with rise and fall given separately.
+    wrong:
+      - Minimum, typical, and maximum, with rise and fall given separately.
+      - Rise and fall, each given for the minimum and maximum corner.
+      - The delay and its uncertainty, for the rising and the falling edge.
+    explain: >-
+      The format allows three values separated by colons, but a missing middle
+      one leaves the pair written here. The first bracket of an arc is the
+      rising output and the second the falling. For a check, the two values
+      are the fast and slow versions of the same requirement.
+    source: write_sdf

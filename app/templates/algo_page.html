@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ algo.name }} - Chipbase{% endblock %}
+{% block content %}
+<article class="algo-detail">
+  <div class="crumb">
+    <a href="/explore">Explore</a> /
+    {% if catalog_kind == "processes" %}
+    <a href="{{ section_href }}">{{ stage.name }}</a> /
+    {% else %}
+    <a href="/explore/algorithms">Methods &amp; Algorithms</a> /
+    <a href="/explore/algorithms/{{ stage.slug }}">{{ stage.name }}</a> /
+    {% endif %}
+    {{ algo.name }}
+  </div>
+  <h1 class="algo-title">{{ algo.name }}</h1>
+  <div class="chip-row">
+    <span class="chip topic-chip">{{ stage.name }}</span>
+    {% if algo.level %}<span class="chip lvl-{{ algo.level }}">{{ algo.level }}</span>{% endif %}
+    {% if algo.scope %}<span class="chip chip-scope">{% if algo.scope == 'both' %}global + detailed{% else %}{{ algo.scope }} routing{% endif %}</span>{% endif %}
+    {% if algo.year %}<span class="chip topic-chip">{{ algo.year }}</span>{% endif %}
+    {% if algo.who %}<span class="chip points-chip">{{ algo.who }}</span>{% endif %}
+    {% for cls, label in algo.chips %}
+    <span class="chip {{ cls }}">{{ label }}</span>
+    {% endfor %}
+  </div>
+
+  {% if algo.lab %}
+  <a class="cc-btn cc-btn-primary algo-lab-cta" href="{{ algo.lab.href }}">{{ algo.lab.label }}</a>
+  {% endif %}
+
+  <div class="desc-body algo-body">
+    {{ body_html | safe }}
+  </div>
+
+  {% if algo.refs %}
+  <section class="algo-refs">
+    <h2>References and further reading</h2>
+    <ul>
+      {% for label, url in algo.refs %}
+      <li><a href="{{ url }}">{{ label }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <nav class="algo-page-nav" id="algo-page-nav">
+    {% set base = (section_href ~ "/") if catalog_kind == "processes" else ("/explore/algorithms/" ~ stage.slug ~ "/") %}
+    <a href="{{ section_href if catalog_kind == "processes" else ("/explore/algorithms/" ~ stage.slug) }}">← {{ stage.name }} catalog</a>
+    <span class="algo-page-nav-siblings">
+      {% if prev %}<a href="{{ base }}{{ prev.slug }}">← {{ prev.name }}</a>{% endif %}
+      {% if next %}<a href="{{ base }}{{ next.slug }}">{{ next.name }} →</a>{% endif %}
+    </span>
+  </nav>
+</article>
+{% endblock %}
+{% block scripts %}
+{% for src in algo.get("extra_scripts", []) %}
+<script src="{{ src }}?v={{ asset_v }}"></script>
+{% endfor %}
+{% endblock %}

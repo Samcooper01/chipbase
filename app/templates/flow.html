@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{#
+  One stage of the OpenROAD flow walkthrough, on one design. The route passes `stage`
+  (synthesis | floorplan | placement | cts | routing | timing | finish); everything else comes
+  from that stage's step module, through the shared engine in
+  flow-page.js.
+#}
+{% set STAGES = {
+  'synthesis': {
+    'title': 'Synthesizing a block, end to end',
+    'stage_name': 'Synthesis',
+    'stage_slug': 'synthesis',
+    'lead': 'Turn a register transfer level description into the gate-level netlist the rest of the flow works on.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'synthesis-steps.js']
+  },
+  'floorplan': {
+    'title': 'Floorplanning a block, end to end',
+    'stage_name': 'Floorplanning',
+    'stage_slug': 'floorplanning',
+    'lead': 'Floorplan one block the way a physical design engineer does, step by step in flow order.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'floorplan-design-view.js']
+  },
+  'placement': {
+    'title': 'Placing a block, end to end',
+    'stage_name': 'Placement',
+    'stage_slug': 'placement',
+    'lead': 'Take the finished floorplan and give every standard cell a legal position.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'placement-steps.js']
+  },
+  'cts': {
+    'title': 'Building the clock tree, end to end',
+    'stage_name': 'Clock Tree Synthesis',
+    'stage_slug': 'cts',
+    'lead': 'Deliver one clock to every flip-flop at almost the same instant.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'placement-steps.js', 'cts-steps.js']
+  },
+  'routing': {
+    'title': 'Routing a block, end to end',
+    'stage_name': 'Routing',
+    'stage_slug': 'routing',
+    'lead': 'Turn every connection into real metal on real tracks, without breaking a design rule.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'placement-steps.js', 'cts-steps.js', 'routing-steps.js']
+  },
+  'timing': {
+    'title': 'Signing off the timing, end to end',
+    'stage_name': 'Timing Analysis',
+    'stage_slug': 'timing',
+    'lead': 'Prove the routed block meets its clock, one path at a time.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'placement-steps.js', 'cts-steps.js', 'routing-steps.js', 'timing-steps.js']
+  },
+  'finish': {
+    'title': 'Finishing the block, end to end',
+    'stage_name': 'Finishing',
+    'stage_slug': 'finishing',
+    'lead': 'Turn the signed-off block into the one file a foundry builds from, and prove it is right.',
+    'scripts': ['floorplan-core.js', 'floorplan-steps.js', 'placement-steps.js', 'cts-steps.js', 'routing-steps.js', 'timing-steps.js', 'finish-steps.js']
+  }
+} %}
+{% set S = STAGES[stage] %}
+{# link the stage name to its methods catalog only when it has one #}
+{% set has_catalog = explore_nav_stages | selectattr("href", "equalto", "/explore/algorithms/" ~ S.stage_slug) | list | length > 0 %}
+{% block title %}{{ S.title }} - Chipbase{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/explore/sandbox-theme.css?v={{ asset_v }}">
+<link rel="stylesheet" href="/static/explore/flow.css?v={{ asset_v }}">
+{% endblock %}
+{% block main_class %}sb-theme{% endblock %}
+{% block content %}
+<div class="sb-page">
+  <div class="crumb">
+    <a href="/sandboxes">Sandboxes</a> / The OpenROAD flow walkthrough /
+    {% if has_catalog %}<a href="/explore/algorithms/{{ S.stage_slug }}">{{ S.stage_name }}</a>{% else %}{{ S.stage_name }}{% endif %}
+  </div>
+  <div class="sb-head" style="margin-bottom:18px">
+    <h1 style="font-size:26px">{{ S.title }}</h1>
+    <p>
+      {{ S.lead }} The design is <code>tile4m</code>, a small teaching
+      block: four memory macros, a controller for each, and a hub that ties
+      them to the pins. One design, carried through every stage.
+    </p>
+    <div class="ff-scope">
+      <strong>The commands here are
+      <a href="https://openroad.readthedocs.io/en/latest/main/src/README.html">OpenROAD's</a>,
+      one open-source flow.</strong> The steps are common to physical design
+      everywhere, and so are the questions each one asks. The command names,
+      the arguments, and the defaults are not: a commercial tool does the same
+      work with its own commands, and a different flow may split or merge these
+      steps. Read the commands as one worked example, not as the way it is
+      always done.
+    </div>
+  </div>
+
+  <div class="ff-grid">
+    <section class="pane">
+      <ol class="ff-track" id="flow-track"></ol>
+      <p class="ff-free ff-stagelinks">
+        Other stages of the flow:
+        {% for key, st in STAGES.items() if key != stage %}<a href="/explore/examples/{{ key }}">{{ st.stage_name }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+      </p>
+    </section>
+    <div id="flow-works"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.FLOW_PAGE_STAGE = "{{ stage }}";</script>
+{% for f in S.scripts %}<script src="/static/explore/{{ f }}?v={{ asset_v }}"></script>
+{% endfor %}<script src="/static/explore/flow-page.js?v={{ asset_v }}"></script>
+{% endblock %}

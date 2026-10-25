@@ -1,0 +1,24 @@
+id: script-batch-clocks
+title: "Write a script: create clocks for every clock port"
+topic: Scripting
+difficulty: medium
+points: 150
+engine: script
+kind: files
+order: 3
+editable:
+  - path: script.tcl
+    language: tcl
+checks:
+  - id: count
+    label: "Exactly three clocks exist"
+    metric: clocks_created
+    op: "~="
+    value: 3
+    tolerance: 0.1
+  - id: correct
+    label: "Each clock: right name, right port, right period (± 1 ps)"
+    metric: clocks_correct
+    op: "~="
+    value: 1
+    tolerance: 0.1

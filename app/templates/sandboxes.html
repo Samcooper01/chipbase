@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Sandboxes{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/explore/sandbox-theme.css?v={{ asset_v }}">{% endblock %}
+{% block main_class %}sb-theme{% endblock %}
+{% block content %}
+{% set stage_accent = {
+  'synthesis': '#7c3aed', 'floorplanning': '#b8692e', 'placement': '#2563eb',
+  'cts': '#0f766e', 'routing': '#0891b2', 'timing': '#d97706', 'finishing': '#be123c', 'design': '#334155'
+} %}
+{% set live_count = (examples + designs) | selectattr("1.live") | list | length %}
+
+{% macro macro_card(cat, e, n) %}
+<article class="sb-macro{% if not e.live %} sb-planned{% endif %}"
+         style="--accent: {{ stage_accent.get(cat.slug, '#16a34a') }};">
+  <span class="sb-pin1" aria-hidden="true"></span>
+  <div class="sb-eyebrow"><span>{{ "%02d"|format(n) }}</span> · {{ cat.name }}</div>
+  {% if e.live %}<div class="sb-thumb" data-thumb="{{ e.id }}" aria-hidden="true"></div>{% endif %}
+  <h3 class="sb-title">
+    {% if e.live %}<a class="sb-open" href="{{ e.href }}">{{ e.title }}</a>{% else %}{{ e.title }}{% endif %}
+  </h3>
+  <p class="sb-blurb">{{ e.blurb }}</p>
+  {% if e.foot %}<div class="sb-meta">{{ e.foot }}</div>{% endif %}
+  <div class="sb-foot">
+    {% if e.live %}
+    <span class="sb-go">{% if e.kind == 'example' %}Walk through it →{% elif cat.slug == 'design' %}Open the design →{% else %}Open the sandbox →{% endif %}</span>
+    {% else %}
+    <span class="sb-soon-tag">in the works</span>
+    {% endif %}
+    {% if cat.catalog %}<a class="sb-methods" href="/explore/algorithms/{{ cat.slug }}">Read the methods</a>{% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+<div class="sb-page">
+  <header class="sb-head">
+    <div class="crumb">Sandboxes</div>
+    <h1>Sandboxes</h1>
+    <p>
+      Physical design you can touch. Start with the OpenROAD flow walkthrough, one real
+      block taken through every stage step by step, then open a sandbox and
+      make the calls yourself. No installs, no accounts:
+      everything runs live in your browser.
+    </p>
+    <div class="sb-readout">
+      <span><b>{{ live_count }}</b>live</span>
+      <span class="sb-soon"><b>{{ (examples + designs) | rejectattr("1.live") | list | length }}</b>in the works</span>
+    </div>
+  </header>
+
+  <details class="sb-die" id="sb-sec-walkthrough" open>
+    <summary class="sb-die-head" aria-label="The OpenROAD flow walkthrough: show or hide">
+      <span class="sb-caret" aria-hidden="true"></span>
+      <h2>The OpenROAD flow walkthrough</h2>
+      <p>One design, taken from Verilog to finished layout through the open-source
+        <a href="https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts">OpenROAD
+        flow</a>, stage by stage, with every choice made and explained.</p>
+    </summary>
+    <div class="sb-core">
+      {% for cat, e in examples %}{{ macro_card(cat, e, loop.index) }}{% endfor %}
+    </div>
+    <div class="sb-die-mark" aria-hidden="true">the openroad flow walkthrough · rev 1</div>
+  </details>
+
+  <section class="sb-die" id="sb-sec-designs">
+    <div class="sb-die-head">
+      <h2>Designs you can do in the browser</h2>
+      <p>Whole designs you take through the flow yourself: pick the settings,
+        and see the layout, timing, area and power that come out.</p>
+    </div>
+    <div class="sb-core">
+      {% for cat, e in designs %}{{ macro_card(cat, e, loop.index) }}{% endfor %}
+    </div>
+    <div class="sb-die-mark" aria-hidden="true">open sandboxes · rev 1</div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+{% for f in ['floorplan-core.js', 'floorplan-steps.js', 'placement-steps.js', 'cts-steps.js',
+             'routing-steps.js', 'timing-steps.js', 'synthesis-steps.js', 'finish-steps.js', 'stage-thumbs.js'] %}
+<script src="/static/explore/{{ f }}?v={{ asset_v }}"></script>
+{% endfor %}
+<script>
+/* the walkthrough section remembers, in this browser only, whether it was left open */
+(function () {
+  document.querySelectorAll("details.sb-die[id]").forEach(function (d) {
+    var key = "sb-open:" + d.id;
+    try { if (localStorage.getItem(key) === "0") d.open = false; } catch (e) {}
+    d.addEventListener("toggle", function () {
+      try { localStorage.setItem(key, d.open ? "1" : "0"); } catch (e) {}
+    });
+  });
+})();
+</script>
+{% endblock %}

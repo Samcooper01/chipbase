@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Chipbase{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v={{ asset_v }}">
+  <meta name="chipbase-issues" content="{{ issues_url }}">
+  <link rel="stylesheet" href="/static/vendor/fonts/fonts.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_v }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="topbar">
+    <a class="brand" href="/">
+      {# the logo: a routed C. One net lying on faint routing tracks, turning at
+         right angles, with a via at each bend and a pin at each end #}
+      <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <!-- the logo: a wafer of dies with one picked out in green; the flat at the bottom is the wafer's orientation edge -->
+        <defs><clipPath id="brand-wafer"><circle cx="32" cy="32" r="27"/></clipPath></defs>
+        <circle cx="32" cy="32" r="27" fill="#ffffff" stroke="currentColor" stroke-width="3"/>
+        <g clip-path="url(#brand-wafer)" fill="none" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.55">
+          <rect x="7" y="7" width="7" height="7" rx="0.8"/>
+          <rect x="7" y="15.5" width="7" height="7" rx="0.8"/>
+          <rect x="7" y="24" width="7" height="7" rx="0.8"/>
+          <rect x="7" y="32.5" width="7" height="7" rx="0.8"/>
+          <rect x="7" y="41" width="7" height="7" rx="0.8"/>
+          <rect x="7" y="49.5" width="7" height="7" rx="0.8"/>
+          <rect x="15.5" y="7" width="7" height="7" rx="0.8"/>
+          <rect x="15.5" y="15.5" width="7" height="7" rx="0.8"/>
+          <rect x="15.5" y="24" width="7" height="7" rx="0.8"/>
+          <rect x="15.5" y="32.5" width="7" height="7" rx="0.8"/>
+          <rect x="15.5" y="41" width="7" height="7" rx="0.8"/>
+          <rect x="15.5" y="49.5" width="7" height="7" rx="0.8"/>
+          <rect x="24" y="7" width="7" height="7" rx="0.8"/>
+          <rect x="24" y="15.5" width="7" height="7" rx="0.8"/>
+          <rect x="24" y="24" width="7" height="7" rx="0.8"/>
+          <rect x="24" y="32.5" width="7" height="7" rx="0.8"/>
+          <rect x="24" y="41" width="7" height="7" rx="0.8"/>
+          <rect x="24" y="49.5" width="7" height="7" rx="0.8"/>
+          <rect x="32.5" y="7" width="7" height="7" rx="0.8"/>
+          <rect x="32.5" y="15.5" width="7" height="7" rx="0.8"/>
+          <rect x="32.5" y="24" width="7" height="7" rx="0.8" fill="#16a34a" stroke="none"/>
+          <rect x="32.5" y="32.5" width="7" height="7" rx="0.8"/>
+          <rect x="32.5" y="41" width="7" height="7" rx="0.8"/>
+          <rect x="32.5" y="49.5" width="7" height="7" rx="0.8"/>
+          <rect x="41" y="7" width="7" height="7" rx="0.8"/>
+          <rect x="41" y="15.5" width="7" height="7" rx="0.8"/>
+          <rect x="41" y="24" width="7" height="7" rx="0.8"/>
+          <rect x="41" y="32.5" width="7" height="7" rx="0.8"/>
+          <rect x="41" y="41" width="7" height="7" rx="0.8"/>
+          <rect x="41" y="49.5" width="7" height="7" rx="0.8"/>
+          <rect x="49.5" y="7" width="7" height="7" rx="0.8"/>
+          <rect x="49.5" y="15.5" width="7" height="7" rx="0.8"/>
+          <rect x="49.5" y="24" width="7" height="7" rx="0.8"/>
+          <rect x="49.5" y="32.5" width="7" height="7" rx="0.8"/>
+          <rect x="49.5" y="41" width="7" height="7" rx="0.8"/>
+          <rect x="49.5" y="49.5" width="7" height="7" rx="0.8"/>
+        </g>
+        <path d="M24 57.5 H40" stroke="#ffffff" stroke-width="4"/>
+        <path d="M24 57 H40" stroke="currentColor" stroke-width="3"/>
+      </svg>
+      <span class="brand-text">Chipbase
+        <span class="brand-sub">Learn physical design for free</span>
+      </span>
+    </a>
+    <div class="nav-links">
+      {% set path = request.url.path %}
+      {% set sandbox_paths = ['/sandboxes', '/explore/algorithms/maze-router', '/explore/algorithms/floorplan-sandbox'] %}
+      {% set in_sandboxes = path in sandbox_paths or path.startswith('/explore/examples/') or path.startswith('/explore/designs/') %}
+      {% set in_reference = path.startswith('/glossary') or path.startswith('/explore/processes') or path.startswith('/data') %}
+      {% set in_learn = not in_sandboxes and not in_reference and (path.startswith('/education') or path.startswith('/explore')) %}
+      <a href="/challenges" class="nav-challenge{% if path.startswith('/challenges') %} active{% endif %}">Challenge</a>
+      <div class="nav-item">
+        <a href="/education" class="{% if in_learn %}active{% endif %}">Learn <span class="nav-caret">▾</span></a>
+        <div class="nav-dropdown">
+          <div class="nav-dd-panel">
+            <div class="nav-dd-item">
+              <a href="/education">Education <span class="nav-flyout-caret">▸</span></a>
+              <div class="nav-flyout">
+                <div class="nav-dd-panel">
+                  <a href="/education">All topics</a>
+                  {% for t in education_nav_topics %}
+                  <a href="{{ t.href }}">{{ t.name }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="nav-dd-item">
+              <a href="/explore/algorithms">Methods &amp; Algorithms <span class="nav-flyout-caret">▸</span></a>
+              <div class="nav-flyout">
+                <div class="nav-dd-panel">
+                  <a href="/explore/algorithms">All stages</a>
+                  {% for s in explore_nav_stages %}
+                  <a href="{{ s.href }}">{{ s.name }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-item">
+        <a href="/problems" class="{% if path.startswith('/problem') or path.startswith('/games') %}active{% endif %}">Practice <span class="nav-caret">▾</span></a>
+        <div class="nav-dropdown">
+          <div class="nav-dd-panel">
+            <div class="nav-dd-item">
+              <a href="/problems">Problems <span class="nav-flyout-caret">▸</span></a>
+              <div class="nav-flyout">
+                <div class="nav-dd-panel">
+                  <a href="/problems">All problems</a>
+                  {% for t in problems_nav_topics %}
+                  <a href="{{ t.href }}">{{ t.name }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="nav-dd-item">
+              <a href="/games">Games <span class="nav-flyout-caret">▸</span></a>
+              <div class="nav-flyout">
+                <div class="nav-dd-panel">
+                  <a href="/games">All games</a>
+                  {% for g in games_nav %}
+                  <a href="{{ g.href }}">{{ g.name }}</a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-item">
+        <a href="/sandboxes" class="{% if in_sandboxes %}active{% endif %}">Sandboxes <span class="nav-caret">▾</span></a>
+        <div class="nav-dropdown">
+          <div class="nav-dd-panel">
+            <div class="nav-dd-item">
+              <a href="/sandboxes">The OpenROAD flow walkthrough <span class="nav-flyout-caret">▸</span></a>
+              <div class="nav-flyout">
+                <div class="nav-dd-panel">
+                  <a href="/explore/examples/synthesis">1 · Synthesis</a>
+                  <a href="/explore/examples/floorplan">2 · Floorplanning</a>
+                  <a href="/explore/examples/placement">3 · Placement</a>
+                  <a href="/explore/examples/cts">4 · Clock tree synthesis</a>
+                  <a href="/explore/examples/routing">5 · Routing</a>
+                  <a href="/explore/examples/timing">6 · Timing sign-off</a>
+                  <a href="/explore/examples/finish">7 · Finishing and tapeout</a>
+                </div>
+              </div>
+            </div>
+            <div class="nav-dd-item">
+              <a href="/sandboxes#sb-sec-designs">Designs you can do in the browser <span class="nav-flyout-caret">▸</span></a>
+              <div class="nav-flyout">
+                <div class="nav-dd-panel">
+                  <a href="/explore/designs/riscv32i">riscv32i</a>
+                  <a href="/explore/designs/aes">aes</a>
+                  <a href="/explore/designs/gcd">gcd</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nav-item">
+        <a href="/glossary" class="{% if in_reference %}active{% endif %}">Reference <span class="nav-caret">▾</span></a>
+        <div class="nav-dropdown">
+          <div class="nav-dd-panel">
+            <a href="/glossary">Glossary</a>
+            <a href="/explore/processes">Foundry Processes</a>
+            <a href="/data">Open data: the OpenROAD runs</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {# the author's profiles, at the right end of the bar: each box has the
+       site's logo, the author's photo there, and the address itself #}
+    <div class="nav-social">
+      <a class="ns-card" href="https://github.com/Samcooper01" target="_blank" rel="noopener" aria-label="Sam Cooper on GitHub">
+        <svg class="ns-logo ns-github" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <img class="ns-pic" src="/static/img/sam_github.jpg" alt="">
+        <span class="ns-url">github.com/Samcooper01</span>
+      </a>
+      <a class="ns-card" href="https://www.linkedin.com/in/sam-cooper12/" target="_blank" rel="noopener" aria-label="Sam Cooper on LinkedIn">
+        <svg class="ns-logo ns-linkedin" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+        <img class="ns-pic" src="/static/img/sam_linkedin.jpg" alt="">
+        <span class="ns-url">linkedin.com/in/sam-cooper12</span>
+      </a>
+    </div>
+  </nav>
+  <main class="{% block main_class %}page{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <div class="footer-inner footer-inner-5">
+      <div class="footer-col footer-brand-col">
+        <div class="footer-brand">Chipbase</div>
+        <p>Learn chip physical design by doing: complete the design
+          challenge, solve graded problems, drill the tools, and take a real
+          processor from netlist to finished layout in your browser, all built
+          from real runs of the open-source OpenROAD flow.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Try it yourself</h4>
+        <a href="/challenges">Challenge</a>
+        <a href="/problems">Problems</a>
+        <a href="/games">Games</a>
+        <a href="/sandboxes">Sandboxes</a>
+        <a href="/#try">Harden a chip in your browser</a>
+      </div>
+      <div class="footer-col">
+        <h4>Learn</h4>
+        <a href="/education">Education</a>
+        <a href="/explore/algorithms">Methods and algorithms</a>
+        <a href="/explore/processes">Foundry processes</a>
+        <a href="/glossary">Glossary</a>
+      </div>
+      <div class="footer-col">
+        <h4>Help and records</h4>
+        <a href="/tutor">Tutor</a>
+        <a href="/progress">Your progress</a>
+        <a href="/data">Open data</a>
+      </div>
+      <div class="footer-col">
+        <h4>Built on</h4>
+        {% for b in built_on %}<a href="{{ b.url }}" target="_blank" rel="noopener">{{ b.name }}</a>{% endfor %}
+      </div>
+    </div>
+  </footer>
+  <script src="/static/app.js?v={{ asset_v }}"></script>
+  <script src="/static/tutor-ref.js?v={{ asset_v }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

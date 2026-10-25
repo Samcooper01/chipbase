@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Suggest a drill - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / Suggest a drill</div>
+  <h1 class="lab-title">Suggest a drill</h1>
+  <p class="gm-intro">
+    Ask for a drill that does not exist yet, send a question for one that
+    does, or name a topic the games never touch. Sending opens a GitHub issue
+    with what you wrote already filled in; submit it there. It goes in the
+    queue rather than straight onto the site, because a question only goes
+    live once its answer can be reviewed.
+  </p>
+
+  <form class="ct-form" method="get" action="{{ issues_url }}/new" target="_blank">
+    <input type="hidden" name="template" value="suggest-drill.yml">
+    <fieldset class="ct-field">
+      <legend>What is it?</legend>
+      {% for value, label in kinds %}
+      <label class="ct-radio">
+        <input type="radio" name="kind" value="{{ label }}"{% if loop.first %} checked{% endif %}>
+        <span>{{ label }}</span>
+      </label>
+      {% endfor %}
+    </fieldset>
+
+    <label class="ct-field">
+      <span class="ct-label">Which drill, if it belongs to one</span>
+      <select name="drill">
+        <option value="">Not sure, or a new one</option>
+        {% for d in drills %}<option value="{{ d.title }}">{{ d.title }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <label class="ct-field">
+      <span class="ct-label">One line saying what it is</span>
+      <input type="text" name="title" maxlength="160" required
+             placeholder="A drill on reading a parasitic extraction report">
+    </label>
+
+    <label class="ct-field">
+      <span class="ct-label">The detail</span>
+      <textarea name="detail" rows="7" maxlength="2000"
+                placeholder="What the question asks, what the right answer is, and why the wrong answers are wrong. If you have the whole card written out, paste it here."></textarea>
+    </label>
+
+    <label class="ct-field">
+      <span class="ct-label">Where the answer can be checked</span>
+      <input type="text" name="source" maxlength="400"
+             placeholder="A tool log, a run you can describe, a manual page, a standard">
+      <span class="ct-hint">
+        This is the part that decides whether it can be used. Every number on
+        this site came out of a run that was kept, so a question that arrives
+        with its evidence is a small edit and one without it is a research
+        project.
+      </span>
+    </label>
+
+    <div class="ct-actions">
+      <button type="submit" class="btn btn-submit">Open it on GitHub</button>
+      <a class="ct-waiting" href="{{ issues_url }}?q=is%3Aissue+is%3Aopen+label%3Asuggestion" target="_blank" rel="noopener">See what is already suggested</a>
+    </div>
+  </form>
+
+  <div class="gm-basis">
+    <span class="gm-basis-label">What happens to it</span>
+    <span>
+      Suggestions are read by hand. One that can be checked becomes a card in
+      the drill's content file, which is plain text under version control, so
+      the change and the reason for it stay in the history. A GitHub account
+      is needed to submit the issue. Nothing sent through this form edits the
+      site by itself.
+    </span>
+  </div>
+</article>
+{% endblock %}

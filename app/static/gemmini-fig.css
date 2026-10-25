@@ -1,0 +1,33 @@
+/* The Gemmini figure, shared by the front page and the challenge page: a
+   simplified floorplan with C = A x B running through the 16 x 16 array.
+   Drawn for a dark background. Markup: templates/_gemmini_fig.html. */
+/* the challenge figure: a simplified Gemmini floorplan with C = A x B running
+   through the array. Row i of A and column j of B meet at step i + j, so each
+   element flashes (i + j + 0.5) hops after the start; that single rule sets
+   every delay, which is why the lit front moves diagonally. */
+.hc-sa { margin: 0; text-align: center; }
+.hc-sa svg { width: 100%; max-width: 300px; height: auto; display: block; margin: 0 auto; }
+.hc-sa figcaption { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.4px; color: rgba(255, 255, 255, 0.55); margin-top: 8px; }
+.hc-fb { fill: rgba(255, 255, 255, 0.04); stroke: rgba(255, 255, 255, 0.28); stroke-width: 0.8; }
+.hc-fl { fill: rgba(255, 255, 255, 0.6); font-family: var(--mono); font-size: 7px; text-anchor: middle; }
+.hc-ml { paint-order: stroke; stroke: #0e1812; stroke-width: 3px; fill: #34d399; font-family: var(--mono); font-size: 9px; font-weight: 700; text-anchor: middle; }
+.hc-pe { fill: rgba(255, 255, 255, 0.06); stroke: rgba(255, 255, 255, 0.14); stroke-width: 0.4; animation: hcPE 5.0s linear infinite; }
+@keyframes hcPE { 0%, 100% { fill: rgba(255, 255, 255, 0.06); } 2% { fill: rgba(52, 211, 153, 0.95); }
+  12% { fill: rgba(52, 211, 153, 0.25); } 40% { fill: rgba(255, 255, 255, 0.06); } }
+.hc-tok { fill: #34d399; opacity: 0; }
+.hc-tok-a { animation: hcTokA 5.0s linear infinite; }
+.hc-tok-b { animation: hcTokB 5.0s linear infinite; }
+.hc-tok-c { fill: #fbbf24; animation: hcTokC 5.0s linear infinite; }
+@keyframes hcTokA { 0% { transform: translateX(0); opacity: 0; } 1% { opacity: 1; }
+  32.0% { transform: translateX(149px); opacity: 1; } 34.0% { opacity: 0; } 100% { transform: translateX(149px); opacity: 0; } }
+@keyframes hcTokB { 0% { transform: translateY(0); opacity: 0; } 1% { opacity: 1; }
+  32.0% { transform: translateY(149px); opacity: 1; } 34.0% { opacity: 0; } 100% { transform: translateY(149px); opacity: 0; } }
+@keyframes hcTokC { 0% { transform: translateY(0); opacity: 0; } 1% { opacity: 1; } 5% { transform: translateY(12px); opacity: 1; }
+  6% { opacity: 0; } 100% { transform: translateY(12px); opacity: 0; } }
+.hc-acc { animation: hcAcc 5.0s linear infinite; animation-delay: 3.32s; }
+@keyframes hcAcc { 0%, 100% { fill: rgba(255, 255, 255, 0.04); } 3% { fill: rgba(251, 191, 36, 0.45); } 16% { fill: rgba(255, 255, 255, 0.04); } }
+.hc-tok, .hc-pe { transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) {
+  .hc-pe, .hc-tok, .hc-acc { animation: none; }
+  .hc-pe.is-lit { fill: rgba(52, 211, 153, 0.6); }
+}

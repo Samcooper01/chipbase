@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Chipbase - Progress{% endblock %}
+{% block head %}
+<style>
+  /* Progress: page-local styles, in the same language as the games pages. */
+  .pg-head { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel);
+    box-shadow: 5px 5px 0 var(--shadow-hard); padding: 22px 26px 20px; margin-bottom: 22px; }
+  .pg-kicker, .pg-k { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.1px; text-transform: uppercase; color: var(--muted); }
+  .pg-head h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 7px 0 10px; }
+  .pg-lede { font-size: 15px; line-height: 1.55; margin: 0; max-width: 760px; }
+  .pg-counts { display: flex; flex-wrap: wrap; gap: 30px; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .pg-count b { display: block; font-family: var(--mono); font-size: 19px; font-weight: 700; color: var(--green-deep); line-height: 1.2; }
+  .pg-count span { font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .pg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; }
+  .pg-card { border: 2px solid var(--navy); border-radius: 14px; background: var(--panel); padding: 16px 18px 18px; }
+  .pg-card.is-soon { border-style: dashed; }
+  .pg-card h2 { font-size: 17px; margin: 4px 0 4px; }
+  .pg-note { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; }
+  .pg-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); font-size: 13.5px; }
+  .pg-row:first-of-type { border-top: none; }
+  .pg-bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin-top: -3px; }
+  .pg-bar i { display: block; height: 100%; background: var(--green); width: 0; }
+  .pg-num { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .pg-pill { font-family: var(--mono); font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .pg-pill.is-solved { border-color: var(--green); color: var(--green-deep); background: rgba(22, 163, 74, 0.08); }
+  .pg-pill.is-attempted { border-color: var(--amber); color: var(--amber-deep); background: rgba(217, 119, 6, 0.08); }
+  .pg-empty { font-size: 13px; color: var(--muted); }
+  .pg-local { font-size: 12.5px; color: var(--muted); margin: 14px 0 0; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="pg-head">
+  <div class="pg-kicker">Your progress</div>
+  <h1>Progress</h1>
+  <p class="pg-lede">
+    What you have done across the site. There are no accounts: problems,
+    drills and worked examples are all recorded in this browser only, so they
+    will look empty on another device or in a private window.
+  </p>
+  <div class="pg-counts">
+    <div class="pg-count"><b><span data-total="solved">0</span> / {{ problems | length }}</b><span>problems solved</span></div>
+    <div class="pg-count"><b data-total="cards">0</b><span>cards known</span></div>
+    <div class="pg-count"><b data-total="answers">0</b><span>drill items answered</span></div>
+    <div class="pg-count"><b data-total="steps">0</b><span>example steps done</span></div>
+  </div>
+</div>
+
+<div class="pg-grid">
+  <section class="pg-card">
+    <div class="pg-k">in this browser</div>
+    <h2>Problems</h2>
+    <p class="pg-note">A problem counts once it has been submitted: solved when every check passed, attempted otherwise.</p>
+    {% for p in problems %}
+    <div class="pg-row" data-problem="{{ p.id }}">
+      <a href="/problem/{{ p.id }}">{{ p.title }}</a>
+      <span class="pg-pill">not started</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="pg-card">
+    <div class="pg-k">in this browser</div>
+    <h2>Flash cards</h2>
+    <p class="pg-note">A card counts as known once it has been answered right often enough to be scheduled a week or more ahead.</p>
+    {% for d in decks %}
+    <div class="pg-row" data-key="{{ d.key }}" data-kind="cards" data-total="{{ d.total }}">
+      <a href="{{ d.href }}">{{ d.title }}</a><span class="pg-num">not started</span>
+      <div class="pg-bar"><i></i></div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="pg-card">
+    <div class="pg-k">in this browser</div>
+    <h2>Drills</h2>
+    <p class="pg-note">Items answered at least once, and how many of those were answered right the last time.</p>
+    {% for d in drills %}
+    <div class="pg-row" data-key="{{ d.key }}" data-kind="{{ d.kind }}" data-total="{{ d.total }}">
+      <a href="{{ d.href }}">{{ d.title }}</a><span class="pg-num">not started</span>
+      <div class="pg-bar"><i></i></div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="pg-card">
+    <div class="pg-k">in this browser</div>
+    <h2>Worked examples</h2>
+    <p class="pg-note">Steps marked done in each stage of the walkthrough.</p>
+    {% for e in examples %}
+    <div class="pg-row" data-key="{{ e.key }}" data-kind="steps">
+      <a href="{{ e.href }}">{{ e.title }}</a><span class="pg-num">not started</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="pg-card is-soon">
+    <div class="pg-k">not recorded yet</div>
+    <h2>Reading</h2>
+    <p class="pg-note">The education pages keep no record of what has been read. When they do, it will show here.</p>
+    {% for r in reading %}<div class="pg-row"><a href="{{ r.href }}">{{ r.title }}</a><span class="pg-num">not tracked</span></div>{% endfor %}
+  </section>
+
+  <section class="pg-card is-soon">
+    <div class="pg-k">not recorded yet</div>
+    <h2>Challenges</h2>
+    <p class="pg-note">Challenge entries are scored on the <a href="/challenges">challenge page</a>, not in this browser.</p>
+  </section>
+</div>
+<p class="pg-local">Clearing this browser's site data resets every problem, drill and example.</p>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    /* problems: static/app.js keeps { id: { status, best, points } } */
+    var probs = window.ChipbaseProblems ? window.ChipbaseProblems.all() : {}, solvedCount = 0;
+    document.querySelectorAll(".pg-row[data-problem]").forEach(function (row) {
+      var rec = probs[row.getAttribute("data-problem")], pill = row.querySelector(".pg-pill");
+      if (!rec) return;
+      pill.textContent = rec.status + (rec.points ? ", " + rec.best + " / " + rec.points + " pts" : "");
+      pill.classList.add("is-" + rec.status);
+      if (rec.status === "solved") solvedCount++;
+    });
+    document.querySelector('[data-total="solved"]').textContent = solvedCount;
+  });
+</script>
+<script>
+  (function () {
+    function read(key) {
+      try { var raw = window.localStorage.getItem(key); var v = raw ? JSON.parse(raw) : null; return v && typeof v === "object" ? v : null; }
+      catch (e) { return null; }
+    }
+    var totals = { cards: 0, answers: 0, steps: 0 };
+    document.querySelectorAll(".pg-row[data-key]").forEach(function (row) {
+      var rec = read(row.getAttribute("data-key")), kind = row.getAttribute("data-kind");
+      var total = +row.getAttribute("data-total") || 0, num = row.querySelector(".pg-num"), bar = row.querySelector(".pg-bar i");
+      if (!rec) return;
+      var ids = Object.keys(rec), text = "", frac = 0;
+      if (kind === "cards") {
+        /* flash-card records: { box: 1..5, due }; box 4 and 5 are scheduled a week or more out */
+        var known = ids.filter(function (k) { return rec[k] && rec[k].box >= 4; }).length;
+        totals.cards += known;
+        text = known + " known, " + ids.length + " seen of " + total; frac = total ? known / total : 0;
+      } else if (kind === "answers") {
+        var right = ids.filter(function (k) { return rec[k] && rec[k].right; }).length;
+        totals.answers += ids.length;
+        text = ids.length + " of " + total + " answered, " + right + " right"; frac = total ? ids.length / total : 0;
+      } else if (kind === "steps") {
+        var done = ids.filter(function (k) { return rec[k]; }).length;
+        totals.steps += done;
+        text = done ? done + " step" + (done === 1 ? "" : "s") + " done" : "not started";
+      }
+      if (text) num.textContent = text;
+      if (bar) bar.style.width = Math.round(frac * 100) + "%";
+    });
+    Object.keys(totals).forEach(function (k) {
+      var el = document.querySelector('[data-total="' + k + '"]');
+      if (el && el.tagName === "B") el.textContent = totals[k];
+    });
+  })();
+</script>
+{% endblock %}

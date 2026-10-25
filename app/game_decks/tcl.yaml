@@ -1,0 +1,1412 @@
+# TCL (Tool Command Language) for physical design flash-card deck.
+#
+# Scope by measurement: 51 Tcl commands appear in the 3540 lines of Tcl that
+# OpenROAD-flow-scripts ships (flow/scripts and flow/platforms). The most used
+# are set (287), if (223), puts (72), source (72), foreach (65), for (55),
+# file (50), proc (49), lappend (37), expr (36). Cards follow the official Tcl
+# manual pages, and the examples follow the flow's own style. See tcl_scope.md.
+
+deck: tcl
+title: TCL for physical design
+reference: https://www.tcl-lang.org/man/tcl8.6/TclCmd
+source_link: path
+basis:
+  tool: Tcl
+  tool_url: https://www.tcl-lang.org/
+  doc_title: the Tcl manual
+  tag: following the Tcl manual
+  note: >-
+    TCL (Tool Command Language) is the scripting language every place-and-route
+    and timing tool embeds, so the same skills carry between them. These cards
+    follow the official Tcl manual pages, and each answer links to the page for
+    that command. The examples are in the style the OpenROAD-flow-scripts
+    scripts use, since that is Tcl written for a real flow.
+
+sections:
+  - id: basics
+    title: Variables and substitution
+    blurb: The three kinds of bracket, and why arithmetic needs its own command.
+    commands: [set, expr, incr, append, unset, subst]
+  - id: lists
+    title: Lists
+    blurb: Building and taking apart the data structure most tool scripts are made of.
+    commands: [list, lindex, llength, lappend, lrange, lsort, lsearch,
+               lassign, join, split, concat]
+  - id: control
+    title: Control flow
+    blurb: Conditions and loops, and the brace rules that make them work.
+    commands: [if, foreach, for, while, switch, break, continue]
+  - id: procs
+    title: Procedures and scope
+    blurb: Writing reusable commands, and reaching variables outside them.
+    commands: [proc, return, global, upvar, uplevel, namespace]
+  - id: strings
+    title: Strings and patterns
+    blurb: Matching and rewriting the names that fill a physical-design script.
+    commands: [string, format, regexp, regsub]
+  - id: data
+    title: Dictionaries and arrays
+    blurb: Keyed data, and the older array form still seen in tool scripts.
+    commands: [dict, array]
+  - id: files
+    title: Files, processes, and the environment
+    blurb: Reading and writing files, running other programs, and reading variables from make.
+    commands: [open, close, gets, puts, file, glob, exec, source,
+               env]
+  - id: errors
+    title: Errors and robustness
+    blurb: Failing deliberately, catching failures, and checking before acting.
+    commands: [catch, error, try, info, exit]
+  - id: objects
+    title: Tool objects and collections
+    blurb: What a tool command hands back, and why it is not an ordinary list.
+    commands: [get_cells, foreach_in_collection, sizeof_collection, get_object_name, redirect]
+  - id: eda
+    title: Tcl in tool scripts
+    blurb: The patterns that distinguish flow scripts from general-purpose Tcl.
+    commands: [set, expr, foreach, catch, info]
+
+cards:
+
+  # ---------------------------------------------------------------- Variables and substitution
+
+  - id: tcl-brackets
+    section: basics
+    command: |-
+      set period 2.0
+      set half [expr {$period / 2}]
+      puts "half is $half"
+    hint: "Three kinds of bracket appear here. Ask what each one does before the command runs."
+    answer: Brackets run a command and substitute its result; quotes substitute variables.
+    wrong:
+      - Square brackets group an expression; quotes prevent substitution.
+      - Square brackets index a list; quotes make a single word of the text.
+      - Both substitute; quotes are needed only when the text has spaces.
+    explain: >-
+      Square brackets are the command ones. Substitution happens once, before
+      the command runs: `[...]` is replaced
+      by the result of the command inside it, and `$name` by the variable's
+      value. Braces, `{...}`, suppress both, which is why they appear around
+      expressions and procedure bodies.
+    source: set.htm
+
+  - id: tcl-expr-braces
+    section: basics
+    command: |-
+      set n 4
+      set a [expr {$n * 2}]
+      set b [expr $n * 2]
+    hint: "Both give 8. Ask what happens to the expression text before expr sees it."
+    answer: Both work here, but the braced form is safer and faster.
+    wrong:
+      - Only the braced form works; the other is a syntax error.
+      - Only the unbraced form works; braces stop the substitution entirely.
+      - They are identical; braces are a matter of style alone.
+    explain: >-
+      Without braces the substitution happens first, so `expr` receives the
+      values as text and must parse them again. That is slower, and a value
+      that contains an operator or a space can change the expression's
+      meaning. Braced expressions are the rule in tool scripts.
+    source: expr.htm
+
+  - id: tcl-everything-string
+    section: basics
+    command: |-
+      set x 0.5
+      set y [expr {$x + 1}]
+    hint: "Ask what type x has before expr looks at it."
+    answer: Values are strings; `expr` is what interprets them as numbers.
+    wrong:
+      - Values carry a type, and expr converts between the numeric types.
+      - Values are numbers unless quoted, in which case they are strings.
+      - Values are typed by their first assignment and keep that type.
+    explain: >-
+      Everything in Tcl is a string at the language level, and commands
+      interpret it. This is why arithmetic needs `expr`, why comparing numbers
+      as strings misleads, and why a stray space in a value can turn into two
+      arguments.
+    source: expr.htm
+
+  - id: tcl-incr-append
+    section: basics
+    command: |-
+      incr count
+      append names " $cell"
+    hint: "Two shorthands. Ask what each saves you writing."
+    answer: Adds one to a numeric variable, and adds text to the end of a string.
+    wrong:
+      - Both add to a variable; incr works on numbers and append on lists.
+      - Increments a counter, and appends an element to a list variable.
+      - Increments by one, and joins two variables into a new one.
+    explain: >-
+      `incr` takes an optional step, so `incr count 5` adds five and a
+      negative value subtracts. `append` grows a string in place; the list
+      equivalent is `lappend`, which keeps list structure instead of
+      concatenating text.
+    source: incr.htm
+
+  # ---------------------------------------------------------------- Lists
+
+  - id: tcl-list-build
+    section: lists
+    command: |-
+      set cells {}
+      foreach c [get_cells *] { lappend cells [get_name $c] }
+    hint: "Ask what lappend does that set with a concatenation would not."
+    answer: Appends each name as one element, keeping the list structure intact.
+    wrong:
+      - Appends each name to a string, separated by spaces.
+      - Replaces the list with the name, so only the last one is kept.
+      - Appends the name only if the list does not already hold it.
+    explain: >-
+      A list is not just text with spaces: `lappend` quotes an element that
+      contains spaces or brackets so it stays a single element. Building a
+      list by string concatenation breaks as soon as a name contains a bracket,
+      which hierarchical names often do.
+    source: lappend.htm
+
+  - id: tcl-lindex
+    section: lists
+    command: |-
+      set corners {slow typical fast}
+      set first [lindex $corners 0]
+      set last  [lindex $corners end]
+    hint: "Note where counting starts, and the word used for the other end."
+    answer: Indexes from 0, and `end` names the last element.
+    wrong:
+      - Indexes from 1, and `end` names the element after the last.
+      - Indexes from 0, and `end` must be written as the list's length.
+      - Indexes from 0, and `end` is a variable that must be set first.
+    explain: >-
+      `end` and arithmetic on it, such as `end-1`, work in every list command
+      that takes an index. `llength` gives the count, and `lrange` takes a
+      span, so `lrange $corners 1 end` drops the first element.
+    source: lindex.htm
+
+  - id: tcl-lsort
+    section: lists
+    command: lsort -real -decreasing $slacks
+    hint: "Ask what the default comparison would do to numbers."
+    answer: Sorts numerically and largest first, rather than as text ascending.
+    wrong:
+      - Sorts as text, largest first, since -real only allows decimals.
+      - Sorts numerically and smallest first; -decreasing reverses the output.
+      - Sorts by the real part of each value, ignoring any unit suffix.
+    explain: >-
+      Sorting defaults to text order, where 10 comes before 9. `-real` and
+      `-integer` compare numerically, `-unique` removes duplicates, and
+      `-command` sorts with your own procedure, which is how a list of objects
+      is sorted by a property.
+    source: lsort.htm
+
+  - id: tcl-lassign-split
+    section: lists
+    command: |-
+      lassign [split $line ":"] rule value
+      set parts [split "metal1 metal2 metal3"]
+    hint: "One takes a list apart into variables; the other makes a list from text."
+    answer: Assigns list elements to named variables, and splits text into a list.
+    wrong:
+      - Both split text; lassign splits on a character and split on spaces.
+      - Assigns a list to one variable, and splits a list into two lists.
+      - Splits a list into variables, and joins a list back into text.
+    explain: >-
+      `split` cuts text at every character of the separator set, defaulting to
+      whitespace; `join` is its inverse. `lassign` unpacks a list positionally,
+      which is the readable way to take apart a line already parsed into
+      fields.
+    source: lassign.htm
+
+  # ---------------------------------------------------------------- Control flow
+
+  - id: tcl-if-braces
+    section: control
+    command: |-
+      if { $slack < 0 } {
+        puts "failing"
+      } else {
+        puts "met"
+      }
+    hint: "Ask why the condition is in braces rather than quotes."
+    answer: The braces keep the condition unsubstituted so `if` evaluates it as an expression.
+    wrong:
+      - The braces are required syntax; a condition cannot be written otherwise.
+      - The braces group the condition as one argument, like quotes would.
+      - The braces make the comparison numeric rather than textual.
+    explain: >-
+      `if` evaluates its condition the way `expr` does, so the same rule
+      applies: braces stop the text being substituted first. Note also that
+      `} else {` must sit on the line the brace closes, since a newline would
+      end the command.
+    source: if.htm
+
+  - id: tcl-foreach-multi
+    section: control
+    command: foreach {name value} $pairs { puts "$name = $value" }
+    hint: "Two variable names in braces. Ask how many elements each pass consumes."
+    answer: Takes two elements per pass, binding them to the two names.
+    wrong:
+      - Iterates the list twice, once per variable name.
+      - Binds the element to both names, so either can be used.
+      - Iterates over a list of pairs, where each element is itself a list.
+    explain: >-
+      A flat list of alternating keys and values is a common shape in tool
+      output, and this is how it is walked. `foreach` can also take several
+      lists at once, stepping through them in parallel.
+    source: foreach.htm
+
+  - id: tcl-switch
+    section: control
+    command: |-
+      switch $stage {
+        place   { global_placement }
+        route   { global_route }
+        default { error "unknown stage: $stage" }
+      }
+    hint: "Ask what the last branch is for, and what happens without it."
+    answer: Runs the branch that matches, and default catches anything else.
+    wrong:
+      - Runs every branch whose pattern matches, including default.
+      - Runs the matching branch and falls through to the next one.
+      - Runs default first, then the branch that matches the value.
+    explain: >-
+      Only the matching branch runs. Without a `default` an unmatched value
+      does nothing at all, silently,
+      which is how a typo in a stage name becomes a script that appears to
+      work. Patterns are glob-style unless `-exact` or `-regexp` is given.
+    source: switch.htm
+
+  # ---------------------------------------------------------------- Procedures and scope
+
+  - id: tcl-proc
+    section: procs
+    command: |-
+      proc report_stage {stage {verbose 0}} {
+        puts "stage $stage"
+        if { $verbose } { report_design_area }
+      }
+    hint: "Read the second parameter: it is written differently from the first."
+    answer: Defines a command whose second argument is optional, defaulting to 0.
+    wrong:
+      - Defines a command with two required arguments, the second a flag.
+      - Defines a command with one argument; the braces hold its body.
+      - Defines a command whose second argument must be a list of values.
+    explain: >-
+      A parameter written as a two-element list gives a default. The special
+      name `args` collects any remaining arguments into a list, which is how a
+      wrapper passes options through to the command it wraps.
+    source: proc.htm
+
+  - id: tcl-global
+    section: procs
+    command: |-
+      proc count_cell {} {
+        global cell_count
+        incr cell_count
+      }
+    hint: "Ask what a procedure can see by default."
+    answer: Makes the global variable visible inside the procedure.
+    wrong:
+      - Creates a new global variable that the procedure then owns.
+      - Copies the global variable's value into a local of the same name.
+      - Marks the local variable so it survives after the procedure returns.
+    explain: >-
+      A procedure's variables are local unless declared otherwise, so a script
+      that sets a variable at the top level and expects a procedure to see it
+      is a common bug. `upvar` links to a caller's variable by name, which is
+      how a procedure modifies a variable passed to it.
+    source: global.htm
+
+  - id: tcl-upvar
+    section: procs
+    command: |-
+      proc add_to {listVar item} {
+        upvar 1 $listVar l
+        lappend l $item
+      }
+    hint: "The procedure is given a variable's name rather than its value."
+    answer: Links the caller's variable to a local name, so changes reach the caller.
+    wrong:
+      - Copies the caller's variable into the procedure as a local.
+      - Evaluates the list in the caller's scope and returns the result.
+      - Makes the local variable visible to the caller after the return.
+    explain: >-
+      Tcl passes arguments by value, so modifying a list means passing its
+      name and linking to it. The `1` is how many levels up to look, almost
+      always the immediate caller. `uplevel` is the same idea for running a
+      script in the caller's scope.
+    source: upvar.htm
+
+  # ---------------------------------------------------------------- Strings and patterns
+
+  - id: tcl-string-match
+    section: strings
+    command: if { [string match "*_reg*" $name] } { ... }
+    hint: "Ask which pattern language this is: the shell's or a regular expression's."
+    answer: Glob-style matching, where `*` matches any text and `?` one character.
+    wrong:
+      - Regular-expression matching, where `*` repeats the previous character.
+      - Exact matching, where the asterisks are part of the text compared.
+      - Glob matching, but anchored, so the pattern must match the whole name.
+    explain: >-
+      Glob patterns are the same ones the object-access commands take, which
+      is why `get_cells *_reg*` feels familiar. For anything with alternation
+      or capture, `regexp` is the tool, at the cost of a denser pattern.
+    source: string.htm
+
+  - id: tcl-regexp
+    section: strings
+    command: if { [regexp {^(\w+)/(\w+)$} $pin -> inst port] } { ... }
+    hint: "Three variables follow the pattern. Ask what the first one receives."
+    answer: Captures the two groups into inst and port, discarding the whole match.
+    wrong:
+      - Captures three groups, the first being the whole pattern's match.
+      - Replaces the matched text with the values of the two variables.
+      - Matches three times, storing each match in one of the variables.
+    explain: >-
+      The first variable after the string takes the whole match, and `->` is
+      the conventional throwaway name for it. The pattern is in braces so Tcl
+      does not substitute the backslashes before the regular-expression engine
+      sees them.
+    source: regexp.htm
+
+  - id: tcl-string-map
+    section: strings
+    command: set out [string map {"/" "_" "\[" "" "\]" ""} $name]
+    hint: "Ask what the pairs in the list mean."
+    answer: Replaces each key with its value, so the name becomes filename-safe.
+    wrong:
+      - Removes every character that appears in the list from the name.
+      - Maps the name through a lookup table, failing if it is not found.
+      - Splits the name at each key and joins the pieces with the values.
+    explain: >-
+      This is the quick way to make a hierarchical pin name usable as a file
+      name, without a regular expression. The replacements are applied in one
+      pass, so an earlier pair cannot match text produced by a later one.
+    source: string.htm
+
+  - id: tcl-format
+    section: strings
+    command: puts [format "%-30s %8.3f" $endpoint $slack]
+    hint: "Two field specifications. Ask what the numbers before them control."
+    answer: Formats a padded name and a slack with three decimals, so columns line up.
+    wrong:
+      - Formats a name of at most 30 characters and rounds the slack to 8.
+      - Prints the name and the slack separated by 30 and 8 spaces.
+      - Truncates the name to 30 characters and the slack to 8 digits.
+    explain: >-
+      The minus sign left-justifies, the first number is the field width, and
+      the second is the precision. Reports that line up are read far faster
+      than ones that do not, which matters when a script's output is scanned
+      by eye across hundreds of rows.
+    source: format.htm
+
+  # ---------------------------------------------------------------- Dictionaries and arrays
+
+  - id: tcl-dict
+    section: data
+    command: |-
+      dict set metrics wns -0.06
+      dict set metrics tns -2.18
+      puts [dict get $metrics wns]
+    hint: "Ask what the value of the variable metrics actually is."
+    answer: "A dictionary, which is a value held in an ordinary variable."
+    wrong:
+      - An array, stored by the interpreter outside the variable itself.
+      - An object with named fields, created by the first dict set.
+      - A nested list, where each element is a key and value pair.
+    explain: >-
+      A dictionary is a list of alternating keys and values. Because it is a
+      value, it can be passed to a procedure,
+      returned, and stored in a list, which an array cannot. `dict for`
+      iterates it, and `dict exists` tests a key without the error that
+      `dict get` would raise.
+    source: dict.htm
+
+  - id: tcl-array
+    section: data
+    command: |-
+      set area(nand2) 0.798
+      foreach cell [array names area] { puts "$cell $area($cell)" }
+    hint: "Compare it with a dictionary: ask what you cannot do with this one."
+    answer: An array, which stays in the interpreter and cannot be passed by value.
+    wrong:
+      - A dictionary written in the older syntax, with the same behaviour.
+      - A list indexed by name rather than by position.
+      - A nested variable, where area holds the names of its elements.
+    explain: >-
+      Arrays predate dictionaries and are still everywhere in tool scripts.
+      Passing one to a procedure needs `upvar` on its name. `array names`
+      lists the keys, in no defined order, and `array get` flattens it into a
+      list that a dictionary can be built from.
+    source: array.htm
+
+  # ---------------------------------------------------------------- Files, processes, environment
+
+  - id: tcl-env
+    section: files
+    command: set def_file $::env(RESULTS_DIR)/6_final.def
+    hint: "Ask where a make-driven flow puts the values its scripts need."
+    answer: Reads an environment variable exported by the flow's makefile.
+    wrong:
+      - Reads a flow variable from the tool's own configuration.
+      - Reads a global Tcl variable defined by an earlier script.
+      - Reads a make variable directly from the makefile at run time.
+    explain: >-
+      `env` is an array holding the process environment, here the variables
+      the makefile exported; and `::` names the
+      global namespace explicitly so it works inside a procedure too. This is
+      exactly how OpenROAD-flow-scripts passes its `config.mk` variables into
+      every Tcl stage script.
+    source: env.htm
+
+  - id: tcl-file-io
+    section: files
+    command: |-
+      set fh [open $report w]
+      puts $fh "slack $slack"
+      close $fh
+    hint: "Note the extra argument to puts, and what open returns."
+    answer: Opens the file for writing, writes a line to it, and closes the handle.
+    wrong:
+      - Opens the file for writing and appends, since puts always appends.
+      - Opens the file for reading and writing, as w allows both.
+      - Opens the file, prints the line to the terminal, and closes it.
+    explain: >-
+      `puts` writes to standard output unless given a channel first. The mode
+      is `r` to read, `w` to truncate and write, and `a` to append. Forgetting
+      `close` can leave the last buffered lines unwritten if the script exits
+      abruptly.
+    source: open.htm
+
+  - id: tcl-file-cmd
+    section: files
+    command: |-
+      if { [file exists $odb] } {
+        set stem [file rootname [file tail $odb]]
+      }
+    hint: "One command, several jobs, chosen by the word after it."
+    answer: Tests the path exists, then strips the directory and extension.
+    wrong:
+      - Tests that the file can be read, then splits its path into parts.
+      - Tests that the path exists, then returns its directory and extension.
+      - Opens the file if it exists, then reads its first line as the stem.
+    explain: >-
+      `file exists` is the test and `tail` with `rootname` does the stripping.
+      `file` is an ensemble: `tail` drops the directory, `dirname` keeps it,
+      `rootname` drops the extension, `extension` keeps it, and `join` builds
+      a path. `file exists` before reading is the usual guard in a flow script.
+    source: file.htm
+
+  - id: tcl-exec
+    section: files
+    command: set n [exec grep -c "VIOLATED" $report]
+    hint: "Ask where the output of the program goes."
+    answer: Runs the program and returns what it printed, as the command's result.
+    wrong:
+      - Runs the program and prints its output to the terminal.
+      - Runs the program in the background and returns its process id.
+      - Runs the program and returns its exit status as a number.
+    explain: >-
+      A non-zero exit status raises an error, so `exec` is usually wrapped in
+      `catch` when the program's failure is expected, as `grep` finding
+      nothing is. Redirections and pipes can be written in the arguments.
+    source: exec.htm
+
+  - id: tcl-source
+    section: files
+    command: source $::env(SCRIPTS_DIR)/load.tcl
+    hint: "Ask what scope the sourced file's commands and variables end up in."
+    answer: Runs the file's commands in the current scope, as if typed there.
+    wrong:
+      - Loads the file's procedures without running its other commands.
+      - Runs the file in a separate interpreter and returns its result.
+      - Runs the file once, ignoring later attempts to source it again.
+    explain: >-
+      Everything the file sets is visible afterwards, and a second `source`
+      runs it again. This is how the flow shares a common setup across stage
+      scripts; it is also why a sourced file that sets a variable can
+      surprise the script that sourced it.
+    source: source.htm
+
+  # ---------------------------------------------------------------- Errors and robustness
+
+  - id: tcl-catch
+    section: errors
+    command: |-
+      if { [catch { read_spef $spef } err] } {
+        puts "no parasitics: $err"
+      }
+    hint: "Ask what catch returns, and what the second variable receives."
+    answer: Runs the script and returns non-zero if it failed, with err set.
+    wrong:
+      - Runs the script and returns its result, or the error message.
+      - Runs the script and stops the flow if it fails, printing err.
+      - Tests whether the script would fail, without running it.
+    explain: >-
+      The message goes into the named variable. `catch` returns 0 on success,
+      so the `if` above reads as "if this
+      failed". Wrapping a whole stage in `catch` hides real failures, so it is
+      used narrowly, around the step whose failure is expected and handled.
+    source: catch.htm
+
+  - id: tcl-error
+    section: errors
+    command: "if { ![file exists $lib] } { error \"missing library: $lib\" }"
+    hint: "Ask what happens to the script after this line runs."
+    answer: Raises an error that stops the script unless a caller catches it.
+    wrong:
+      - Prints the message to standard error and carries on.
+      - Records the message and stops only at the end of the script.
+      - Stops the script unconditionally, even inside a catch.
+    explain: >-
+      Failing early with a clear message is far better than continuing on
+      missing input and failing later in a stage that cannot explain why.
+      Flow scripts use this to check their inputs before spending an hour on a
+      run that cannot succeed.
+    source: error.htm
+
+  - id: tcl-info-exists
+    section: errors
+    command: if { [info exists ::env(CTS_ARGS)] } { set args $::env(CTS_ARGS) }
+    hint: "Ask what reading an unset variable does."
+    answer: Tests whether the variable is set, since reading an unset one is an error.
+    wrong:
+      - Tests whether the variable is non-empty, which unset ones are not.
+      - Tests whether the variable exists in the environment of the shell.
+      - Tests whether the variable was set by this script rather than inherited.
+    explain: >-
+      An optional setting is exactly this shape: use it if it exists,
+      otherwise keep the default. `info` also answers questions about
+      procedures, commands, and the call stack, which is how a script reports
+      where it is.
+    source: info.htm
+
+  # ---------------------------------------------------------------- Tcl in tool scripts
+
+  - id: tcl-collections
+    section: eda
+    command: |-
+      set cells [get_cells *_reg*]
+      puts [llength $cells]
+    hint: "Ask whether what the tool returns is really a Tcl list."
+    answer: The tool returns objects, which not every list command handles.
+    wrong:
+      - The tool returns a plain Tcl list of cell names, as text.
+      - The tool returns one object, and llength always reports 1.
+      - The tool returns a dictionary keyed by the cells' names.
+    explain: >-
+      What comes back is a collection of objects. They carry properties that a
+      name cannot, which is why `get_property`
+      and `get_full_name` exist. Some tools return a collection type that
+      needs its own commands, so mixing list commands with tool objects is a
+      common source of confusion when a script moves between tools.
+    source: llength.htm
+
+  - id: tcl-build-args
+    section: eda
+    command: |-
+      set args ""
+      if { $::env(GPL_TIMING_DRIVEN) } { append args " -timing_driven" }
+      global_placement {*}$args
+    hint: "Read the last line: something is done to the variable before the command sees it."
+    answer: Expands the string into separate arguments instead of one long one.
+    wrong:
+      - Passes the string as a single argument, which the command parses.
+      - Substitutes the variable and quotes it, keeping spaces intact.
+      - Expands the variable only if it is a list, otherwise passes it as text.
+    explain: >-
+      Without `{*}`, a command receives `" -timing_driven"` as one argument
+      and rejects it. Building a command's options conditionally and expanding
+      them is the standard way a flow turns variables into tool arguments.
+    source: set.htm
+
+  - id: tcl-units
+    section: eda
+    command: |-
+      set period_ns 2.0
+      create_clock -name clk -period $period_ns [get_ports clk]
+    hint: "Ask what the tool does with the number, and where its unit comes from."
+    answer: The number has no unit in Tcl; the tool reads it in library units.
+    wrong:
+      - The variable's name tells the tool the value is in nanoseconds.
+      - Tcl attaches the unit from the last set_units command that ran.
+      - The tool assumes nanoseconds unless the value has a suffix.
+    explain: >-
+      Library units are usually nanoseconds, but not always. A script can hold
+      a number that means something different to the tool
+      than to its author, and nothing will complain. `report_units` shows what
+      the tool is using, and `set_units` records the intent in a constraint
+      file.
+    source: set.htm
+
+  - id: tcl-foreach-objects
+    section: eda
+    command: |-
+      foreach path [find_timing_paths -path_delay max -group_path_count 10] {
+        puts "[get_property $path slack]"
+      }
+    hint: "Ask why the script asks for objects rather than reading a report."
+    answer: Iterates the path objects the tool returns, reading a property from each.
+    wrong:
+      - Iterates the lines of the timing report that the tool printed.
+      - Iterates the ten worst endpoints, since paths are named by endpoint.
+      - Iterates once per path group, with path holding the group's paths.
+    explain: >-
+      Parsing a printed report is brittle: its format changes between
+      versions. Asking for objects and reading properties is stable, and it is
+      why reporting commands usually have a `find_` counterpart meant for
+      scripts.
+    source: foreach.htm
+
+  - id: tcl-script-gate
+    section: eda
+    command: |-
+      if { ![design_is_routed] } {
+        error "routing did not finish"
+      }
+    hint: "Ask what this protects the rest of the flow from."
+    answer: Stops the flow before a later stage runs on a design that is not ready.
+    wrong:
+      - Reports that routing failed, then lets the flow continue anyway.
+      - Retries the routing step until the design is fully routed.
+      - Checks the routing for violations rather than for completeness.
+    explain: >-
+      A stage that runs on an unfinished design either fails confusingly much
+      later or produces results that look plausible and are not. Checks
+      between stages turn that into one clear failure at the point where
+      something actually went wrong.
+    source: if.htm
+
+  # ---------------------------------------------------------------- Basics additions
+
+  - id: tcl-quotes-vs-braces
+    section: basics
+    command: |-
+      set name clk
+      puts "the clock is $name"
+      puts {the clock is $name}
+    hint: "Read the second line and the third as the interpreter would."
+    answer: Quotes substitute variables and commands; braces pass the text through.
+    wrong:
+      - Quotes make one word of the text; braces make a list of it.
+      - Braces substitute variables; quotes are for text with spaces.
+      - Both substitute, but braces also allow the text to span lines.
+    explain: >-
+      The second line prints the clock is clk and the third prints the dollar
+      sign and the name. This is the single most useful rule in the language:
+      braces mean literally this, quotes mean fill it in. It is why procedure
+      bodies and expressions are braced.
+    source: set.htm
+
+  - id: tcl-eq-vs-equals
+    section: basics
+    command: |-
+      set name clk
+      expr { $name == "clk" }
+      expr { $name eq "clk" }
+    hint: "One of the two operators works on numbers first."
+    answer: Both compare here, but only the second is always a string comparison.
+    wrong:
+      - Both compare as strings, and the second is only the clearer spelling.
+      - The first compares as strings, the second as values of any type.
+      - The first is invalid, since the operands are not numbers.
+    explain: >-
+      The numeric operator converts when it can, so comparing 1.0 with 1 is
+      true and comparing 0x10 with 16 is true. That is rarely what a script
+      comparing names wants, and it is a classic source of a condition that is
+      true for the wrong reason. Use `eq` and `ne` for text.
+    source: expr.htm
+
+  - id: tcl-brace-varname
+    section: basics
+    command: |-
+      set stage place
+      puts "${stage}_done"
+    hint: "Ask where the interpreter would decide the variable name ends."
+    answer: The braces mark where the variable name ends.
+    wrong:
+      - The braces prevent the variable from being substituted.
+      - The braces make the result a single word.
+      - The braces are optional here and only aid readability.
+    explain: >-
+      Without them the interpreter looks for a variable called `stage_done` and
+      fails. A name runs to the first character that cannot be part of one, and
+      an underscore can be, which is why this bites when building file names.
+    source: set.htm
+
+  - id: tcl-global-scope
+    section: basics
+    command: |-
+      set ::top_module gcd
+      puts $::env(HOME)
+    hint: "Two colons in front of a name. Ask which variable is meant."
+    answer: The variable at the top level, reachable from inside any procedure.
+    wrong:
+      - A read-only variable, which a procedure may not change.
+      - A variable belonging to the tool rather than to the script.
+      - A variable that is exported to the shell environment.
+    explain: >-
+      A procedure sees only its own variables unless it says otherwise, and the
+      leading colons name the global namespace directly, which avoids having to
+      declare it. The environment array is the common case, since a flow is
+      usually configured through it.
+    source: namespace.htm
+
+  # ---------------------------------------------------------------- List additions
+
+  - id: tcl-lsearch
+    section: lists
+    command: |-
+      set corners {slow typical fast}
+      lsearch $corners typical
+      lsearch -exact -not -inline -all $corners typical
+    hint: "The plain form answers where, not whether."
+    answer: The position of a match, or minus one.
+    wrong:
+      - Whether the element is present, as one or zero.
+      - The matching element itself, or an empty string.
+      - Every matching element, as a list.
+    explain: >-
+      The plain call returns an index, so a test reads `if {[lsearch $l $x] >=
+      0}`. Options change both the matching and the result: `-exact`, `-glob`,
+      and `-regexp` choose how to match, `-all` returns every index, and
+      `-inline` returns the elements instead.
+    source: lsearch.htm
+
+  - id: tcl-list-immutable
+    section: lists
+    command: |-
+      set corners {slow typical fast}
+      lreplace $corners 1 1 nominal
+      puts $corners
+    hint: "Ask what the last line prints."
+    answer: The original is unchanged, since the command returns a new list.
+    wrong:
+      - The original is changed in place, and the command also returns it.
+      - The original is changed, but only if it is not referenced elsewhere.
+      - The command fails, since a literal list cannot be modified.
+    explain: >-
+      Every list command except `lappend` and `lset` returns a value and leaves
+      its argument alone, so the result has to be assigned. Forgetting this is
+      why a filtered list comes out identical to the one it was built from.
+    source: lreplace.htm
+
+  - id: tcl-join-split
+    section: lists
+    command: |-
+      join {metal1 metal2 metal3} ", "
+      concat {a b} {c d}
+    hint: "One produces a string, the other a list."
+    answer: The first makes one string with a separator; the second merges lists.
+    wrong:
+      - The first splits a string into a list; the second appends to it.
+      - Both merge lists, but the first inserts a separator between elements.
+      - The first makes a string of the elements; the second nests one list in another.
+    explain: >-
+      Joining is how a report line or a comma-separated argument is built, and
+      `split` is its inverse. Merging produces a flat list, which is the
+      difference from `lappend`, since appending a list adds it as one element.
+    source: join.htm
+
+  - id: tcl-list-quoting
+    section: lists
+    command: |-
+      set pin {dpath/a_reg[9]/D}
+      report_slack $pin
+      eval "report_slack $pin"
+    hint: "One of the two lines lets the brackets be seen by the interpreter again."
+    answer: The second substitutes the name a second time, so the brackets run as a command.
+    wrong:
+      - The second is equivalent, and only clearer about what is called.
+      - The second fails, since the name must be quoted before it is evaluated.
+      - The second is required, since a variable cannot be an argument.
+    explain: >-
+      Substitution happens once per evaluation, so passing a variable directly
+      is safe however strange the name is. Building a command as a string and
+      evaluating it exposes every special character again. Where a command must
+      be built, `list` quotes each part correctly.
+    source: list.htm
+
+  # ---------------------------------------------------------------- Control additions
+
+  - id: tcl-for-while
+    section: control
+    command: |-
+      for {set i 0} {$i < $n} {incr i} { ... }
+      while {[gets $fh line] >= 0} { ... }
+    hint: "Count the pieces of the first line and ask what each one is."
+    answer: Both are ordinary commands whose arguments are braced scripts.
+    wrong:
+      - Both are language keywords, with the syntax the language defines.
+      - The first is a command, the second a keyword of the language.
+      - Both are commands, but only the test is a script.
+    explain: >-
+      The loop takes four arguments: a start script, a test expression, a step
+      script, and a body. Nothing here is special syntax, which is why the
+      opening brace must sit on the same line as the command: a newline would
+      end it.
+    source: for.htm
+
+  - id: tcl-break-continue
+    section: control
+    command: |-
+      foreach c $cells {
+        if { [string match "FILLER*" $c] } { continue }
+        if { $found } { break }
+      }
+    hint: "One skips the rest of this pass, the other leaves the loop."
+    answer: The first goes to the next item; the second ends the loop entirely.
+    wrong:
+      - The first ends the loop; the second leaves the procedure.
+      - The first skips the next item; the second skips the rest of them.
+      - Both leave the loop, but the second also returns a value.
+    explain: >-
+      Both are implemented as return codes rather than as jumps, which is why
+      they work inside a braced body but not inside a procedure called from
+      one. A procedure that wants to stop its caller's loop has to return a
+      value the caller tests.
+    source: break.htm
+
+  - id: tcl-switch-patterns
+    section: control
+    command: |-
+      switch -glob -- $name {
+        *_reg*   -
+        *_ff*    { set kind register }
+        default  { set kind logic }
+      }
+    hint: "One branch has a body of a single hyphen."
+    answer: Glob matching, with the first pattern falling through to the next body.
+    wrong:
+      - Glob matching, with the hyphen marking a pattern to ignore.
+      - Exact matching, with the hyphen joining two patterns into one.
+      - Glob matching, with the hyphen standing for an empty body.
+    explain: >-
+      A body of one hyphen means use the next one, which is how several
+      patterns share code. The double hyphen ends the options, so a value
+      beginning with one is not mistaken for a switch. Without `-glob` the
+      match is exact, and `-regexp` is also available.
+    source: switch.htm
+
+  # ---------------------------------------------------------------- Procedure additions
+
+  - id: tcl-proc-args
+    section: procs
+    command: |-
+      proc report {stage args} {
+        puts "$stage: $args"
+      }
+      report place -verbose -limit 10
+    hint: "The last parameter has a name the language treats specially."
+    answer: Whatever is left over arrives as a list in the final parameter.
+    wrong:
+      - The final parameter holds the last argument only.
+      - The final parameter makes every argument optional.
+      - The final parameter holds the arguments as a single string.
+    explain: >-
+      This is how a wrapper passes options through to the command it calls,
+      usually with `{*}$args` so the list is expanded back into separate
+      arguments rather than passed as one. It is the standard way to wrap a
+      tool command and add a default.
+    source: proc.htm
+
+  - id: tcl-return-semantics
+    section: procs
+    command: |-
+      proc worst {slacks} {
+        lindex [lsort -real $slacks] 0
+      }
+    hint: "There is no return statement, and yet the procedure is useful."
+    answer: The value of the last command is returned.
+    wrong:
+      - Nothing is returned, so the caller gets an empty string.
+      - The procedure fails, since a return value is required.
+      - The value of the first command is returned.
+    explain: >-
+      An explicit `return` is still clearer, and it is needed to leave early or
+      to return something other than the last value. Its option form sets the
+      code as well, so `return -code error` raises an error the caller can
+      catch, exactly as `error` does.
+    source: return.htm
+
+  - id: tcl-namespace
+    section: procs
+    command: |-
+      namespace eval flow {
+        variable count 0
+        proc reset {} { variable count; set count 0 }
+      }
+      flow::reset
+    hint: "Ask what would happen if the procedure were called `reset` at the top level."
+    answer: A named scope for procedures and variables.
+    wrong:
+      - A way to group procedures so they can be sourced together.
+      - A private scope, whose procedures only the namespace may call.
+      - A way to override a tool command safely within a block.
+    explain: >-
+      A tool's interpreter already holds hundreds of commands, and a procedure
+      named the same as one of them replaces it silently for the rest of the
+      session. Namespacing a script's own procedures is the way to stay clear
+      of that, and `variable` is how a procedure reaches the namespace's data.
+    source: namespace.htm
+
+  # ---------------------------------------------------------------- String additions
+
+  - id: tcl-regsub
+    section: strings
+    command: |-
+      regsub -all {\[(\d+)\]} $name {_\1} flat
+    hint: "The last argument is a variable name, and the pattern has a group in it."
+    answer: Replaces every match, writing the result into the named variable.
+    wrong:
+      - Replaces every match and returns the new string.
+      - Replaces the first match, and returns how many were found.
+      - Matches the pattern and stores each captured group in a variable.
+    explain: >-
+      The return value is the number of substitutions made, and the new string
+      goes into the variable given last; without that argument the string is
+      returned instead. In the replacement, a backslash and a digit stand for
+      the matching group, so bus bits become underscores here.
+    source: regsub.htm
+
+  - id: tcl-regexp-all-inline
+    section: strings
+    command: |-
+      set nums [regexp -all -inline {-?\d+\.\d+} $line]
+    hint: "Ask what is returned when the match variables are left out."
+    answer: A list of every match in the line, instead of one or zero.
+    wrong:
+      - A list of the parts of the line that did not match.
+      - The number of matches found in the line.
+      - The first match, with the rest discarded.
+    explain: >-
+      This is the compact way to pull the numbers out of a report line without
+      a loop. With capture groups, each match contributes the whole match and
+      then each group, so the list has to be read in strides.
+    source: regexp.htm
+
+  - id: tcl-string-ops
+    section: strings
+    command: |-
+      string trim $line
+      string first ":" $line
+      string range $line 0 $i
+    hint: "Three small operations that together take a line apart."
+    answer: Strip the whitespace, find a character's position, and take a slice.
+    wrong:
+      - Strip the whitespace, find the first word, and take the first line.
+      - Remove a character, find its position, and remove a range.
+      - Trim to a length, search for text, and return the remainder.
+    explain: >-
+      Positions are counted from zero and `end` may be used in place of a
+      number, as in `string range $line 0 end-1`. Between these and the
+      pattern commands, most report parsing needs no regular expression at all.
+    source: string.htm
+
+  # ---------------------------------------------------------------- Dictionary additions
+
+  - id: tcl-dict-for
+    section: data
+    command: |-
+      dict for {key value} $metrics {
+        puts [format "%-12s %s" $key $value]
+      }
+      dict exists $metrics wns
+      dict keys $metrics
+    hint: "Ask what order the pairs come out in."
+    answer: Walks every pair in insertion order, with the keys available separately.
+    wrong:
+      - Walks every pair in sorted order, with the keys available separately.
+      - Walks the keys only, so the value must be fetched inside the body.
+      - Walks every pair, in an order the interpreter does not define.
+    explain: >-
+      Insertion order is guaranteed, which is what makes a dictionary good for
+      a report whose rows should stay in the order they were built. Testing
+      with `dict exists` avoids the error that fetching a missing key raises.
+    source: dict.htm
+
+  - id: tcl-dict-vs-array
+    section: data
+    command: |-
+      set  metrics [dict create wns -0.06]
+      set  area(nand2) 0.798
+    hint: "Ask which of the two can be returned from a procedure."
+    answer: A dictionary is a value; an array is a variable.
+    wrong:
+      - A dictionary is ordered and an array is not, but both are values.
+      - An array is faster, but a dictionary can hold any type of key.
+      - A dictionary is local and an array is global by default.
+    explain: >-
+      Because an array is a collection of variables, a procedure has to reach
+      it with `upvar` or pass it as `array get`. A dictionary is an ordinary
+      string, so it can be passed, returned, and nested. Arrays remain useful
+      for very large tables that are updated in place.
+    source: dict.htm
+
+  - id: tcl-dict-nested
+    section: data
+    command: |-
+      dict set runs base place wns -0.06
+      dict get $runs base place wns
+    hint: "Count the words between the command and the value."
+    answer: A path of keys into a dictionary of dictionaries.
+    wrong:
+      - A single key made of several words, holding the value.
+      - Four separate keys, each holding the same value.
+      - A key and a list of subkeys, which must already exist.
+    explain: >-
+      Intermediate levels are created as needed on a set, which makes this a
+      tidy way to collect results per run and per stage. Reading a path that
+      does not exist raises an error, so `dict exists` takes a path too.
+    source: dict.htm
+
+  - id: tcl-dict-incr
+    section: data
+    command: |-
+      dict incr counts $type
+      dict lappend byType $type $violation
+    hint: "Both work on a key that may not be there yet."
+    answer: Count into a key, and collect a list under a key.
+    wrong:
+      - Count into a key, and append the count to a list of keys.
+      - Increment every key, and append one value to every key.
+      - Count into a key, failing if the key does not yet exist.
+    explain: >-
+      This is the whole of a violation summary: walk the report, increment by
+      type, and keep the instances under the same key. Neither needs the key to
+      exist first, which removes the usual test before each update.
+    source: dict.htm
+
+  # ---------------------------------------------------------------- File additions
+
+  - id: tcl-gets-loop
+    section: files
+    command: |-
+      set fh [open $report r]
+      while { [gets $fh line] >= 0 } {
+        ...
+      }
+      close $fh
+    hint: "Ask what the command returns, given what the test compares it with."
+    answer: The line's length, which is negative only at the end of the file.
+    wrong:
+      - Zero while lines remain, and minus one at the end of the file.
+      - The line itself, which compares as negative when empty.
+      - The number of lines left, which reaches zero at the end.
+    explain: >-
+      An empty line has length zero, so testing for greater than or equal to
+      zero is right and testing for greater than zero silently stops at the
+      first blank line. Reading a whole file with `read` is simpler but loads
+      all of it, which matters on a large report.
+    source: gets.htm
+
+  - id: tcl-exec-status
+    section: files
+    command: |-
+      if { [catch { exec grep -c VIOLATED $rpt } out] } {
+        set out 0
+      }
+    hint: "The command finds nothing. Ask what that does to the script."
+    answer: A non-zero exit status raises an error, so it has to be caught.
+    wrong:
+      - The output is empty, so the variable is set to an empty string.
+      - The error output is returned in place of the result.
+      - The script exits, since an external command failed.
+    explain: >-
+      Anything the command writes to its error stream, and any non-zero status,
+      becomes a Tcl error. That is why counting matches is wrapped like this,
+      and why `2>@1` or a redirect to a file appears in scripts that expect
+      warnings from the command they run.
+    source: exec.htm
+
+  - id: tcl-file-join
+    section: files
+    command: |-
+      set out [file join $::env(RESULTS_DIR) reports timing.rpt]
+      file mkdir [file dirname $out]
+    hint: "Ask what this avoids, compared with building the path with slashes."
+    answer: Builds a path correctly and creates the directories leading to it.
+    wrong:
+      - Builds a path and checks that every directory in it exists.
+      - Joins the path and opens it for writing.
+      - Builds a path, failing if the directory is missing.
+    explain: >-
+      Joining handles a trailing separator and an absolute component correctly,
+      which string concatenation does not. Making a directory creates every
+      missing level and does not complain when it is already there, so no test
+      is needed first.
+    source: file.htm
+
+  # ---------------------------------------------------------------- Error additions
+
+  - id: tcl-try-finally
+    section: errors
+    command: |-
+      try {
+        set fh [open $f r]
+        process $fh
+      } finally {
+        close $fh
+      }
+    hint: "Ask what runs if the middle line raises an error."
+    answer: The last block runs either way, error or not.
+    wrong:
+      - The last block runs only if an error was raised.
+      - The last block runs only if no error was raised.
+      - The error is suppressed, and the last block reports it.
+    explain: >-
+      The error still propagates; the block only guarantees the cleanup. There
+      is also `trap` for handling a particular kind of error. In a tool script
+      this is how a report file, a redirect, or a changed setting is restored
+      whatever happens.
+    source: try.htm
+
+  - id: tcl-catch-options
+    section: errors
+    command: |-
+      set code [catch { risky } result opts]
+    hint: "Three things come back. Ask what the third one is for."
+    answer: The status, the result or message, and an error dictionary.
+    wrong:
+      - The status, the result, and the options the command was given.
+      - The status, the error message, and the line it happened on.
+      - Whether it failed, the result, and the result of the cleanup.
+    explain: >-
+      The options hold the error code, the stack trace, and the return code,
+      which is what a wrapper needs to re-raise an error faithfully with
+      `return -options $opts $result`. Catching and reporting only the message
+      throws away everything that makes the failure findable.
+    source: catch.htm
+
+  - id: tcl-errorinfo
+    section: errors
+    command: |-
+      puts $::errorInfo
+    hint: "Ask what more this holds than the message the error carried."
+    answer: The stack trace of the last error.
+    wrong:
+      - Every error raised so far in the session.
+      - The message of the last error, with its code.
+      - The line of the script that is running now.
+    explain: >-
+      A tool that prints only a one-line message leaves this behind, and it
+      usually names the procedure and the line. A script that catches errors
+      should record it, since the trace is gone as soon as the next error
+      replaces it.
+    source: info.htm
+
+  # ---------------------------------------------------------------- Tool objects and collections
+
+  - id: tcl-collection-not-list
+    section: objects
+    command: |-
+      set regs [get_cells *_reg*]
+      llength $regs
+      sizeof_collection $regs
+    hint: "Ask what the second line counts, in a tool that returns objects."
+    answer: A collection is not a list, so counting it needs the tool's own command.
+    wrong:
+      - A collection is a list of names, so both lines agree.
+      - A collection must be converted with `list` before it can be counted.
+      - A collection is a list of objects, so the first line counts them.
+    explain: >-
+      Commercial timers and place-and-route tools hand back a collection, which
+      is a handle to a set of objects rather than a string. Counting it with a
+      list command gives one, or nonsense. The open tools return ordinary Tcl
+      lists, which is why a script moved between them needs care here.
+    source: llength.htm
+
+  - id: tcl-foreach-in-collection
+    section: objects
+    command: |-
+      foreach_in_collection c [get_cells *] {
+        puts [get_object_name $c]
+      }
+    hint: "Two commands here are not Tcl's. Ask what each replaces."
+    answer: The tool's own loop over a collection, and the way to get an object's name.
+    wrong:
+      - A faster loop over a list, and the way to print an object.
+      - A loop that skips objects the tool has filtered out.
+      - A loop over a collection, which yields names rather than objects.
+    explain: >-
+      The loop variable holds an object, not a string, so printing it directly
+      gives an internal identifier. Where the open tools let `foreach` work
+      over a list of objects, the commercial ones need this form, and it is the
+      commonest thing to change when a script crosses between them.
+    source: foreach.htm
+
+  - id: tcl-object-vs-name
+    section: objects
+    command: |-
+      set ep [lindex $endpoints 0]
+      report_slack $ep
+      report_slack "dpath/a_reg[9]/D"
+    hint: "Look at what the quoted name contains."
+    answer: Passing the object avoids the brackets in the name being substituted.
+    wrong:
+      - Passing the object is faster, since the name need not be looked up.
+      - The quoted form fails, since a name may not contain brackets.
+      - The two are equivalent, since the name is quoted.
+    explain: >-
+      Inside quotes the brackets are still a command substitution, so the name
+      has to be braced or escaped. Keeping objects in variables and passing
+      them straight through sidesteps the whole problem, which matters because
+      bus bits and generated names are full of special characters.
+    source: list.htm
+
+  - id: tcl-capture-output
+    section: objects
+    command: |-
+      redirect -variable txt { report_timing }
+      with_output_to_variable txt { report_checks }
+    hint: "Both do the same job, under different names."
+    answer: Capture a report's text into a variable instead of printing it.
+    wrong:
+      - Write a report to a file named by the variable.
+      - Return the report as the command's value.
+      - Suppress a report's output while keeping its side effects.
+    explain: >-
+      A report command prints and returns nothing, so parsing its output means
+      capturing it first. The first spelling is the commercial one and the
+      second is OpenSTA's. Both take the command as a script, so it must be
+      braced, not built as a string.
+    source: catch.htm
+
+  # ---------------------------------------------------------------- Tool script additions
+
+  - id: tcl-query-once
+    section: eda
+    command: |-
+      foreach c $cells { if { [get_property [get_cells $c] is_buffer] } { ... } }
+    hint: "Ask what the inner call does on every pass of the loop."
+    answer: It queries the database once per cell, not once in total.
+    wrong:
+      - It queries the database once, since the result is cached.
+      - It fails, since the collection must be built before the loop.
+      - It is correct, and the only way to read a property.
+    explain: >-
+      A database query costs far more than a Tcl operation, and a loop over a
+      million instances turns a second into an hour. The fix is to ask once,
+      with a filter in the query, and loop over what comes back. This is the
+      usual reason a constraint script takes longer than the tool stage it
+      configures.
+    source: foreach.htm
+
+  # ---------------------------------------------------------------- Find the fault
+
+  - id: tcl-bug-expr-unbraced
+    section: basics
+    style: bug
+    command: set half [expr $period / 2]
+    hint: "Ask what the expression looks like after substitution, if the variable holds text."
+    answer: The value is substituted into the expression before it is parsed.
+    wrong:
+      - The division needs a decimal point or the result is truncated.
+      - The expression needs quotes, since it contains spaces.
+      - Nothing is wrong; braces around an expression are only a style.
+    explain: >-
+      With a plain number it works. If the variable holds `2+1`, the expression
+      becomes `2+1 / 2`, which is not what was meant, and a value from a file
+      or a tool can hold anything. Bracing the expression also lets it be
+      compiled once rather than reparsed on every pass of a loop.
+    source: expr.htm
+
+  - id: tcl-bug-brace-newline
+    section: control
+    style: bug
+    command: |-
+      if { $slack < 0 }
+      {
+        puts "failing"
+      }
+    hint: "Remember that the body is an argument, not a block."
+    answer: The newline ends the command, so the body is not passed to it.
+    wrong:
+      - The condition needs parentheses when it spans a line.
+      - The body needs a semicolon before its closing brace.
+      - Nothing is wrong; this is the usual layout.
+    explain: >-
+      A command ends at a newline, so this is a conditional with no body,
+      followed by a script that the interpreter tries to run as a command. The
+      opening brace has to sit on the same line, which is why every Tcl script
+      looks the way it does.
+    source: if.htm
+
+  - id: tcl-bug-missing-global
+    section: procs
+    style: bug
+    command: |-
+      set count 0
+      proc bump {} {
+        incr count
+      }
+    hint: "Ask which variable the procedure is reaching for."
+    answer: The procedure has its own scope, so it does not see that variable.
+    wrong:
+      - The variable must be initialised inside the procedure first.
+      - Incrementing needs a value, so a second argument is missing.
+      - The procedure needs to return the variable for the change to stick.
+    explain: >-
+      A procedure sees only its own variables and those it names with `global`,
+      `variable`, or `upvar`. As written it fails, since there is no local
+      variable to increment. The clearer fix in a tool script is often to pass
+      the value in and return the new one.
+    source: global.htm
+
+  - id: tcl-bug-glob-empty
+    section: files
+    style: bug
+    command: set reports [glob $dir/*.rpt]
+    hint: "Ask what happens on the run where the stage produced nothing."
+    answer: Matching nothing is an error, which stops the script.
+    wrong:
+      - Matching nothing returns the pattern itself, as a shell would.
+      - The pattern needs quoting, or the shell expands it first.
+      - The result is a string, so it must be split before use.
+    explain: >-
+      The command raises an error when no file matches, which is right for a
+      required file and wrong for an optional one. Adding `-nocomplain` returns
+      an empty list instead. Unlike a shell, nothing else expands the pattern:
+      it is matched by this command alone.
+    source: file.htm
+
+  # ---------------------------------------------------------------- Name the command
+
+  - id: tcl-rev-read-lines
+    section: files
+    style: reverse
+    prompt: >-
+      You want to walk a very large report one line at a time, without holding
+      the whole file in memory, and without an extra empty pass at the end.
+    hint: "One of these tests the wrong thing, and runs the body once too often."
+    answer: while { [gets $fh line] >= 0 } { ... }
+    wrong:
+      - while { ![eof $fh] } { gets $fh line; ... }
+      - foreach line [split [read $fh] "\n"] { ... }
+      - for {set i 0} {[gets $fh line]} {incr i} { ... }
+    explain: >-
+      The end of a file is only known once a read has failed, so testing for it
+      first runs the body one extra time with a stale line. Reading the whole
+      file and splitting it is correct but loads everything, which matters on a
+      report of millions of lines.
+    source: gets.htm
+
+  - id: tcl-rev-upvar
+    section: procs
+    style: reverse
+    prompt: >-
+      Your procedure is given the name of a variable belonging to its caller,
+      and it has to change that variable rather than a copy.
+    hint: "The procedure needs a local name that stands for the caller's variable."
+    answer: upvar 1 $varName local
+    wrong:
+      - global $varName
+      - set $varName $value
+      - "namespace upvar :: $varName local"
+    explain: >-
+      Linking the names makes every later use of the local name act on the
+      caller's variable. Declaring it global reaches the top level instead,
+      which is wrong when the caller is another procedure, and assigning
+      through the name only works if the variable happens to be visible.
+    source: upvar.htm

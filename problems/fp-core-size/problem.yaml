@@ -1,0 +1,24 @@
+id: fp-core-size
+title: "Size a core to hit target utilization"
+topic: Floorplanning
+difficulty: easy
+points: 100
+engine: sim
+kind: files
+order: 1
+editable:
+  - path: floorplan.tcl
+    language: tcl
+checks:
+  - id: util
+    label: "Core utilization lands in the healthy 0.60-0.72 window"
+    metric: utilization
+    op: between
+    min: 0.60
+    max: 0.72
+  - id: aspect
+    label: "Aspect ratio (height ÷ width) stays between 0.60 and 1.67"
+    metric: aspect_ratio
+    op: between
+    min: 0.60
+    max: 1.67

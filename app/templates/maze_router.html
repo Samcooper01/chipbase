@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}The Maze Router - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/explore/sandbox-theme.css?v={{ asset_v }}">{% endblock %}
+{% block main_class %}sb-theme{% endblock %}
+{% block content %}
+<div class="sb-page">
+<div class="split">
+
+  <section class="pane pane-desc">
+    <div class="desc-head">
+      <div class="crumb"><a href="/sandboxes">Sandboxes</a> / <a href="/explore/algorithms/routing">Routing</a></div>
+      <h1>The Maze Router</h1>
+      <div class="chip-row">
+        <span class="chip topic-chip">Routing</span>
+        <span class="chip eng-openroad">interactive</span>
+      </div>
+    </div>
+    <article class="desc-body">
+      <h2>What you are looking at</h2>
+      <p>
+        A chip's router connects millions of pin pairs with wires that ride
+        on a grid of routing tracks, dodging macros and every wire already
+        placed. This page is that problem, shrunk to one metal layer:
+        colored dots are pin pairs (nets), gray cells are blockages, and
+        <strong>Run</strong> routes the nets one at a time.
+      </p>
+
+      <h2>Four classic algorithms</h2>
+      <p>
+        The <a href="https://en.wikipedia.org/wiki/Lee_algorithm">Lee
+        algorithm</a> (1961) is breadth-first wavefront expansion: rings
+        radiate from the source until they touch the target, then the path
+        traces back. Its guarantee is total: <em>if any path exists, Lee
+        finds one, and it is shortest</em>. Its cost is that the wave
+        floods everywhere.
+      </p>
+      <p>
+        <a href="https://en.wikipedia.org/wiki/A*_search_algorithm">A*
+        (A-star)</a> keeps the shortest-path guarantee but steers the
+        search using a distance estimate to the target (here: Manhattan
+        distance, which never overestimates, so optimality survives).
+        Switch algorithms and watch the <em>cells explored</em> counter:
+        same wirelength, a fraction of the work. That ratio is why
+        production routers are A*-family, not pure Lee.
+      </p>
+      <p>
+        Two more classics from the same lineage are in the toolbar.
+        <a href="https://en.wikipedia.org/wiki/Hadlock%27s_algorithm">Hadlock
+        (1977)</a> expands cells by <em>detour number</em> (how many moves
+        a cell's best path has spent walking away from the target); since
+        path length = Manhattan distance + 2 × detours, minimal detours
+        still means a shortest path, found with remarkably few cells
+        settled. Soukup (1978) simply <em>sprints</em> straight toward the
+        target and only falls back to a Lee-style escape wave when it hits
+        an obstacle: very fast, but the shortest-path guarantee is gone.
+        Run all four on the Macro maze and compare both counters: that
+        two-axis comparison (wirelength vs cells explored) is the whole
+        design space of maze routing.
+      </p>
+
+      <h2>Net order is a real problem</h2>
+      <p>
+        Each routed net becomes an obstacle for the nets after it. Load
+        the <em>Shared channel</em> preset: both nets want the central
+        gap, the first one takes it, and the second pays a detour. Press
+        <strong>Swap net order</strong> and the winner changes. Sequential
+        routing is inherently order-dependent, and with tight resources a
+        late net can fail outright (draw a wall with one gap and try to
+        push two nets through it).
+      </p>
+      <p>
+        Real routers answer this with <em>rip-up and reroute</em> (tear
+        out the offender, try again in a new order) and with negotiated
+        congestion schemes in the
+        <a href="https://dl.acm.org/doi/10.1145/201310.201328">PathFinder</a>
+        family, where nets bid for contested resources over several
+        iterations and prices rise on congestion.
+      </p>
+
+      <h2>From this toy to a real router</h2>
+      <p>
+        Scale this grid to a few billion cells across 10-15 metal layers
+        (vias connect layers, each layer prefers one direction), price
+        bends and vias instead of counting steps, and split the job into
+        a coarse capacity-planning pass and an exact track-level pass:
+        that is global and detailed routing, e.g. FastRoute and
+        TritonRoute inside
+        <a href="https://github.com/The-OpenROAD-Project/OpenROAD">OpenROAD</a>.
+        The algorithmic skeleton on this page survives all of it.
+      </p>
+
+      <h2>Things to try</h2>
+      <ul>
+        <li>Macro maze preset: run Lee, then A*. Compare cells explored
+            at equal wirelength.</li>
+        <li>Draw a wall with a single gap, add two nets that both need
+            it. One will fail. Swap the order: the <em>other</em> fails.
+            That is why rip-up and reroute exists.</li>
+        <li>Build a spiral around a pin and watch Lee flood it.</li>
+      </ul>
+    </article>
+  </section>
+
+  <section class="pane pane-work">
+    <div class="maze-toolbar">
+      <select id="maze-preset" title="load a scenario">
+        <option value="channel" selected>Shared channel</option>
+        <option value="macros">Macro maze</option>
+        <option value="open">Open field</option>
+      </select>
+      <span class="seg" id="maze-modes">
+        <button class="seg-btn active" data-mode="block" title="click/drag to draw blockages">Blockages</button>
+        <button class="seg-btn" data-mode="erase" title="click/drag to erase; clicking a pin deletes its net">Erase</button>
+        <button class="seg-btn" data-mode="pin" title="two clicks = one new net">Net pins</button>
+      </span>
+      <span class="seg">
+        <label class="algo-opt"><input type="radio" name="maze-algo" value="bfs" checked> Lee</label>
+        <label class="algo-opt"><input type="radio" name="maze-algo" value="hadlock"> Hadlock</label>
+        <label class="algo-opt"><input type="radio" name="maze-algo" value="soukup"> Soukup</label>
+        <label class="algo-opt"><input type="radio" name="maze-algo" value="astar"> A* (A-star)</label>
+      </span>
+    </div>
+    <div class="maze-toolbar">
+      <button class="btn btn-submit" id="maze-run">Run</button>
+      <button class="btn btn-ghost" id="maze-swap" title="reverse the net routing order and re-run">Swap net order</button>
+      <button class="btn btn-ghost" id="maze-clear-routes">Clear routes</button>
+      <button class="btn btn-ghost" id="maze-clear-all">Clear all</button>
+      <label class="speed-label">speed
+        <input type="range" id="maze-speed" min="0" max="100" value="40"
+               title="far left = watch every step; far right = instant">
+      </label>
+    </div>
+    <div class="maze-canvas-wrap">
+      <canvas id="maze-canvas"></canvas>
+    </div>
+    <div class="run-status" id="maze-hint"></div>
+    <div class="maze-stats" id="maze-stats"></div>
+  </section>
+
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/explore/maze-core.js?v={{ asset_v }}"></script>
+<script src="/static/explore/maze-ui.js?v={{ asset_v }}"></script>
+{% endblock %}

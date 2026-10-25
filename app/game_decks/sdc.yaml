@@ -1,0 +1,1624 @@
+# SDC (Synopsys Design Constraints) flash-card deck.
+#
+# Card fields:
+#   id       stable identifier; progress is stored against it, so never reuse one
+#   section  id of the section the card belongs to (see `sections`)
+#   command  the command line shown on the card
+#   answer   the correct option
+#   wrong    three plausible wrong options, each a real, common confusion
+#   explain  shown after answering; `backticks` render as code
+#   source   anchor in the OpenSTA command reference (appended to `reference`)
+#
+# Time values are in nanoseconds, the usual library time unit.
+
+deck: sdc
+title: SDC (Synopsys Design Constraints)
+reference: https://github.com/parallaxsw/OpenSTA/blob/master/doc/Commands.md
+# The documentation the cards follow, shown on every page of the deck.
+basis:
+  tool: OpenSTA
+  tool_url: https://github.com/parallaxsw/OpenSTA
+  doc_title: OpenSTA command reference
+  note: >-
+    These cards follow SDC (Synopsys Design Constraints) as implemented by OpenSTA, the open-source static
+    timing analyzer used by OpenROAD, and each answer links to that command in
+    the OpenSTA command reference. Commercial timers accept the same commands
+    but can differ in details; where OpenSTA reads a command without acting on
+    it, the card says so.
+# Sections, in the order shown on the deck page. `commands` lists the SDC (Synopsys Design Constraints)
+# commands the section covers; legacy commands are left out (see sdc_scope.md).
+sections:
+  - id: object-access
+    title: Object access
+    blurb: Finding ports, pins, cells, nets, and clocks so other commands can act on them.
+    commands: [get_ports, get_pins, get_cells, get_nets, get_clocks, all_inputs, all_outputs,
+               all_clocks, all_registers, current_design, get_libs, get_lib_cells, get_lib_pins]
+  - id: general
+    title: General purpose
+    blurb: Units and how names are resolved in the hierarchy.
+    commands: [set_units, current_instance, set_hierarchy_separator]
+  - id: clocks
+    title: Clocks
+    blurb: Defining clocks and describing their latency, uncertainty, and relationships.
+    commands: [create_clock, create_generated_clock, set_clock_uncertainty, set_clock_latency,
+               set_propagated_clock, set_clock_transition, set_clock_groups, set_clock_gating_check,
+               set_sense, set_ideal_network, set_ideal_latency, set_ideal_transition]
+  - id: io
+    title: Input and output
+    blurb: Timing and electrical conditions at the block boundary.
+    commands: [set_input_delay, set_output_delay, set_driving_cell, set_input_transition, set_load,
+               set_drive]
+  - id: exceptions
+    title: Timing exceptions
+    blurb: Paths that must be timed differently from the default single-cycle check.
+    commands: [set_false_path, set_multicycle_path, set_max_delay, set_min_delay, group_path,
+               set_disable_timing, set_case_analysis, set_max_time_borrow, set_data_check,
+               set_min_pulse_width]
+  - id: design-rules
+    title: Design rules
+    blurb: Electrical limits on slew, capacitance, and fanout.
+    commands: [set_max_transition, set_max_capacitance, set_max_fanout, set_min_capacitance]
+  - id: environment
+    title: Environment and derating
+    blurb: Operating conditions and on-chip variation.
+    commands: [set_timing_derate, set_operating_conditions]
+  - id: power
+    title: Power and multiple voltages
+    blurb: Supply voltages and voltage-domain regions.
+    commands: [set_voltage, create_voltage_area]
+
+cards:
+
+  - id: clk-create
+    section: clocks
+    command: create_clock -name clk -period 2.0 [get_ports clk]
+    hint: "Ask what -period covers, and where the falling edge goes when no waveform is given."
+    answer: Defines a 2.0 ns clock on port clk, rising at 0 and falling at 1.0.
+    wrong:
+      - Defines a 4.0 ns clock on port clk, high for 2.0 ns and low for 2.0 ns.
+      - Defines a virtual 2.0 ns clock named clk, not attached to any port.
+      - Limits the delay of any path that starts at port clk to 2.0 ns.
+    explain: >-
+      `-period` is the full cycle time, and `-name` gives the clock a name
+      separate from the port. With no `-waveform`, the clock rises at 0 and
+      falls at half the period, a 50% duty cycle.
+    source: create_clock
+
+  - id: clk-virtual
+    section: clocks
+    command: create_clock -name vclk -period 2.0
+    hint: "Nothing follows the period. Ask what the clock is attached to."
+    answer: Defines a clock on no pin or port, used as a reference for I/O (Input/Output) delays.
+    wrong:
+      - Defines a 2.0 ns clock on every clock input port of the design at once.
+      - Is rejected by the timer, because every clock must be attached to a port or pin.
+      - Defines a 2.0 ns clock on the input port whose name is vclk.
+    explain: >-
+      With no object list the clock is virtual. It models the clock of an
+      off-chip device, so `set_input_delay -clock vclk` and `set_output_delay
+      -clock vclk` can time the chip's I/O (Input/Output) paths against it.
+    source: create_clock
+
+  - id: clk-waveform
+    section: clocks
+    command: create_clock -name clk -period 10 -waveform {0 3} [get_ports clk]
+    hint: "Two numbers in the waveform. Ask which edge each one is."
+    answer: Defines a 10 ns clock that rises at 0 and falls at 3, a 30% duty cycle.
+    wrong:
+      - Defines a 10 ns clock that rises at 3 and falls at 10 (the period end).
+      - Defines a 10 ns clock with a 3 ns rise and fall transition time.
+      - Defines a 10 ns clock whose first edge arrives 3 ns late.
+    explain: >-
+      The waveform list gives the rise time first and the fall time second,
+      both within one period. `{0 3}` means high from 0 to 3 and low from 3 to 10.
+    source: create_clock
+
+  - id: clk-add
+    section: clocks
+    command: create_clock -name clk_test -period 20 -add [get_ports clk]
+    hint: "A clock already exists on that port. Ask what the flag protects."
+    answer: Defines a second clock on port clk, keeping the clock already there.
+    wrong:
+      - Adds 20 ns to the period of the clock already defined on port clk.
+      - Replaces the clock already defined on port clk with a 20 ns clock.
+      - Places clk_test in the same clock group as the clock already on clk.
+    explain: >-
+      Defining a clock on a pin that already has one replaces it. `-add` keeps
+      both, which models one port that carries different clocks in different
+      modes (functional and test). Such clocks are usually then separated with
+      `set_clock_groups`.
+    source: create_clock
+
+  - id: clk-gen-div
+    section: clocks
+    command: create_generated_clock -name clk_div2 -source [get_ports clk] -divide_by 2 [get_pins div_reg/Q]
+    hint: "Dividing the frequency does the opposite to the period."
+    answer: Declares a clock at div_reg/Q, derived from clk, with twice its period.
+    wrong:
+      - Declares a clock at div_reg/Q with half the period of the clock at port clk.
+      - Inserts a divide-by-2 flip-flop into the netlist at div_reg to make it.
+      - Declares an independent clock at div_reg/Q whose edges are unrelated to clk.
+    explain: >-
+      SDC (Synopsys Design Constraints) describes the circuit; it does not build it. The divider flip-flop
+      already exists, and this command tells the timer what clock appears at its
+      output. Because the clock is derived from clk, its edges stay aligned with
+      clk and paths between the two clocks are timed.
+    source: create_generated_clock
+
+  - id: clk-gen-mul
+    section: clocks
+    command: create_generated_clock -name clk_pll -source [get_pins pll/REF] -multiply_by 4 [get_pins pll/OUT]
+    hint: "Multiplying the frequency does the opposite to the period."
+    answer: Declares a clock at the PLL (Phase-Locked Loop) output with one quarter of the reference clock's period.
+    wrong:
+      - Declares a clock at the PLL (Phase-Locked Loop) output with four times the reference clock's period.
+      - Multiplies the clock uncertainty at the PLL (Phase-Locked Loop) output by 4.
+      - Copies the reference clock to the PLL (Phase-Locked Loop) output, delayed by 4 ns.
+    explain: >-
+      `-multiply_by` multiplies the frequency, so the period is divided. A PLL
+      (Phase-Locked Loop) output cannot be traced through the netlist, so a
+      generated clock declares it.
+    source: create_generated_clock
+
+  - id: clk-unc-setup
+    section: clocks
+    command: set_clock_uncertainty -setup 0.15 [get_clocks clk]
+    hint: "Ask which direction uncertainty pushes a setup check, and what the flag narrows it to."
+    answer: Makes setup checks on clk 0.15 ns stricter, as margin for jitter and skew.
+    wrong:
+      - Makes both setup and hold checks on clk 0.15 ns stricter, as margin.
+      - Sets the transition time of clk at every register clock pin to 0.15 ns.
+      - Lets the period of clk vary by 0.15 ns from cycle to cycle during analysis.
+    explain: >-
+      For a setup check the uncertainty moves the required time earlier, which
+      reduces setup slack by that amount. The `-setup` flag limits it to setup
+      checks. Before CTS (Clock Tree Synthesis) the
+      value usually includes a skew estimate. After CTS (Clock Tree Synthesis) the real skew is
+      computed, and the value is reduced to jitter plus margin.
+    source: set_clock_uncertainty
+
+  - id: clk-unc-both
+    section: clocks
+    command: set_clock_uncertainty 0.1 [get_clocks clk]
+    hint: "No -setup and no -hold. Ask which checks are left."
+    answer: Applies 0.1 ns of uncertainty to both setup and hold checks on clk.
+    wrong:
+      - Applies 0.1 ns of uncertainty to the setup checks on clk only.
+      - Applies 0.1 ns of uncertainty to the hold checks on clk only.
+      - Applies 0.05 ns to setup checks and 0.05 ns to hold checks.
+    explain: >-
+      Without `-setup` or `-hold` the value applies to both checks. Setup and
+      hold usually need different margins, so production constraints often set
+      them separately.
+    source: set_clock_uncertainty
+
+  - id: clk-lat-source
+    section: clocks
+    command: set_clock_latency -source 0.4 [get_clocks clk]
+    hint: "Source latency is measured on one side of the clock definition point. Ask which."
+    answer: Models 0.4 ns of delay from the clock's origin to its definition point.
+    wrong:
+      - Estimates 0.4 ns of on-chip clock tree delay before clock tree synthesis.
+      - Moves both defined edges of clk 0.4 ns later within its waveform.
+      - Sets the maximum allowed skew between registers on clk to 0.4 ns.
+    explain: >-
+      Source latency is the delay before the clock definition point, for
+      example from an off-chip oscillator to the clock port. Network
+      latency (the same command without `-source`) is the delay from the
+      definition point to the register clock pins. Source latency still
+      applies after the clocks are propagated; ideal network latency is
+      replaced by the computed tree delay.
+    source: set_clock_latency
+
+  - id: clk-lat-network
+    section: clocks
+    command: set_clock_latency 0.8 [get_clocks clk]
+    hint: "Without -source, the latency is on the other side of the definition point."
+    answer: Estimates 0.8 ns of on-chip clock tree delay while clk is still ideal.
+    wrong:
+      - Models 0.8 ns of off-chip delay from the oscillator to the clock port.
+      - Adds 0.8 ns to the clock period for every setup check.
+      - Delays only the launch edge of clk by 0.8 ns on every path it starts.
+    explain: >-
+      Before CTS (Clock Tree Synthesis) no tree exists, so its delay is
+      estimated. The latency is added to both launch and capture edges, so it
+      cancels on paths within clk but shifts I/O (Input/Output) paths and paths
+      to other clocks. After `set_propagated_clock` the computed tree delay is
+      used instead.
+    source: set_clock_latency
+
+  - id: clk-propagated
+    section: clocks
+    command: set_propagated_clock [all_clocks]
+    hint: "Ask what a clock's delay is before this command, and after it."
+    answer: Makes timing use the calculated delay through the built clock tree.
+    wrong:
+      - Derives generated clocks automatically at every clock divider.
+      - Makes every clock ideal (zero delay) for analysis before clock tree synthesis.
+      - Copies each clock's constraints onto every register that it reaches.
+    explain: >-
+      The command switches clocks from ideal to propagated. An ideal clock
+      reaches every register at the same time, plus any
+      estimated latency. A propagated clock carries the real buffer and wire
+      delays, so real skew appears in the timing report. It is applied after
+      CTS (Clock Tree Synthesis).
+    source: set_propagated_clock
+
+  - id: clk-transition
+    section: clocks
+    command: set_clock_transition 0.05 [get_clocks clk]
+    hint: "An ideal clock has no buffers. Ask where a slew would otherwise come from."
+    answer: Sets the slew assumed at register clock pins while clk is ideal.
+    wrong:
+      - Sets a design rule limiting the transition on clock nets to 0.05 ns.
+      - Sets the delay of every clock buffer in the tree of clk to 0.05 ns.
+      - Sets the time between the rising and falling edges of clk to 0.05 ns.
+    explain: >-
+      An ideal clock has no buffers from which to compute a slew, so this value
+      stands in for one. It affects register clock-to-output delay and setup
+      and hold times. After propagation the computed slews replace it. The
+      design-rule limit is a different command, `set_max_transition`.
+    source: set_clock_transition
+
+  - id: clk-groups-async
+    section: clocks
+    command: set_clock_groups -asynchronous -group [get_clocks clk_a] -group [get_clocks clk_b]
+    hint: "Two groups, no phase relation. Ask what the timer should do with paths between them."
+    answer: Declares clk_a and clk_b asynchronous, so paths between them are not timed.
+    wrong:
+      - Merges clk_a and clk_b into a single clock for all timing checks.
+      - Balances the skew between clk_a and clk_b during clock tree synthesis.
+      - Times paths between the two clocks using their tightest edge alignment.
+    explain: >-
+      The effect is a false path in both directions between the groups. Signals
+      that cross between asynchronous clocks cannot be closed by timing
+      analysis; they need CDC (Clock Domain Crossing) synchronizers, which are
+      verified separately.
+    source: set_clock_groups
+
+  - id: clk-gen-edges
+    section: clocks
+    command: create_generated_clock -name clk_e -source [get_ports clk] -edges {1 3 5} [get_pins div/Q]
+    hint: "Edges are numbered from 1: rise, fall, rise. Count 1 to 5."
+    answer: Declares a clock at div/Q with twice the period of clk.
+    wrong:
+      - Declares a clock at div/Q that divides clk's frequency by 5.
+      - Declares a clock at div/Q that changes on every third edge of clk.
+      - Declares a clock at div/Q with half the period of clk.
+    explain: >-
+      The waveform is built from clk edges 1, 3, and 5. The source clock's
+      edges are numbered from 1: rise, fall, rise, and so on. The generated
+      clock rises at edge 1, falls at edge 3, and rises
+      again at edge 5, so its period covers two source periods. `-edges`
+      describes waveforms that `-divide_by` cannot, such as a non-50% duty
+      cycle.
+    source: create_generated_clock
+
+  - id: clk-gen-invert
+    section: clocks
+    command: create_generated_clock -name clk_n -source [get_ports clk] -divide_by 1 -invert [get_pins u_gen/CLKN]
+    hint: "Divide by one changes nothing; ask what -invert adds."
+    answer: Declares the clock at u_gen/CLKN as clk inverted, with the same period.
+    wrong:
+      - Declares a clock at u_gen/CLKN with half the period of clk.
+      - Stops clk from propagating any further than u_gen/CLKN.
+      - Declares a clock at u_gen/CLKN with the duty cycle of clk reversed in time.
+    explain: >-
+      The timer already propagates a clock through a plain inverter. A
+      generated clock with `-invert` is for an inversion the timer cannot
+      trace, such as the output of a clock-generator cell.
+    source: create_generated_clock
+
+  - id: clk-gen-master
+    section: clocks
+    command: create_generated_clock -name gclk -source [get_pins mux/Z] -master_clock clk_b -divide_by 2 [get_pins div/Q]
+    hint: "Several clocks reach the source pin. Ask what the option resolves."
+    answer: Derives gclk from clk_b, one of several clocks that reach mux/Z.
+    wrong:
+      - Makes clk_b the only clock that can reach the pin mux/Z.
+      - Derives gclk from every clock that reaches the pin mux/Z.
+      - Declares gclk asynchronous to clk_b at the pin div/Q.
+    explain: >-
+      When more than one clock reaches the source pin, `-master_clock` says
+      which one the generated clock is derived from. A second generated clock
+      with `-add` covers the other master.
+    source: create_generated_clock
+
+  - id: clk-groups-physical
+    section: clocks
+    command: set_clock_groups -physically_exclusive -group [get_clocks clk_func] -group [get_clocks clk_test]
+    hint: "Physically exclusive: ask whether both clocks are ever present at once."
+    answer: Declares that clk_func and clk_test never exist on the chip at the same time.
+    wrong:
+      - Declares that both clocks run together but never exchange data.
+      - Declares that both clocks run together with no fixed phase relation.
+      - Merges clk_func and clk_test into one clock for timing analysis.
+    explain: >-
+      Physically exclusive clocks are defined on the same point for different
+      modes, so only one is ever present. Paths between them are not timed,
+      and crosstalk between them is not considered either, since they never
+      switch together.
+    source: set_clock_groups
+
+  - id: clk-groups-logical
+    section: clocks
+    command: set_clock_groups -logically_exclusive -group [get_clocks clk_a] -group [get_clocks clk_b]
+    hint: "Logically exclusive: both exist on the chip. Ask what they never do."
+    answer: Declares that clk_a and clk_b both exist on the chip but never exchange data.
+    wrong:
+      - Declares that clk_a and clk_b are never present on the chip together.
+      - Declares that clk_a and clk_b run with no fixed phase relation.
+      - Declares that paths between clk_a and clk_b need two cycles.
+    explain: >-
+      The typical case is a multiplexer that selects one of two clocks: both
+      clocks run on the chip, but beyond the multiplexer only one reaches the
+      registers. Paths between them are not timed; crosstalk between the two
+      clock networks is still considered, because both switch.
+    source: set_clock_groups
+
+  - id: clk-gating-check
+    section: clocks
+    command: set_clock_gating_check -setup 0.1 -hold 0.05
+    hint: "No objects are named. Ask how widely the margins apply."
+    answer: Adds 0.1 ns setup and 0.05 ns hold checks on the enable of every clock gate.
+    wrong:
+      - Adds 0.1 ns of uncertainty to every clock that passes a gating cell.
+      - Inserts clock-gating cells wherever registers share an enable.
+      - Sets the setup and hold times of every register to 0.1 and 0.05 ns.
+    explain: >-
+      An enable that changes while the clock is active would cut the clock
+      pulse short. For an AND gate the enable must be stable while the clock
+      is high; the check enforces that with margins. With no objects the
+      margins apply to every clock-gating circuit in the design.
+    source: set_clock_gating_check
+
+  - id: clk-sense-stop
+    section: clocks
+    command: set_sense -type clock -stop_propagation [get_pins u_mux/I1]
+    hint: "Only clock propagation is affected. Ask where it stops."
+    answer: Stops clocks from propagating beyond the pin u_mux/I1.
+    wrong:
+      - Holds u_mux/I1 at a constant, like case analysis.
+      - Removes every timing path through u_mux/I1, data paths included.
+      - Makes the clock at u_mux/I1 an inverted copy of its source.
+    explain: >-
+      Only clock propagation stops; data timing through the pin is unchanged.
+      It prunes a clock from logic it never really drives, such as the unused
+      input of a clock multiplexer. `set_sense` replaces the deprecated
+      `set_clock_sense`.
+    source: set_sense
+
+  - id: clk-sense-negative
+    section: clocks
+    command: set_sense -type clock -negative [get_pins u_xor/Z]
+    hint: "An XOR (exclusive-OR) gate can pass or invert. Ask what the timer cannot work out alone."
+    answer: Tells the timer the clock at u_xor/Z is inverted from its input.
+    wrong:
+      - Makes the timer propagate only falling edges through u_xor/Z.
+      - Stops the clock from propagating beyond the pin u_xor/Z.
+      - Swaps the setup and hold checks of registers after u_xor/Z.
+    explain: >-
+      An XOR (exclusive-OR) gate is not unate: its output can follow or invert an input
+      depending on the other input. The timer cannot tell which, so it
+      considers both. Setting the sense resolves it to one.
+    source: set_sense
+
+  - id: clk-ideal-network
+    section: clocks
+    command: set_ideal_network [get_ports scan_en]
+    hint: "scan_en is a high-fanout net buffered later. Ask how it is treated until then."
+    answer: Treats the scan_en network as ideal, with no delay or buffering.
+    wrong:
+      - Holds scan_en at a constant value throughout timing analysis.
+      - Removes every timing path that starts at port scan_en.
+      - Defines scan_en as a new clock with an ideal waveform.
+    explain: >-
+      High-fanout nets such as scan enable and reset are buffered in a
+      dedicated step later. Until then, treating them as ideal keeps their
+      huge fanout from distorting timing and from wasting optimization effort.
+      OpenSTA reads this command and ignores it.
+    source: set_ideal_network
+
+  - id: clk-ideal-latency
+    section: clocks
+    command: set_ideal_latency 0.3 [get_ports scan_en]
+    hint: "An ideal network has zero delay. Ask what this estimates."
+    answer: Gives the ideal network from scan_en an arrival latency of 0.3 ns.
+    wrong:
+      - Adds 0.3 ns of network latency to a clock named scan_en.
+      - Sets a 0.3 ns transition on every pin of the scan_en network.
+      - Limits the buffer-tree delay of scan_en to at most 0.3 ns.
+    explain: >-
+      An ideal network has zero delay, which is optimistic. The latency
+      estimates the delay its future buffer tree will add, as network latency
+      does for an ideal clock. OpenSTA reads this command and ignores it.
+    source: set_ideal_latency
+
+  - id: clk-ideal-transition
+    section: clocks
+    command: set_ideal_transition 0.1 [get_ports scan_en]
+    hint: "An ideal network has no buffers, so it has no slew of its own."
+    answer: Sets 0.1 ns as the transition on the ideal network from scan_en.
+    wrong:
+      - Limits the transition on the scan_en network to 0.1 ns, as a rule.
+      - Delays every pin on the scan_en network by 0.1 ns.
+      - Sets the transition of a clock named scan_en while it is ideal.
+    explain: >-
+      An ideal network has no real buffers to compute a slew from, so this
+      value stands in for one, as `set_clock_transition` does for an ideal
+      clock. OpenSTA reads this command and ignores it.
+    source: set_ideal_transition
+
+  # ---------------------------------------------------------------- Input and output
+
+  - id: io-in-delay
+    section: io
+    command: set_input_delay -clock clk 0.6 [get_ports data_in]
+    hint: "The delay describes what happens outside the block, before the port."
+    answer: Says data_in arrives 0.6 ns after the rising edge of clk.
+    wrong:
+      - Inserts 0.6 ns of delay between port data_in and its first gate.
+      - Requires data_in to reach its first register within 0.6 ns.
+      - Sets a 0.6 ns hold requirement on the input port data_in.
+    explain: >-
+      The input delay models the part of the path outside the block: from the
+      launching register off-chip, through external logic and the board, to
+      the port. The timer gives the on-chip path what is left of the cycle.
+      Without `-max` or `-min`, the value is used for both setup and hold.
+    source: set_input_delay
+
+  - id: io-out-delay
+    section: io
+    command: set_output_delay -clock clk 0.8 [get_ports data_out]
+    hint: "The delay describes what happens after the port, outside the block."
+    answer: Requires data_out to be valid 0.8 ns before the next capturing edge of clk.
+    wrong:
+      - Requires data_out to switch within 0.8 ns after the launching edge of clk.
+      - Inserts a buffer that delays data_out by 0.8 ns before it leaves.
+      - Sets 0.8 ns as the largest transition allowed on port data_out.
+    explain: >-
+      The output delay is the external path after the port plus the setup time
+      of the register that captures it off-chip. The on-chip path from the
+      launching register to the port must finish in the period minus 0.8 ns.
+    source: set_output_delay
+
+  - id: io-maxmin
+    section: io
+    command: |-
+      set_input_delay -clock clk -max 1.2 [get_ports din]
+      set_input_delay -clock clk -min 0.3 [get_ports din]
+    hint: "Two commands, two flags. Ask which check uses each."
+    answer: Gives din a latest arrival of 1.2 ns for setup and an earliest of 0.3 ns for hold.
+    wrong:
+      - Lets din arrive anywhere from 0.3 to 1.2 ns, but checks it for setup only.
+      - The second command replaces the first, so only the 0.3 ns arrival remains.
+      - Sets a 1.2 ns arrival for rising data and a 0.3 ns arrival for falling data.
+    explain: >-
+      A setup check uses the latest possible arrival and a hold check uses the
+      earliest, so real interfaces constrain both. `-max` and `-min` set
+      separate values and do not replace each other. `-rise` and `-fall` are
+      the options that split the value by data transition.
+    source: set_input_delay
+
+  - id: io-add-delay
+    section: io
+    command: |-
+      set_input_delay -clock clk_a 1.0 [get_ports din]
+      set_input_delay -clock clk_b 2.0 -add_delay [get_ports din]
+    hint: "Two clocks, and a flag on the second command. Ask what it prevents."
+    answer: Gives din two arrival times, one relative to clk_a and one to clk_b, both timed.
+    wrong:
+      - Replaces the clk_a arrival on din with a 2.0 ns arrival relative to clk_b.
+      - Sets the arrival of din to 1.0 plus 2.0, which is 3.0 ns after clk_a.
+      - Declares clk_a and clk_b asynchronous for every path that starts at din.
+    explain: >-
+      Without `-add_delay`, a second input delay on the same port replaces the
+      first. With it, both are kept, which models a port driven by devices on
+      two different clocks.
+    source: set_input_delay
+
+  - id: io-clock-fall
+    section: io
+    command: set_input_delay -clock clk -clock_fall 0.5 [get_ports din]
+    hint: "Distinguish -clock_fall from -fall: one is about the clock, the other the data."
+    answer: Says din arrives 0.5 ns after the falling edge of clk.
+    wrong:
+      - Constrains only the falling transitions of din, 0.5 ns after clk rises.
+      - Says din arrives 0.5 ns before the rising edge of clk.
+      - Says din is captured only by registers on the falling edge of clk.
+    explain: >-
+      `-clock_fall` chooses which edge of the clock the delay is measured from.
+      `-fall` is different: it restricts the value to falling transitions of
+      the data signal. A falling-edge reference models an external device that
+      launches data on the falling edge, as in DDR (Double Data Rate)
+      interfaces.
+    source: set_input_delay
+
+  - id: io-out-min-neg
+    section: io
+    command: set_output_delay -clock clk -min -0.2 [get_ports dout]
+    hint: "A negative value on a minimum delay. Ask which check uses min, and which way it moves."
+    answer: Requires data to reach dout no sooner than 0.2 ns after the clk edge.
+    wrong:
+      - Is rejected, because an output delay cannot be negative.
+      - Gives the path to dout 0.2 ns of extra time in its setup check.
+      - Requires dout to be valid 0.2 ns before the clk edge, for setup checks.
+    explain: >-
+      The value is used for the hold check. There, the minimum output delay is the external minimum
+      path delay minus the external register's hold time. A negative value
+      means that hold time is longer than the external path, so the on-chip
+      path to the port must supply the difference: data launched at the edge
+      must not reach dout sooner than 0.2 ns.
+    source: set_output_delay
+
+  - id: io-driving-cell
+    section: io
+    command: set_driving_cell -lib_cell BUF_X2 -pin Z [all_inputs]
+    hint: "SDC (Synopsys Design Constraints) cannot change the netlist. Ask what the cell is used for."
+    answer: Models every input port as driven by a BUF_X2 output pin.
+    wrong:
+      - Inserts a BUF_X2 cell at every input port of the netlist.
+      - Limits each input port to driving the load of one BUF_X2.
+      - Sets every input slew to the fixed output slew of a BUF_X2.
+    explain: >-
+      SDC (Synopsys Design Constraints) does not change the netlist. The port's slew now depends on its
+      load: the timer uses the library tables of BUF_X2 to compute the delay and transition at each port from the load
+      that port actually drives. This is more realistic than a fixed
+      `set_input_transition`. The clock port is usually excluded and
+      constrained separately.
+    source: set_driving_cell
+
+  - id: io-input-transition
+    section: io
+    command: set_input_transition 0.08 [get_ports din]
+    hint: "Compare it with set_driving_cell: ask whether this value depends on the load."
+    answer: Sets a fixed 0.08 ns transition at din, whatever load it drives.
+    wrong:
+      - Limits the transition at din to at most 0.08 ns, as a design rule.
+      - Delays the arrival time of din by 0.08 ns on every path it starts.
+      - Sets a transition at din that starts at 0.08 ns and grows with load.
+    explain: >-
+      The slew is fixed and does not depend on the load. A load-dependent slew
+      comes from `set_driving_cell`, and a transition limit comes from
+      `set_max_transition`.
+    source: set_input_transition
+
+  - id: io-load
+    section: io
+    command: set_load 0.02 [get_ports data_out]
+    hint: "The port is an output. Ask what is on the other side of it."
+    answer: Adds 0.02 pF (picofarads) of off-chip capacitance on data_out for its driver.
+    wrong:
+      - Limits the capacitance that data_out may drive to 0.02 pF (picofarads).
+      - Adds 0.02 ns of delay to every timing path that ends at data_out.
+      - Sets the capacitance of the output pad cell at data_out to 0.02 pF.
+    explain: >-
+      The load models the board trace and the receiving pin outside the block.
+      The on-chip cell that drives the port must charge it, which increases
+      that cell's delay and output slew. Capacitance is in the library's unit,
+      which varies: picofarads in many libraries, femtofarads in others such as
+      Nangate45. `report_units` shows which. A limit on load is
+      `set_max_capacitance`.
+    source: set_load
+
+  - id: io-drive
+    section: io
+    command: set_drive 0.5 [get_ports din]
+    hint: "The unit is resistance. Ask which end of the input it describes."
+    answer: Models the external driver of din as a 0.5 kilohm resistance.
+    wrong:
+      - Sets a fixed 0.5 ns transition time at the input port din.
+      - Sets the wire resistance of the net connected to din to 0.5 kilohm.
+      - Requires the cell that receives din to have a 0.5 kilohm output drive.
+    explain: >-
+      The drive resistance and the port's load set the input slew and delay.
+      It is the older, simpler alternative to `set_driving_cell`, which uses a
+      real cell's delay and slew tables and is usually preferred. Resistance is
+      in the library's unit, usually kilohms.
+    source: set_drive
+
+  - id: io-driving-from-pin
+    section: io
+    command: set_driving_cell -lib_cell NAND2_X1 -from_pin A1 [get_ports din]
+    hint: "A NAND has more than one input. Ask which arc the option picks."
+    answer: Models din as driven by a NAND2_X1 through its arc from A1.
+    wrong:
+      - Connects port din to the A1 input of a new NAND2_X1 instance.
+      - Models din as driving the A1 input pin of a NAND2_X1.
+      - Uses the slowest arc of NAND2_X1, whichever input it starts from.
+    explain: >-
+      The delay and slew come from the NAND2_X1 arc that starts at input A1
+      and ends at its output. A cell with several inputs has a different delay
+      arc from each one.
+      `-from_pin` picks the arc, and `-input_transition_rise` and
+      `-input_transition_fall` set the slew assumed at that input.
+    source: set_driving_cell
+
+  - id: io-load-net
+    section: io
+    command: set_load 0.015 [get_nets n_long]
+    hint: "The object is a net, not a port. Ask what part of the net's capacitance this sets."
+    answer: Sets the wire capacitance of n_long to 0.015 pF, replacing extracted values.
+    wrong:
+      - Adds 0.015 pF (picofarads) to the load of every output port.
+      - Limits the capacitance of net n_long to at most 0.015 pF.
+      - Adds 0.015 pF (picofarads) to the capacitance extracted for n_long.
+    explain: >-
+      On a port the value is external load; on a net it is the net's wire
+      capacitance, in picofarads here. It overrides parasitics read from a
+      SPEF (Standard Parasitic Exchange Format) file for that net.
+    source: set_load
+
+  # ---------------------------------------------------------------- Timing exceptions
+
+  - id: ex-false-clocks
+    section: exceptions
+    command: set_false_path -from [get_clocks clk_a] -to [get_clocks clk_b]
+    hint: "-from and -to are given. Ask whether the reverse direction is covered too."
+    answer: Stops timing paths launched by clk_a and captured by clk_b, in that direction only.
+    wrong:
+      - Stops timing every path between clk_a and clk_b, in both directions.
+      - Times paths from clk_a to clk_b with a relaxed two-cycle requirement.
+      - Stops timing clk_a and clk_b entirely, including paths within each clock.
+    explain: >-
+      A false path is directional. Paths from clk_b back to clk_a are still
+      timed unless a second command covers them; `set_clock_groups` covers both
+      directions at once. A path should be declared false only when its timing
+      can never matter, for example a crossing handled by a synchronizer.
+    source: set_false_path
+
+  - id: ex-false-reset
+    section: exceptions
+    command: set_false_path -from [get_ports rst_n]
+    hint: "Only -from is given. Ask which checks at the far end also disappear."
+    answer: Removes every timing path that starts at the reset port rst_n.
+    wrong:
+      - Holds rst_n at a constant value and propagates it through the design.
+      - Treats rst_n as an ideal network, with no delay and no buffering.
+      - Stops only the hold checks on paths that start at port rst_n.
+    explain: >-
+      With only `-from`, every path from the port is removed, including the
+      recovery and removal checks at the registers it resets. That is safe only
+      when the release of reset is synchronized inside the block. Holding a
+      pin constant is `set_case_analysis`; an ideal network is
+      `set_ideal_network`.
+    source: set_false_path
+
+  - id: ex-mcp-setup
+    section: exceptions
+    command: set_multicycle_path 2 -setup -from [get_cells a_reg] -to [get_cells b_reg]
+    hint: "The setup edge moves a cycle later. Ask what happens to the hold check by default."
+    answer: Gives the path from a_reg to b_reg two clock cycles for setup instead of one.
+    wrong:
+      - Gives the path from a_reg to b_reg two cycles for setup and for hold.
+      - Adds 2 ns of extra time to the setup check from a_reg to b_reg.
+      - Requires the path from a_reg to b_reg to finish in half a cycle.
+    explain: >-
+      The setup capture edge moves one cycle later. The hold check moves with
+      it by default, to one cycle after the launch edge, which demands a very
+      long minimum delay. That is why a setup multicycle is almost always
+      paired with a hold multicycle of one less.
+    source: set_multicycle_path
+
+  - id: ex-mcp-hold
+    section: exceptions
+    command: |-
+      set_multicycle_path 2 -setup -from [get_cells a_reg] -to [get_cells b_reg]
+      set_multicycle_path 1 -hold  -from [get_cells a_reg] -to [get_cells b_reg]
+    hint: "Two commands, N and N-1. Ask where the hold check ends up."
+    answer: Allows two cycles for setup and moves the hold check back to the launch edge.
+    wrong:
+      - Allows two cycles for setup and one more for hold, three cycles in total.
+      - The second command cancels the first, restoring single-cycle timing.
+      - Allows two cycles for setup and makes the hold check one cycle stricter.
+    explain: >-
+      The hold multiplier counts how many cycles the hold check moves back from
+      its default position. After `-setup N`, the rule is `-hold N-1`, which
+      returns the hold check to the launch edge, the same as a normal
+      single-cycle path.
+    source: set_multicycle_path
+
+  - id: ex-mcp-start
+    section: exceptions
+    command: set_multicycle_path 2 -setup -start -from [get_clocks clk_fast] -to [get_clocks clk_slow]
+    hint: "Launch and capture clocks differ. Ask which one's period the multiplier counts."
+    answer: Counts the two setup cycles in periods of the launching clock, clk_fast.
+    wrong:
+      - Counts the two setup cycles in periods of the capturing clock, clk_slow.
+      - Counts the two setup cycles in periods of whichever clock is faster.
+      - Applies the two-cycle multiplier to the hold check only, not setup.
+    explain: >-
+      When the launch and capture clocks differ, the multiplier needs a
+      reference clock. `-start` uses the launching clock and `-end` the
+      capturing clock. By default setup multipliers count capture periods
+      (`-end`) and hold multipliers count launch periods (`-start`).
+    source: set_multicycle_path
+
+  - id: ex-max-delay
+    section: exceptions
+    command: set_max_delay 2.0 -from [get_ports in_a] -to [get_ports out_b]
+    hint: "A combinational path between two ports has no clock to constrain it."
+    answer: Requires the path from in_a to out_b to take at most 2.0 ns.
+    wrong:
+      - Requires the path from in_a to out_b to take at least 2.0 ns.
+      - Adds 2.0 ns of delay to the path from in_a to out_b.
+      - Limits the transition on every net from in_a to out_b to 2.0 ns.
+    explain: >-
+      A typical use is a combinational feedthrough from an input port to an
+      output port, which has no register to define a clock-based requirement.
+      On a path that already has a clock requirement, the value replaces it.
+      `set_min_delay` is the matching lower bound.
+    source: set_max_delay
+
+  - id: ex-min-delay
+    section: exceptions
+    command: set_min_delay 0.3 -from [get_ports in_a] -to [get_ports out_b]
+    hint: "The mirror of a maximum delay. Ask which direction it bounds."
+    answer: Requires the path from in_a to out_b to take at least 0.3 ns.
+    wrong:
+      - Requires the path from in_a to out_b to take at most 0.3 ns.
+      - Inserts 0.3 ns of delay buffers on the path from in_a to out_b.
+      - Reports the path from in_a to out_b only if its slack is below 0.3 ns.
+    explain: >-
+      The minimum delay is checked like a hold requirement. The command states
+      the requirement; an optimization tool may then add delay to meet it, but
+      the constraint itself inserts nothing.
+    source: set_min_delay
+
+  - id: ex-group-path
+    section: exceptions
+    command: group_path -name io_in -from [all_inputs]
+    hint: "Ask what a report shows per group, and what that hides when everything is in one."
+    answer: Puts every path from an input port into a group reported apart from others.
+    wrong:
+      - Removes every path that starts at an input port from timing reports.
+      - Gives every path from an input port the same timing requirement.
+      - Bundles all input ports into one bus so they are routed together.
+    explain: >-
+      Each path group has its own worst path. A failing input path in its own
+      group cannot hide the register-to-register paths in theirs, and
+      optimization tools work on the worst path of every group. Commercial
+      tools also accept `-weight` to set a group's optimization priority.
+    source: group_path
+
+  - id: ex-disable-timing
+    section: exceptions
+    command: set_disable_timing -from A -to Z [get_cells u_mux]
+    hint: "Compare it with a false path: ask what happens to the arc itself."
+    answer: Deletes the timing arc from pin A to pin Z of u_mux, so no path uses it.
+    wrong:
+      - Holds pin A of u_mux at a constant logic value during analysis.
+      - Declares every path through u_mux false, on all of its pins.
+      - Marks u_mux as fixed, so optimization never resizes or removes it.
+    explain: >-
+      The arc is removed from the timing graph, so no path of any kind passes
+      through it. Other arcs of the cell stay. Typical uses are breaking a
+      combinational loop and removing an arc that the design never exercises.
+    source: set_disable_timing
+
+  - id: ex-case-analysis
+    section: exceptions
+    command: set_case_analysis 0 [get_ports test_mode]
+    hint: "The pin is a mode select. Ask what happens to logic downstream of it."
+    answer: Holds test_mode at 0 and propagates the constant through the logic.
+    wrong:
+      - Sets a 0 ns input delay on port test_mode relative to every clock.
+      - Declares a false path from test_mode to every register it reaches.
+      - Checks that test_mode is at logic 0 whenever any clock edge arrives.
+    explain: >-
+      The constant propagates through downstream logic, so paths used only in
+      test mode drop out. A multiplexer whose
+      select is 0 passes only its 0 input, so paths through its 1 input
+      disappear. This is how one netlist is timed separately in functional and
+      test modes. A false path from the port would remove only paths starting
+      there; the downstream logic would stay unconstrained by the mode.
+    source: set_case_analysis
+
+  - id: ex-time-borrow
+    section: exceptions
+    command: set_max_time_borrow 0.3 [get_cells lat_*]
+    hint: "Borrowing is a latch's ability to accept late data. Ask what the number caps."
+    answer: Limits the latches lat_* to borrowing at most 0.3 ns after they open.
+    wrong:
+      - Requires data to reach the latches lat_* 0.3 ns before they open.
+      - Converts the latches lat_* to flip-flops when they borrow over 0.3 ns.
+      - Sets the transparent window of the latches lat_* to exactly 0.3 ns.
+    explain: >-
+      Time borrowing is data arriving at a transparent latch after it opens;
+      the late arrival is passed on to the next stage. Capping it keeps the
+      next stage's budget predictable.
+    source: set_max_time_borrow
+
+  - id: ex-data-check
+    section: exceptions
+    command: set_data_check -from [get_pins u1/STROBE] -to [get_pins u1/D] -setup 0.1
+    hint: "Neither pin is a clock. Ask what the -from pin acts as."
+    answer: Requires u1/D to arrive at least 0.1 ns before u1/STROBE does.
+    wrong:
+      - Requires u1/D and u1/STROBE to arrive within 0.1 ns of each other.
+      - Adds 0.1 ns of delay to the path running from u1/STROBE to u1/D.
+      - Defines u1/STROBE as a clock pin with 0.1 ns of uncertainty.
+    explain: >-
+      This is a setup check between two data pins. A normal setup check
+      compares data with a clock; a data check compares
+      two data signals: the `-from` pin is the reference and the `-to` pin is
+      checked against it. It suits a strobe and the data it samples, or the
+      inputs of a custom macro.
+    source: set_data_check
+
+  - id: ex-min-pulse
+    section: exceptions
+    command: set_min_pulse_width -high 0.4 [get_clocks clk]
+    hint: "The clock tree can shrink a pulse on its way to the registers."
+    answer: Requires each high pulse of clk to last at least 0.4 ns.
+    wrong:
+      - Sets the high time of the clk waveform to exactly 0.4 ns.
+      - Requires clk to stay high for at most 0.4 ns in each cycle.
+      - Filters glitches shorter than 0.4 ns out of the clk network.
+    explain: >-
+      The check applies at the register clock pins. Unequal rise and fall
+      delays in the clock tree can shrink a pulse on its way there. The check catches a pulse too narrow for a register
+      to respond to. Without `-high` or `-low`, it applies to both.
+    source: set_min_pulse_width
+
+  - id: ex-max-delay-reg
+    section: exceptions
+    command: set_max_delay 1.0 -from [get_ports din] -to [get_cells cap_reg]
+    hint: "The path ends at a register, not a port. Ask what else is in the path then."
+    answer: Requires data from din to meet cap_reg's check within 1.0 ns, setup time included.
+    wrong:
+      - Requires data from din to reach cap_reg within 1.0 ns, setup time excluded.
+      - Requires din itself to arrive at its port no later than 1.0 ns.
+      - Adds 1.0 ns to the clock-based requirement of the path to cap_reg.
+    explain: >-
+      When the path ends at a timing check, the check's setup time counts as
+      part of the path, so the data must arrive earlier than 1.0 ns by that
+      amount. The same holds for `set_min_delay` with the hold time.
+    source: set_max_delay
+
+  - id: ex-group-default
+    section: exceptions
+    command: group_path -default -from [all_inputs]
+    hint: "The flag is -default. Ask what it undoes."
+    answer: Returns the paths from input ports to their default path group.
+    wrong:
+      - Creates a new path group named default for paths from input ports.
+      - Removes the paths from input ports from every path group and report.
+      - Gives the paths from input ports the default optimization weight.
+    explain: >-
+      `group_path -default` undoes an earlier grouping for the matching paths.
+      By default a path belongs to the group of the clock that captures it.
+    source: group_path
+
+  - id: ex-disable-instance
+    section: exceptions
+    command: set_disable_timing [get_cells u_ro]
+    hint: "A whole instance, no -from or -to. Ask whether its internal checks go too."
+    answer: Disables every timing arc through u_ro but keeps its checks.
+    wrong:
+      - Removes u_ro and every timing check inside it from the analysis.
+      - Disables only the arcs that start at the first input of u_ro.
+      - Holds every output of u_ro at a constant logic value.
+    explain: >-
+      With an instance and no `-from` or `-to`, all arcs through it are
+      disabled; the timing checks inside it, such as a register's setup and
+      hold, stay. A
+      typical use is breaking the loop of a ring oscillator.
+    source: set_disable_timing
+
+  - id: ex-case-rising
+    section: exceptions
+    command: set_case_analysis rising [get_pins u_sel/S]
+    hint: "The value is a transition, not a constant. Ask what still switches."
+    answer: Times only rising transitions at u_sel/S and drops its falling ones.
+    wrong:
+      - Holds u_sel/S at a constant 1 and propagates it downstream.
+      - Treats u_sel/S as the rising edge of a new clock.
+      - Holds u_sel/S at 0 until its first rising transition arrives.
+    explain: >-
+      Besides constants 0 and 1, case analysis accepts rising and falling. A
+      transition value keeps the pin switching but limits it to one direction,
+      for a signal that is only ever asserted one way during operation.
+    source: set_case_analysis
+
+  # ---------------------------------------------------------------- Design rules
+
+  - id: dr-max-transition
+    section: design-rules
+    command: set_max_transition 0.15 [current_design]
+    hint: "Ask whether this describes the design or constrains it."
+    answer: Sets a 0.15 ns slew limit on every pin of the design, as a rule to fix.
+    wrong:
+      - Sets a fixed 0.15 ns transition at every input port of the design.
+      - Requires every timing path in the design to finish within 0.15 ns.
+      - Sets the slew assumed at register clock pins to 0.15 ns while ideal.
+    explain: >-
+      A slow transition increases delay, short-circuit power, and sensitivity
+      to noise. Violations are fixed by buffering or upsizing, usually before
+      timing optimization. Library pins carry their own limits as well.
+    source: set_max_transition
+
+  - id: dr-stricter
+    section: design-rules
+    command: set_max_transition 0.5 [current_design]    ;# library pin limits are 0.3
+    hint: "Two limits now exist on those pins. Ask which one wins."
+    answer: Leaves the library's 0.3 ns limit in force on those pins.
+    wrong:
+      - Raises every pin's limit to 0.5 ns, overriding the library value.
+      - Averages the two limits, giving every pin a limit of 0.4 ns.
+      - Applies 0.5 ns to data pins and keeps 0.3 ns on clock pins only.
+    explain: >-
+      The stricter limit applies. A design rule can come from the library (per pin) and from the
+      constraints (per design, port, or clock). Where both exist, the tighter
+      one is checked, so an SDC (Synopsys Design Constraints) limit can tighten the library value but never
+      relax it.
+    source: set_max_transition
+
+  - id: dr-clock-path
+    section: design-rules
+    command: set_max_transition -clock_path 0.08 [get_clocks clk]
+    hint: "The object is a clock and the flag narrows it further. Ask to what."
+    answer: Sets a 0.08 ns slew limit on the clock network of clk only.
+    wrong:
+      - Sets the transition assumed for clk while it is still ideal to 0.08 ns.
+      - Sets a 0.08 ns slew limit on the data paths captured by clk only.
+      - Sets a 0.08 ns slew limit on all clock and data pins in clk's domain.
+    explain: >-
+      On a clock object the limit applies to every pin in that clock's domain;
+      `-clock_path` narrows it to the clock network. Clock slews affect skew,
+      pulse width, and power, so they are usually held tighter than data
+      slews.
+    source: set_max_transition
+
+  - id: dr-max-cap
+    section: design-rules
+    command: set_max_capacitance 0.1 [current_design]
+    hint: "The load a driver sees is wire plus pins. Ask what the limit protects."
+    answer: Sets 0.1 pF (picofarads) as the most load any driver may drive.
+    wrong:
+      - Adds 0.1 pF (picofarads) of load to every output port of the design.
+      - Limits the wire capacitance of each net to 0.1 pF, not counting pins.
+      - Sets 0.1 pF (picofarads) as the input capacitance of every cell pin.
+    explain: >-
+      The load is the net's wire capacitance plus the input pins it drives. A
+      cell's delay tables cover a limited range of loads; beyond it the delay
+      is extrapolated and unreliable. Violations are fixed by buffering or
+      upsizing the driver.
+    source: set_max_capacitance
+
+  - id: dr-max-fanout
+    section: design-rules
+    command: set_max_fanout 16 [current_design]
+    hint: "Fanout counts loads, not length. Ask how a violation is fixed."
+    answer: Limits every driver in the design to a fanout of 16.
+    wrong:
+      - Limits each net to at most 16 wire segments when it is routed.
+      - Limits every path in the design to at most 16 levels of logic.
+      - Limits every cell in the design to at most 16 input pins.
+    explain: >-
+      Violations are fixed by splitting the net with buffers. Fanout adds up
+      the fanout load of the pins a driver drives, usually 1 each. It is a coarse stand-in for capacitance and slew, so many flows
+      rely on the transition and capacitance limits instead.
+    source: set_max_fanout
+
+  - id: dr-min-cap
+    section: design-rules
+    command: set_min_capacitance 0.002 [get_ports dout]
+    hint: "A minimum, not a maximum. Ask when too little load is a problem."
+    answer: Requires the driver of dout to see at least 0.002 pF (picofarads) of load.
+    wrong:
+      - Adds 0.002 pF (picofarads) of external load on the output port dout.
+      - Limits the load on dout to at most 0.002 pF (picofarads).
+      - Sets the input capacitance of port dout to 0.002 pF (picofarads).
+    explain: >-
+      A minimum load is uncommon. It applies when a cell is characterized, or
+      stable, only above some load. The fix is to add load, for example a
+      larger wire or an extra pin.
+    source: set_min_capacitance
+
+  # ---------------------------------------------------------------- Environment and derating
+
+  - id: env-derate-late
+    section: environment
+    command: set_timing_derate -late 1.05
+    hint: "Late values are the ones that hurt when larger. Ask which paths those are."
+    answer: Scales late delays up by 5%, to model slow on-chip variation.
+    wrong:
+      - Adds 1.05 ns to the delay of every late path in the design.
+      - Slows only the clock network by 5%, leaving data paths unchanged.
+      - Scales both early and late delays up by 5% throughout the design.
+    explain: >-
+      Late values are the ones that hurt when larger: the data path of a setup
+      check and the capture clock path of a hold check. Without `-clock` or
+      `-data`, both clock and data paths are derated; without `-cell_delay` or
+      `-net_delay`, both kinds of delay are.
+    source: set_timing_derate
+
+  - id: env-derate-early
+    section: environment
+    command: set_timing_derate -early 0.95 -cell_delay
+    hint: "Two restrictions: early paths, and one kind of delay."
+    answer: Scales early cell delays down by 5%, leaving net delays unchanged.
+    wrong:
+      - Scales early cell delays and early net delays down by 5%.
+      - Speeds up only the cells of the clock network by 5%.
+      - Scales every cell delay down by 5%, early and late alike.
+    explain: >-
+      An early derate below 1 and a late derate above 1 make the analysis
+      pessimistic in both directions at once. On a clock path shared by launch
+      and capture, the two derates cannot both be true;
+      CRPR (Clock Reconvergence Pessimism Removal) removes that part.
+    source: set_timing_derate
+
+  - id: env-opcond
+    section: environment
+    command: set_operating_conditions ss_0p72v_125c
+    hint: "The name looks like a corner. Ask where such a condition is defined."
+    answer: Selects the operating condition ss_0p72v_125c from a loaded library.
+    wrong:
+      - Loads the library file named ss_0p72v_125c for timing analysis.
+      - Sets the supply to 0.72 V and 125 C for power analysis only.
+      - Creates a corner by scaling all library delays to 0.72 V.
+    explain: >-
+      An operating condition (process, voltage, temperature) is defined inside
+      a loaded library; the command picks one by name for delay calculation. Current flows usually
+      load one library per corner instead, and analyze several corners.
+    source: set_operating_conditions
+
+  - id: env-ocv
+    section: environment
+    command: set_operating_conditions -analysis_type on_chip_variation -min ff_cond -max ss_cond
+    hint: "On-chip variation assumes both conditions at once. Ask which side gets which."
+    answer: Times setup with slow data and a fast clock, and hold the reverse.
+    wrong:
+      - Uses ss_cond for every setup path and ff_cond for every hold path, clock included.
+      - Runs two separate analyses, one at ff_cond and one at ss_cond.
+      - Uses the average of ff_cond and ss_cond for every path.
+    explain: >-
+      On-chip variation assumes both conditions can occur on the same die at
+      once. A setup check takes the max condition for data and the min for the
+      clock; a hold check takes the reverse. The `bc_wc` type instead applies
+      one condition to both clock and data.
+    source: set_operating_conditions
+
+  # ---------------------------------------------------------------- Object access
+
+  - id: oa-ports
+    section: object-access
+    command: get_ports data*
+    hint: "A port belongs to the design's boundary, not to an instance."
+    answer: Returns the top-level ports whose names start with data.
+    wrong:
+      - Returns every instance pin named data* in the design.
+      - Returns the nets whose names start with data.
+      - Returns ports named data* on every block at every level.
+    explain: >-
+      A port is a pin of the top-level design itself, where the block meets
+      the outside. Pins of instances inside the design are found with
+      `get_pins`.
+    source: get_ports
+
+  - id: oa-pins
+    section: object-access
+    command: get_pins u_alu/*
+    hint: "A pin belongs to an instance. Ask what u_alu/* covers."
+    answer: Returns every pin of the instance u_alu.
+    wrong:
+      - Returns every cell instance inside the hierarchy of u_alu.
+      - Returns the top-level ports of the block named u_alu.
+      - Returns the nets connected to the instance u_alu.
+    explain: >-
+      A pin name is the instance name, the hierarchy separator, and the pin
+      name, as in `u_alu/A`. When u_alu is a hierarchical block, its pins are
+      the block's boundary pins.
+    source: get_pins
+
+  - id: oa-clocks
+    section: object-access
+    command: get_clocks clk*
+    hint: "A clock is a constraint object with its own name, separate from the port."
+    answer: Returns the defined clocks whose names start with clk, not ports or pins.
+    wrong:
+      - Returns the top-level ports whose names start with clk.
+      - Returns the clock pins of every register driven by clk*.
+      - Returns the nets of the clock trees whose names start with clk.
+    explain: >-
+      A clock is a constraint object with its own name, which need not match
+      the port it is defined on. Commands such as `set_clock_uncertainty` and
+      `set_false_path -from` expect clock objects; passing a port applies the
+      constraint at that point instead.
+    source: get_clocks
+
+  - id: oa-hier
+    section: object-access
+    command: get_cells -hierarchical *_reg*
+    hint: "Ask what the pattern would match without the flag."
+    answer: Returns instances matching *_reg* at every level below this one.
+    wrong:
+      - Returns instances matching *_reg* at the current level only.
+      - Returns the library cells whose names match the pattern *_reg*.
+      - Returns the output pins of the instances matching *_reg*.
+    explain: >-
+      Without `-hierarchical`, a pattern is matched only at the current level
+      of hierarchy. With it, the search descends into every block below.
+    source: get_cells
+
+  - id: oa-of-objects
+    section: object-access
+    command: get_nets -of_objects [get_pins u1/Z]
+    hint: "It walks connectivity rather than matching a name."
+    answer: Returns the net connected to pin u1/Z.
+    wrong:
+      - Returns every pin on the net that u1/Z drives.
+      - Returns the cell instance u1 that owns pin Z.
+      - Returns the nets whose names start with u1/Z.
+    explain: >-
+      `-of_objects` walks the connectivity instead of matching names: the net
+      of a pin, the pins of a net, or the pins of a cell.
+    source: get_nets
+
+  - id: oa-all-inputs
+    section: object-access
+    command: all_inputs
+    hint: "Ask whether the clock port counts as an input."
+    answer: Returns every input port of the design, including clock inputs.
+    wrong:
+      - Returns every input port of the design except the clock inputs.
+      - Returns every input pin of every cell instance in the design.
+      - Returns the input ports that do not yet have an input delay.
+    explain: >-
+      The clock port is an input too, so `set_input_delay` applied to
+      `all_inputs` also puts an input delay on the clock. Flows remove the
+      clock port from the list first.
+    source: all_inputs
+
+  - id: oa-all-outputs
+    section: object-access
+    command: set_output_delay -clock clk 0.5 [all_outputs]
+    hint: "Ask what set of ports the command returns, and what it leaves out."
+    answer: Applies a 0.5 ns output delay relative to clk to every output port.
+    wrong:
+      - Applies a 0.5 ns output delay to every output pin of every cell.
+      - Applies a 0.5 ns output delay only to outputs that have no constraint yet.
+      - Applies a 0.5 ns output delay to every output port except the clock outputs.
+    explain: >-
+      `all_outputs` returns the top-level output ports. Combined with a single
+      output delay it is the usual first-pass boundary constraint, refined
+      later for ports with different external timing.
+    source: all_outputs
+
+  - id: oa-all-registers
+    section: object-access
+    command: all_registers -clock clk_a
+    hint: "By default it returns instances. Ask whether latches are among them."
+    answer: Returns the registers and latches clocked by clk_a.
+    wrong:
+      - Returns the flip-flops clocked by clk_a, leaving out the latches.
+      - Returns the clock pins of the registers clocked by clk_a.
+      - Returns every cell in the fanout of clk_a, including buffers.
+    explain: >-
+      By default the result is register instances, both flip-flops and
+      latches. `-clock_pins`, `-data_pins`, `-async_pins`, and `-output_pins`
+      return pins instead; `-edge_triggered` and `-level_sensitive` pick one
+      kind.
+    source: all_registers
+
+  - id: oa-all-clocks
+    section: object-access
+    command: all_clocks
+    hint: "Ask whether a clock with no pin still counts."
+    answer: Returns every defined clock, including generated and virtual clocks.
+    wrong:
+      - Returns only the clocks that are defined on top-level ports.
+      - Returns the top-level ports that carry a clock.
+      - Returns the clock pins of every register in the design.
+    explain: >-
+      The result is clock objects: every clock from `create_clock` and
+      `create_generated_clock`, whether it sits on a port, on an internal pin,
+      or on nothing (a virtual clock).
+    source: all_clocks
+
+  - id: oa-current-design
+    section: object-access
+    command: current_design top
+    hint: "Several designs can be loaded. Ask what the command picks."
+    answer: Makes top the design that the following commands apply to.
+    wrong:
+      - Renames the current design to top.
+      - Creates a new, empty design named top.
+      - Makes top the only module timed; the rest are black boxes.
+    explain: >-
+      With several designs loaded, constraints apply to the current one.
+      Constraint files often begin with it so they are read in the right
+      context.
+    source: current_design
+
+  - id: oa-lib-cells
+    section: object-access
+    command: get_lib_cells */BUF_*
+    hint: "The pattern names a library. Ask whether the result is in the design."
+    answer: Returns the library cells named BUF_* in every loaded library.
+    wrong:
+      - Returns every BUF_* instance placed in the design.
+      - Returns the loaded libraries whose names start with BUF_ only.
+      - Returns the pins named BUF_* on every cell in every library.
+    explain: >-
+      No instances are returned. Library objects are the cell definitions; design objects are the
+      instances of them in the netlist. A library cell is named with its
+      library, as in `lib/BUF_X2`.
+    source: get_lib_cells
+
+  - id: oa-lib-pins
+    section: object-access
+    command: get_lib_pins */BUF_X2/Z
+    hint: "The pattern names a library cell's pin. Ask which pin it is."
+    answer: Returns the Z pin of the library cell BUF_X2, not a pin of any instance.
+    wrong:
+      - Returns the Z pin of every BUF_X2 instance in the design.
+      - Returns the net driven by every BUF_X2 instance in the design.
+      - Returns the library cells that have an output pin named Z.
+    explain: >-
+      A library pin belongs to the cell definition. It carries the pin's
+      library data, such as its capacitance and design-rule limits.
+    source: get_lib_pins
+
+  - id: oa-libs
+    section: object-access
+    command: get_libs *ss*
+    hint: "Ask whether this searches files on disk or what is already loaded."
+    answer: Returns the loaded libraries whose names contain ss.
+    wrong:
+      - Reads every library file on disk whose name contains ss.
+      - Returns the library cells whose names contain ss.
+      - Returns the operating conditions whose names contain ss.
+    explain: >-
+      It searches libraries already loaded, for example to pick the
+      slow-corner library by name. Reading a library from disk is a tool
+      command, not part of SDC (Synopsys Design Constraints).
+    source: get_libs
+
+  - id: oa-filter
+    section: object-access
+    command: get_pins -of_objects [get_nets n1] -filter "direction==output"
+    hint: "A net has one output pin among its pins. Ask what that pin is."
+    answer: Returns the driver of net n1, the pin on it whose direction is output.
+    wrong:
+      - Returns every pin on net n1 except the ones that are outputs.
+      - Returns the output port named n1 at the top level.
+      - Returns the output pins whose names contain the text n1.
+    explain: >-
+      `-filter` keeps only objects whose properties match the expression.
+      Combined with `-of_objects`, this is the usual way to find the pin that
+      drives a net.
+    source: get_pins
+
+  - id: oa-regexp
+    section: object-access
+    command: get_ports -regexp {data\[[0-3]\]}
+    hint: "Ask what the brackets mean once the pattern is a regular expression."
+    answer: Returns the ports data[0] through data[3], using a regular expression.
+    wrong:
+      - Returns only a port whose name is literally data\[[0-3]\].
+      - Returns every port named data[n], whatever its index may be.
+      - Returns the ports data0 through data3, written without brackets.
+    explain: >-
+      Without `-regexp`, patterns are wildcard patterns in which `*` matches
+      any text and `?` one character. `-regexp` switches to regular
+      expressions, and `-nocase` then makes matching case-insensitive.
+    source: get_ports
+
+  - id: oa-quiet
+    section: object-access
+    command: get_cells -quiet u_spare*
+    hint: "Ask what normally happens when a pattern matches nothing."
+    answer: Returns the matching cells, or an empty list with no error if none match.
+    wrong:
+      - Returns the matching cells without printing their names to the log.
+      - Returns only the first cell whose name matches u_spare*.
+      - Suppresses timing warnings about the cells named u_spare*.
+    explain: >-
+      A pattern that matches nothing normally reports an error. `-quiet`
+      suits constraints shared between designs where some objects may not
+      exist.
+    source: get_cells
+
+  # ---------------------------------------------------------------- General purpose
+
+  - id: gen-units
+    section: general
+    command: set_units -time ns -capacitance pF
+    hint: "Numbers in a constraint file carry no units of their own."
+    answer: Declares the file's times are in ns and capacitances in pF.
+    wrong:
+      - Converts every library delay table to ns and pF before timing.
+      - Sets the rounding of timing reports to whole nanoseconds.
+      - Multiplies every time value in the file by 0.000000001.
+    explain: >-
+      Here ns is nanoseconds and pF is picofarads. Numbers in SDC (Synopsys Design Constraints) carry no units of their own. Without this declaration
+      they are read in the library's units, so a file written for one library
+      can be misread with another. OpenSTA checks the declared units and warns
+      if they differ from the ones it uses.
+    source: set_units
+
+  - id: gen-current-instance
+    section: general
+    command: current_instance u_core
+    hint: "Ask what a relative name means afterwards."
+    answer: Makes later object names resolve relative to the instance u_core.
+    wrong:
+      - Restricts timing analysis to the paths inside u_core.
+      - Makes u_core the top design for all later commands.
+      - Selects u_core as the instance shown in timing reports.
+    explain: >-
+      After it, `get_pins alu/A` means `u_core/alu/A`. This lets a block's own
+      constraints be applied inside a larger design. With no argument, it
+      returns to the top level.
+    source: current_instance
+
+  - id: gen-hier-sep
+    section: general
+    command: set_hierarchy_separator .
+    hint: "The default separator is a slash. Ask what this changes."
+    answer: Makes names use . instead of / between hierarchy levels.
+    wrong:
+      - Renames every net in the netlist to use . instead of /.
+      - Sets . as the decimal separator for numbers in the file.
+      - Flattens the design so its names have no hierarchy levels.
+    explain: >-
+      The default separator is `/`, as in `u_core/alu/A`. A file written with
+      `u_core.alu.A` style names needs this command so its names resolve.
+    source: set_hierarchy_separator
+
+  # ---------------------------------------------------------------- Power and multiple voltages
+
+  - id: pw-voltage
+    section: power
+    command: set_voltage 0.72 -object_list VDD
+    hint: "The object is a power net. Ask what the number describes."
+    answer: Sets the supply voltage on the power net VDD to 0.72 V.
+    wrong:
+      - Creates a new power net named VDD with a 0.72 V supply.
+      - Sets 0.72 V as the level-shifter threshold on the net VDD.
+      - Scales every library delay as if all cells ran at 0.72 V.
+    explain: >-
+      In a design with several supplies, each power net has its own voltage.
+      `-min` sets a separate value for minimum-delay analysis. The command
+      describes the supply; it does not create the net.
+    source: set_voltage
+
+  - id: pw-voltage-area
+    section: power
+    command: create_voltage_area -name VA_LOW -coordinate {100 100 400 300} [get_cells u_lp]
+    hint: "Coordinates are given. Ask whether this is a physical or an electrical statement."
+    answer: Reserves a region of the die for the cells of u_lp, on their own supply.
+    wrong:
+      - Sets the supply voltage of the cells in u_lp to a lower value.
+      - Blocks every cell from being placed inside the region.
+      - Creates a separate power-domain netlist for the block u_lp.
+    explain: >-
+      It is a physical constraint for placement: the cells of u_lp go inside
+      the region and all others stay out, so the region can have its own power
+      grid. Timing analysis ignores it. Coordinates are in micrometres.
+    source: create_voltage_area
+
+  # ---------------------------------------------------------------- Name the command
+
+  - id: sdc-rev-clock-groups
+    section: clocks
+    style: reverse
+    prompt: >-
+      Two clocks in the design never appear in the same logic. You want every
+      path between them left unchecked, in both directions, with one command
+      that also covers paths added later.
+    hint: "A one-way exception would leave the other direction still checked."
+    answer: set_clock_groups -asynchronous -group {clk_a} -group {clk_b}
+    wrong:
+      - set_false_path -from [get_clocks clk_a] -to [get_clocks clk_b]
+      - set_clock_uncertainty 1.0 -from [get_clocks clk_a] -to [get_clocks clk_b]
+      - set_disable_timing [get_clocks clk_b]
+    explain: >-
+      Grouping cuts every path between the groups, both ways, and keeps doing
+      so for paths created later. A false path as written covers one direction
+      only, so the reverse paths are still timed. Uncertainty adds margin
+      rather than removing the check.
+    source: set_clock_groups
+
+  - id: sdc-rev-output-delay
+    section: io
+    style: reverse
+    prompt: >-
+      You are constraining a block. Outside it, the logic between this output
+      port and the register that captures it takes 0.4 nanoseconds.
+    hint: "The delay being described happens after the port, not before it."
+    answer: set_output_delay 0.4 -clock clk [get_ports out]
+    wrong:
+      - set_input_delay 0.4 -clock clk [get_ports out]
+      - set_max_delay 0.4 -to [get_ports out]
+      - set_load 0.4 [get_ports out]
+    explain: >-
+      The number is the external delay the block must leave room for, so it is
+      subtracted from the period when the path to the port is checked. A
+      maximum delay would instead replace the clock-based check entirely, and
+      a load is a capacitance, not a time.
+    source: set_output_delay
+
+  - id: sdc-rev-multicycle
+    section: exceptions
+    style: reverse
+    prompt: >-
+      A path between two registers on the same clock is allowed two clock
+      cycles to settle, rather than one.
+    hint: "One of these relaxes the check; the others remove it or replace it."
+    answer: set_multicycle_path 2 -setup -from [get_pins a_reg/CK] -to [get_pins b_reg/D]
+    wrong:
+      - set_false_path -from [get_pins a_reg/CK] -to [get_pins b_reg/D]
+      - set_max_delay 2 -from [get_pins a_reg/CK] -to [get_pins b_reg/D]
+      - set_multicycle_path 2 -hold -from [get_pins a_reg/CK] -to [get_pins b_reg/D]
+    explain: >-
+      The path is still checked, against a capture edge two cycles later. A
+      false path would stop it being checked at all, and a maximum delay of 2
+      would set an absolute limit in nanoseconds unrelated to the clock. The
+      hold form moves the hold check instead, which is the companion command,
+      not this one.
+    source: set_multicycle_path
+
+  - id: sdc-rev-max-transition
+    section: design-rules
+    style: reverse
+    prompt: >-
+      No pin in the design may be driven with a transition slower than 0.15
+      nanoseconds, whatever the library allows.
+    hint: "The limit is on how sharp an edge is, not on what it drives."
+    answer: set_max_transition 0.15 [current_design]
+    wrong:
+      - set_max_capacitance 0.15 [current_design]
+      - set_clock_transition 0.15 [get_clocks]
+      - set_input_transition 0.15 [all_inputs]
+    explain: >-
+      This is a design rule, checked at every pin and repaired by sizing and
+      buffering. The capacitance form limits load instead, the clock form sets
+      an assumed transition on an ideal clock, and the input form describes
+      what drives the ports.
+    source: set_max_transition
+
+  # ---------------------------------------------------------------- Find the fault
+
+  - id: sdc-bug-virtual-clock
+    section: clocks
+    style: bug
+    command: create_clock -name clk -period 2.0
+    hint: "Ask what this clock is attached to."
+    answer: No port is given, so this defines a virtual clock instead.
+    wrong:
+      - No units are given, so the period is ambiguous.
+      - No waveform is given, so the duty cycle is undefined.
+      - Nothing is wrong; the clock port is found by its name.
+    explain: >-
+      A clock with no object list is a virtual clock, which exists for
+      constraining ports but drives nothing in the design. Every register meant
+      to be on it is then unclocked, and the timer reports the endpoints as
+      unconstrained rather than failing.
+    source: create_clock
+
+  - id: sdc-bug-mcp-hold
+    section: exceptions
+    style: bug
+    command: set_multicycle_path 2 -setup -from [get_pins a_reg/CK] -to [get_pins b_reg/D]
+    hint: "Ask which check moved when the setup edge moved."
+    answer: Without a matching hold exception, hold is now checked a cycle late.
+    wrong:
+      - Without a matching setup exception, setup is checked at the wrong edge.
+      - The pins are the wrong way round for a register-to-register path.
+      - A multicycle path may not name pins, only registers or clocks.
+    explain: >-
+      Moving the capture edge for setup moves the hold check with it, so hold
+      is checked against the edge before the new capture edge, one full cycle
+      after launch. Almost nothing meets that. The usual pair is a setup value
+      of N with a hold value of N minus one.
+    source: set_multicycle_path
+
+  - id: sdc-bug-input-delay-clock
+    section: io
+    style: bug
+    command: set_input_delay 0.5 [get_ports data_in]
+    hint: "An arrival time is always measured from something."
+    answer: No clock is named, so the delay has no edge to be relative to.
+    wrong:
+      - No direction is given, so the tool cannot tell input from output.
+      - The value is missing its units, so it is taken as picoseconds.
+      - Nothing is wrong; the port's own clock is used.
+    explain: >-
+      An input delay says how late the data arrives after an edge of some
+      clock, so the clock has to be named. Without it the command is an error,
+      and in a script that ignores errors the port is left unconstrained and
+      quietly never checked.
+    source: set_input_delay
+
+  - id: sdc-bug-brackets
+    section: object-access
+    style: bug
+    command: set_false_path -from [get_pins dpath/a_reg[9]/Q]
+    hint: "Count the square brackets and ask what each pair means to the interpreter."
+    answer: The bus index is taken as a command, so the line fails.
+    wrong:
+      - The bus index must be written with braces to match the library.
+      - A false path may not start at a register output pin.
+      - The path has no destination, so the command is incomplete.
+    explain: >-
+      Square brackets are command substitution, so the interpreter tries to run
+      a command named 9. The name has to be braced or escaped, as in
+      `{dpath/a_reg[9]/Q}`, or built with a variable that is passed straight
+      through. This is the commonest mistake in a constraints file.
+    source: get_pins
+
+  # ---------------------------------------------------------------- Fill the gap
+
+  - id: sdc-blank-waveform
+    section: clocks
+    style: blank
+    command: create_clock -period 2.0 -name clk -waveform {0 ____} [get_ports clk]
+    hint: "The clock is meant to spend half its period high."
+    answer: "1.0"
+    wrong:
+      - "2.0"
+      - "0.5"
+      - "1.5"
+    explain: >-
+      The two numbers are the times of the first rising and the first falling
+      edge, so a symmetric clock of period 2 falls at 1. This is also the
+      default, which is why the option is usually left out and only appears
+      when the duty cycle is not even.
+    source: create_clock
+
+  - id: sdc-blank-input-clock
+    section: io
+    style: blank
+    command: set_input_delay 0.4 ____ clk [get_ports data_in]
+    hint: "The missing word names which clock the arrival is measured against."
+    answer: "-clock"
+    wrong:
+      - "-reference"
+      - "-related_clock"
+      - "-from"
+    explain: >-
+      Every port constraint is relative to a clock edge, and this is the option
+      that names it. Its companions are `-clock_fall` for an arrival relative
+      to the falling edge, and `-add_delay` to keep an earlier constraint on
+      the same port rather than replacing it.
+    source: set_input_delay
+
+  - id: sdc-blank-derate
+    section: environment
+    style: blank
+    command: set_timing_derate ____ 1.05
+    hint: "The paths being slowed are the late ones, whichever check they serve."
+    answer: "-late"
+    wrong:
+      - "-max"
+      - "-slow"
+      - "-setup"
+    explain: >-
+      Derating is expressed as early and late, not as minimum and maximum,
+      because the same path can be the late one in a setup check and the early
+      one in a hold check. A factor above one slows the late paths; the early
+      ones take a factor below one.
+    source: set_timing_derate
+
+  # ---------------------------------------------------------------- Put in order
+
+  - id: sdc-order-load
+    section: general
+    style: order
+    question: Put these in the order a timing session must run them.
+    hint: "Each line needs something the line before it created."
+    items:
+      - read_liberty NangateOpenCellLibrary_typical.lib
+      - read_verilog gcd.v
+      - link_design gcd
+      - read_sdc gcd.sdc
+    explain: >-
+      The netlist names cells, so the library has to be read first. Linking
+      resolves those names into a design, and only then do objects exist for
+      the constraints to find. A constraints file read before linking matches
+      nothing, and usually says so only as a warning.
+    source: read_sdc

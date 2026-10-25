@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ meta.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / <a href="{{ game.href }}">{{ game.title }}</a> / {{ meta.title }}</div>
+  <h1 class="lab-title">{{ meta.title }} <span class="gm-basis-tag">{{ deck.basis.tag or "as implemented in " ~ deck.basis.tool }}</span></h1>
+  <p class="gm-intro">
+    Choose a section to drill, or play every section mixed together. Each
+    section lists the commands it covers, and any kinds of card it holds
+    besides the plain one: a command whose meaning you pick.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ deck.basis.note }}
+    Reference: <a href="{{ deck.reference }}" target="_blank" rel="noopener">{{ deck.basis.doc_title }}</a>
+    (<a href="{{ deck.basis.tool_url }}" target="_blank" rel="noopener">{{ deck.basis.tool }} on GitHub</a>).</span></div>
+  <div class="gm-grid">
+    <a class="gm-tile is-mixed" href="/games/flash-cards/{{ meta.id }}/all"><div class="gm-tile-body">
+      <h2 class="gm-title">All sections</h2>
+      <p class="gm-blurb">A mixed round drawn from every section. Due cards come first, then new cards in random order.</p>
+      <div class="gm-mixed-num">{{ total }}<small>cards across {{ deck.sections | length }} sections</small></div>
+      <div class="gm-tile-foot">
+        <span class="gm-count">mixed round</span>
+        <span class="chip diff-easy">play</span>
+      </div>
+    </div></a>
+    {% for s in deck.sections %}
+    {% if s.count %}<a class="gm-tile" href="/games/flash-cards/{{ meta.id }}/{{ s.id }}">{% else %}<div class="gm-tile is-off">{% endif %}<div class="gm-tile-body">
+      <h2 class="gm-title">{{ s.title }}</h2>
+      <p class="gm-blurb">{{ s.blurb }}</p>
+      <div class="gm-cmds">{% for c in s.commands %}<code>{{ c }}</code>{% endfor %}</div>
+      {% if s.styles %}<div class="gm-styles">{% for st in s.styles %}<span class="gm-style">{{ style_names[st] }}</span>{% endfor %}</div>{% endif %}
+      <div class="gm-tile-foot">
+        <span class="gm-count">{{ s.count }} card{% if s.count != 1 %}s{% endif %}</span>
+        {% if s.count %}<span class="chip diff-easy">play</span>{% else %}<span class="chip chip-soon">no cards yet</span>{% endif %}
+      </div>
+    </div>{% if s.count %}</a>{% else %}</div>{% endif %}
+    {% endfor %}
+  </div>
+</article>
+{% endblock %}

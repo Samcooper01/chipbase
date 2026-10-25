@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ problem.title }} - Chipbase{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/static/vendor/codemirror/codemirror.min.css">
+<script src="/static/vendor/codemirror/codemirror.min.js"></script>
+<script src="/static/vendor/codemirror/mode/tcl.min.js"></script>
+<style>
+  /* .chip sets display, which would override the hidden attribute */
+  .chip[hidden] { display: none; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="split">
+
+  <section class="pane pane-desc">
+    <div class="desc-head">
+      <h1>{{ problem.title }}</h1>
+      <div class="chip-row">
+        <span class="chip topic-chip">{{ problem.topic }}</span>
+        <span class="chip diff-{{ problem.difficulty }}">{{ problem.difficulty }}</span>
+        {% if problem.engine == 'openroad' %}
+          <span class="chip eng-openroad">OpenROAD run</span>
+        {% elif problem.engine == 'quiz' %}
+          <span class="chip eng-quiz">concept quiz</span>
+        {% elif problem.engine == 'script' %}
+          <span class="chip eng-script">script check</span>
+        {% else %}
+          <span class="chip eng-sim">instant model</span>
+        {% endif %}
+        <span class="chip points-chip">{{ problem.points }} pts</span>
+        <span class="chip st-chip-solved" id="solved-chip" hidden>✓ solved</span>
+      </div>
+    </div>
+    {% if problem.engine == 'openroad' %}
+    <div class="banner banner-warn">
+      This problem is graded by a real OpenROAD run, which cannot run in a
+      browser. Its grading harness is in the site's repository under
+      <code>problems/{{ problem.id }}/harness</code>: with OpenROAD installed,
+      put your <code>floorplan.tcl</code> beside <code>grade.tcl</code>, set
+      <code>PDLEET_PLATFORM_DIR</code> to the {{ problem.platform }} platform
+      folder of OpenROAD-flow-scripts, and run <code>openroad -exit grade.tcl</code>.
+      It writes the same metrics to <code>metrics.json</code>.
+    </div>
+    {% endif %}
+    <article class="desc-body">
+      {{ problem.description_html | safe }}
+    </article>
+  </section>
+
+  <section class="pane pane-work">
+    {% if problem.kind == 'numeric' %}
+    <div class="numeric-box">
+      <label for="numeric-answer" class="numeric-prompt">
+        {{ problem.numeric.get('prompt', 'Answer') }}
+      </label>
+      <div class="numeric-row">
+        <input id="numeric-answer" type="number" step="any" placeholder="your answer">
+        <span class="numeric-unit">{{ problem.numeric.get('unit', '') }}</span>
+      </div>
+    </div>
+    {% else %}
+    <div class="editor-head">
+      <div class="tabs" id="file-tabs"></div>
+      <button class="btn btn-ghost" id="btn-reset" title="restore the starter file(s)">Reset</button>
+    </div>
+    <div id="editors"></div>
+    {% endif %}
+
+    {% if problem.engine != 'openroad' %}
+    <div class="action-row">
+      <button class="btn btn-run" id="btn-run"
+              title="grade without saving the result">Run</button>
+      <button class="btn btn-submit" id="btn-submit"
+              title="grade and save the result in this browser">Submit</button>
+      <span class="run-status" id="run-status"></span>
+    </div>
+    {% endif %}
+
+    <div id="results" class="results hidden"></div>
+  </section>
+
+</div>
+<script id="problem-data" type="application/json">{{ client_payload | safe }}</script>
+{% endblock %}

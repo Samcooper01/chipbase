@@ -1,0 +1,409 @@
+/* Silicon-die theme (light, polished-wafer palette) for the Sandboxes tab: the hub page and every
+   sandbox page. Scoped to main.sb-theme, so the shared top bar and
+   footer keep the site theme. Inside the scope it redefines the site's
+   color variables, so shared components (panes, buttons, chips,
+   toolbars) recolor themselves; the rest is die-specific decoration.
+   The --cv-* variables are read by the sandbox canvas scripts. */
+
+main.sb-theme {
+  --bg: #eef1f4;
+  --panel: #fbfcfd;
+  --panel-2: #eef1f4;
+  --border: #d3d9e0;
+  --text: #1c2530;
+  --muted: #5b6673;
+  --green: #16a34a;
+  --green-deep: #15803d;
+  --amber: #d97706;
+  --red: #dc2626;
+  --code-bg: #eef1f4;
+
+  --copper: #b8692e;
+  --copper-light: #a55a22;   /* text-weight copper, dark enough to read on light */
+  --copper-dim: rgba(184, 105, 46, 0.42);
+  --metal: #c3cbd4;
+  --metal-hi: #9aa5b1;
+
+  /* canvas palette (read by floorplan-ui.js and maze-ui.js) */
+  --cv-bg: #e8ecf0;
+  --cv-die: #f9fafb;
+  --cv-grid: rgba(15, 23, 42, 0.06);
+  --cv-block: #cbd2da;
+  --cv-block-edge: #8e99a6;
+  --cv-ink: #1c2530;
+  --cv-muted: #5b6673;
+  --cv-halo: rgba(71, 85, 105, 0.45);
+  --cv-outline: #334155;
+  --cv-ring: #ffffff;
+  --cv-port: #7c3aed;
+
+  flex: 1;
+  width: 100%;
+  color: var(--text);
+  background-color: #e9edf1;
+  background-image:
+    /* standard-cell rows */
+    repeating-linear-gradient(0deg, rgba(30, 41, 59, 0.045) 0 1px, transparent 1px 14px),
+    /* sparse vertical metal */
+    repeating-linear-gradient(90deg, rgba(184, 105, 46, 0.07) 0 1px, transparent 1px 84px),
+    radial-gradient(ellipse at 50% 0%, #f7f9fb 0%, #e3e8ed 75%);
+}
+
+.sb-theme .sb-page {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 22px 60px;
+}
+
+.sb-theme a { color: var(--copper-light); }
+.sb-theme .crumb, .sb-theme .crumb a { color: var(--muted); }
+.sb-theme .crumb a:hover { color: var(--copper-light); }
+
+/* ---------- shared components, recolored ---------- */
+
+.sb-theme .pane {
+  background: rgba(251, 252, 253, 0.96);
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.07);
+}
+.sb-theme .desc-head h1 { font-family: var(--mono); letter-spacing: -0.01em; }
+.sb-theme .desc-body h2 { color: var(--copper-light); font-family: var(--mono); font-size: 14.5px; }
+.sb-theme .desc-body strong { color: #0f172a; }
+.sb-theme .desc-body code { border-color: var(--border); color: var(--text); }
+
+.sb-theme .chip.topic-chip { color: #475569; background: rgba(71, 85, 105, 0.10); }
+.sb-theme .chip.eng-openroad { color: var(--copper-light); background: rgba(184, 105, 46, 0.12); }
+.sb-theme .chip.chip-soon { color: var(--muted); background: rgba(100, 116, 139, 0.10); }
+
+.sb-theme .btn { border-color: var(--metal); background: var(--panel); color: var(--text); }
+.sb-theme .btn:hover { background: #e6eaef; border-color: var(--metal-hi); }
+.sb-theme .btn-ghost { color: var(--muted); }
+.sb-theme .btn-submit { background: var(--green); border-color: var(--green); color: #ffffff; }
+.sb-theme .btn-submit:hover { background: var(--green-deep); border-color: var(--green-deep); }
+
+.sb-theme .seg-btn.active { color: var(--copper-light); }
+.sb-theme input[type="range"], .sb-theme input[type="radio"], .sb-theme input[type="checkbox"] {
+  accent-color: var(--copper);
+}
+.sb-theme .maze-canvas-wrap { background: var(--cv-bg); border-color: var(--metal); }
+
+/* ---------- hub: the die ---------- */
+
+.sb-theme .sb-head { margin: 6px 0 26px; }
+.sb-theme .sb-head h1 {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 4px 0 10px;
+}
+.sb-theme .sb-head p { color: var(--muted); font-size: 15px; max-width: 760px; margin: 0; }
+.sb-theme .sb-readout {
+  display: flex;
+  gap: 22px;
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.sb-theme .sb-readout b { color: var(--green); font-size: 15px; margin-right: 6px; }
+.sb-theme .sb-readout .sb-soon b { color: var(--copper-light); }
+
+/* the die: seal ring outline, pad ring of copper squares, core inside */
+.sb-theme .sb-die {
+  position: relative;
+  border: 1px solid var(--metal);
+  border-radius: 6px;
+  padding: 44px 40px 40px;
+  border-color: #b7c1cc;
+  background: linear-gradient(180deg, #f1f4f7 0%, #e4e9ee 100%);
+  box-shadow: inset 0 1px 0 #ffffff,
+              inset 0 0 0 5px rgba(244, 246, 248, 0.7), inset 0 0 0 6px var(--metal),
+              0 1px 2px rgba(15, 23, 42, 0.08), 0 10px 24px rgba(15, 23, 42, 0.10),
+              0 34px 70px -24px rgba(15, 23, 42, 0.32);
+}
+.sb-theme .sb-die::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, var(--copper-dim) 0 10px, transparent 10px 22px) top / 100% 7px no-repeat,
+    repeating-linear-gradient(90deg, var(--copper-dim) 0 10px, transparent 10px 22px) bottom / 100% 7px no-repeat,
+    repeating-linear-gradient(180deg, var(--copper-dim) 0 10px, transparent 10px 22px) left / 7px 100% no-repeat,
+    repeating-linear-gradient(180deg, var(--copper-dim) 0 10px, transparent 10px 22px) right / 7px 100% no-repeat;
+}
+.sb-theme .sb-die-mark {
+  position: absolute;
+  right: 30px;
+  bottom: 22px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(91, 102, 115, 0.55);
+}
+
+.sb-theme .sb-die + .sb-die { margin-top: 30px; }
+.sb-theme .sb-die-head { margin-bottom: 18px; }
+.sb-theme .sb-die-head h2 {
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--copper-light);
+  margin: 0 0 6px;
+}
+.sb-theme .sb-die-head p { margin: 0; max-width: 680px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+.sb-theme .sb-meta {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--copper-light);
+  margin: -8px 0 12px;
+}
+
+.sb-theme .sb-core {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 30px 28px; /* the routing channels */
+  padding: 8px 4px 22px;
+}
+
+/* ---------- hub: each sandbox is a macro ---------- */
+
+.sb-theme .sb-macro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+  padding: 22px 20px 18px;
+  border: 1px solid #c0c9d3;
+  border-bottom-color: #a9b3bf;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f7f9 100%);
+  box-shadow: inset 0 1px 0 #ffffff,
+              0 1px 2px rgba(15, 23, 42, 0.10), 0 4px 10px rgba(15, 23, 42, 0.07),
+              0 18px 34px -16px rgba(15, 23, 42, 0.34);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+/* pin ticks along the top and bottom edges */
+.sb-theme .sb-macro::before,
+.sb-theme .sb-macro::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, var(--copper) 0 3px, transparent 3px 10px);
+  opacity: 0.85;
+}
+.sb-theme .sb-macro::before { top: -7px; }
+.sb-theme .sb-macro::after { bottom: -7px; }
+.sb-theme .sb-macro:hover {
+  border-color: var(--accent);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px var(--accent),
+              0 2px 4px rgba(15, 23, 42, 0.10),
+              0 26px 44px -16px color-mix(in srgb, var(--accent) 45%, rgba(15, 23, 42, 0.45));
+  transform: translateY(-4px);
+}
+
+/* pin-1 orientation dot, in the stage's accent color */
+.sb-theme .sb-pin1 {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.sb-theme .sb-eyebrow {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px 12px;
+}
+.sb-theme .sb-eyebrow span { color: var(--accent); }
+.sb-theme .sb-title {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.sb-theme .sb-open { color: var(--text); text-decoration: none; }
+.sb-theme .sb-open::after { content: ""; position: absolute; inset: 0; } /* whole macro is the link */
+.sb-theme .sb-blurb { font-size: 13.5px; color: var(--muted); line-height: 1.55; margin: 0 0 16px; flex: 1; }
+.sb-theme .sb-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  font-family: var(--mono);
+}
+.sb-theme .sb-go { color: var(--green); font-weight: 700; }
+.sb-theme .sb-methods { position: relative; z-index: 1; color: var(--muted); }
+.sb-theme .sb-methods:hover { color: var(--copper-light); }
+
+.sb-theme .sb-macro.sb-planned { border-style: dashed; border-color: #9aa5b1; background: rgba(226, 231, 237, 0.55); box-shadow: none; }
+.sb-theme .sb-macro.sb-planned::before,
+.sb-theme .sb-macro.sb-planned::after {
+  background: repeating-linear-gradient(90deg, var(--metal-hi) 0 3px, transparent 3px 10px);
+  opacity: 0.6;
+}
+.sb-theme .sb-macro.sb-planned .sb-pin1 { box-shadow: none; opacity: 0.45; }
+.sb-theme .sb-macro.sb-planned .sb-title,
+.sb-theme .sb-macro.sb-planned .sb-blurb { opacity: 0.6; }
+.sb-theme .sb-macro.sb-planned:hover { transform: none; box-shadow: none; border-color: var(--metal-hi); }
+.sb-theme .sb-soon-tag { color: var(--copper-light); opacity: 0.8; }
+
+@media (max-width: 640px) {
+  .sb-theme .sb-die { padding: 34px 16px 36px; }
+  .sb-theme .sb-core { grid-template-columns: 1fr; padding: 22px 14px 26px; }
+}
+
+
+/* ---------- stage thumbnails: a die photo on every live card ---------- */
+
+.sb-theme .sb-thumb {
+  margin: 2px 0 12px;
+  border: 1px solid #bcc6d1;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #e2e7ed 0%, #edf0f4 100%);
+  box-shadow: inset 0 2px 5px rgba(15, 23, 42, 0.14), 0 1px 0 #ffffff;
+  overflow: hidden;
+  min-height: 4px;
+}
+.sb-theme .sb-thumb:empty { display: none; }
+.sb-theme .th-svg { display: block; width: 100%; height: auto; }
+
+.sb-theme .th-die { fill: #eef1f4; stroke: #aeb8c3; stroke-width: 0.8;
+  filter: drop-shadow(0 1.2px 1.4px rgba(15, 23, 42, 0.28)); }
+.sb-theme .th-core { fill: #ffffff; stroke: var(--copper); stroke-width: 0.6; }
+.sb-theme .th-macro { fill: rgba(100, 116, 139, 0.45); stroke: #64707d; stroke-width: 0.6; }
+.sb-theme .th-mlab { font: 600 5.5px var(--mono); fill: #3d4753; text-anchor: middle;
+  letter-spacing: 0.06em; }
+.sb-theme .th-macro-flat { fill: rgba(100, 116, 139, 0.26); }
+/* placement: cells on rows, in the placement figure's module colours */
+.sb-theme .th-pc { opacity: 0.72; }
+.sb-theme .th-pc-A { fill: #15803d; }
+.sb-theme .th-pc-B { fill: #1d4ed8; }
+.sb-theme .th-pc-C { fill: #b45309; }
+.sb-theme .th-pc-D { fill: #be185d; }
+.sb-theme .th-pc-hub { fill: #1c2530; opacity: 0.6; }
+/* routing: signal metal, in the finished-layout figure's two colours */
+.sb-theme .th-wh { stroke: #2563eb; stroke-width: 0.55; opacity: 0.6; }
+.sb-theme .th-wv { stroke: #7c3aed; stroke-width: 0.55; opacity: 0.6; }
+.sb-theme .th-pin { stroke: #7c3aed; stroke-width: 1; }
+.sb-theme .th-aedge { stroke: #9aa5b1; stroke-width: 0.7; }
+.sb-theme .th-bubble { fill: #ffffff; stroke: #9aa5b1; stroke-width: 0.6; }
+.sb-theme .th-anode { fill: #ffffff; stroke: #64707d; stroke-width: 0.7; }
+.sb-theme .th-anode-io { fill: #e7ebf0; }
+.sb-theme .th-anodet { font: 600 5px var(--mono); fill: #3d4753; text-anchor: middle; }
+.sb-theme .th-cover { fill: rgba(124, 58, 237, 0.07); stroke: #7c3aed; stroke-width: 0.6;
+  stroke-dasharray: 2.2 1.6; }
+.sb-theme .th-covlab { font: 4.8px var(--mono); fill: #7c3aed; text-anchor: middle;
+  letter-spacing: 0.02em; }
+.sb-theme .th-sink { fill: #7c3aed; opacity: 0.45; }
+.sb-theme .th-clk { fill: none; stroke: #0f766e; stroke-width: 0.7; }
+.sb-theme .th-clk-trunk { stroke-width: 1.4; }
+.sb-theme .th-clk-leaf { stroke-width: 0.45; opacity: 0.6; }
+
+/* ---------- more of the die, less of the card ---------- */
+
+/* reticle crosshairs at the four corners of every die box */
+.sb-theme .sb-die::after {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--metal), var(--metal)) left top / 14px 1px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) left top / 1px 14px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) right top / 14px 1px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) right top / 1px 14px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) left bottom / 14px 1px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) left bottom / 1px 14px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) right bottom / 14px 1px no-repeat,
+    linear-gradient(var(--metal), var(--metal)) right bottom / 1px 14px no-repeat;
+  opacity: 0.55;
+}
+
+/* the core: a recessed well the cards sit in, with routing tracks
+   across its floor, the way a core area looks before placement */
+.sb-theme .sb-core {
+  position: relative;
+  padding: 28px 26px 32px;
+  border-radius: 6px;
+  background-color: #d5dce4;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(71, 85, 105, 0.08) 0 1px, transparent 1px 16px),
+    repeating-linear-gradient(0deg, rgba(71, 85, 105, 0.06) 0 1px, transparent 1px 16px),
+    linear-gradient(180deg, #cfd7e0 0%, #d9e0e7 100%);
+  box-shadow: inset 0 3px 8px rgba(15, 23, 42, 0.16), inset 0 0 0 1px rgba(15, 23, 42, 0.08),
+              0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+/* the card's own accent, carried into its eyebrow and its thumbnail frame */
+.sb-theme .sb-macro:hover .sb-thumb { border-color: var(--accent); }
+.sb-theme .sb-eyebrow span { color: var(--accent); }
+
+/* timing: the setup and hold checks on one capturing edge */
+.sb-theme .th-clkw { fill: none; stroke: #1c2530; stroke-width: 1.1; }
+.sb-theme .th-bus { fill: #ffffff; stroke: #1c2530; stroke-width: 0.9; }
+.sb-theme .th-bus-cap { fill: rgba(21, 128, 61, 0.1); }
+.sb-theme .th-edge { stroke: #64707d; stroke-width: 0.6; stroke-dasharray: 2 1.5; }
+.sb-theme .th-setupw { fill: rgba(217, 119, 6, 0.28); }
+.sb-theme .th-holdw { fill: rgba(37, 99, 235, 0.24); }
+.sb-theme .th-wlab { font: 600 6px var(--mono); fill: #3d4753; }
+.sb-theme .th-wtag { font: 600 5.5px var(--mono); }
+.sb-theme .th-wtag-s { fill: #b45309; }
+.sb-theme .th-wtag-h { fill: #1d4ed8; }
+.sb-theme .th-slk { stroke: #15803d; stroke-width: 0.8; }
+.sb-theme .th-slkt { font: 600 5.5px var(--mono); fill: #15803d; text-anchor: middle; }
+
+/* ---------- depth: the hub's page, a step below the die ---------- */
+main.sb-theme:has(.sb-page) {
+  background-color: #d9dfe6;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(30, 41, 59, 0.045) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(90deg, rgba(184, 105, 46, 0.07) 0 1px, transparent 1px 84px),
+    radial-gradient(ellipse 90% 55% at 50% -10%, #eff2f6 0%, #dde3e9 55%, #cfd6df 100%);
+}
+.sb-theme .sb-head h1 { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9); }
+
+/* finishing: the cell library's real layout, in the usual layout colours */
+.sb-theme .th-cellrow polygon, .sb-theme .th-cellrow rect { stroke-width: 0.5; }
+.sb-theme .th-cellrow .fn-l-nwell rect { fill: rgba(234, 179, 8, 0.16); stroke: #ca8a04; stroke-dasharray: 2 1.5; }
+.sb-theme .th-cellrow .fn-l-pwell rect { fill: rgba(22, 163, 74, 0.08); stroke: #15803d; stroke-dasharray: 2 1.5; }
+.sb-theme .th-cellrow .fn-l-pimplant rect { fill: rgba(219, 39, 119, 0.06); stroke: none; }
+.sb-theme .th-cellrow .fn-l-nimplant rect { fill: rgba(37, 99, 235, 0.06); stroke: none; }
+.sb-theme .th-cellrow .fn-l-active polygon { fill: rgba(22, 163, 74, 0.5); stroke: #15803d; }
+.sb-theme .th-cellrow .fn-l-poly polygon { fill: rgba(220, 38, 38, 0.66); stroke: #b91c1c; }
+.sb-theme .th-cellrow .fn-l-contact polygon { fill: #1f2937; stroke: none; }
+.sb-theme .th-cellrow .fn-l-metal1 polygon { fill: rgba(37, 99, 235, 0.34); stroke: #1d4ed8; stroke-width: 0.6; }
+
+/* ---------- the hub's sections fold ---------- */
+.sb-theme details.sb-die > summary { list-style: none; cursor: pointer; position: relative; padding-left: 26px; }
+.sb-theme details.sb-die > summary::-webkit-details-marker { display: none; }
+.sb-theme details.sb-die > summary:focus-visible { outline: 2px solid var(--copper); outline-offset: 4px; border-radius: 4px; }
+.sb-theme .sb-caret {
+  position: absolute; left: 2px; top: 5px; width: 0; height: 0;
+  border-left: 7px solid transparent; border-right: 7px solid transparent;
+  border-top: 9px solid var(--copper-light);
+  transition: transform 0.18s ease;
+}
+.sb-theme details.sb-die:not([open]) .sb-caret { transform: rotate(-90deg); }
+.sb-theme details.sb-die:not([open]) { padding-bottom: 30px; }
+.sb-theme details.sb-die:not([open]) > .sb-die-head { margin-bottom: 0; }
+.sb-theme details.sb-die:not([open]) .sb-die-mark { display: none; }
+.sb-theme details.sb-die > summary:hover h2 { text-decoration: underline; text-underline-offset: 4px; }
+.sb-theme .th-img { display: block; width: 100%; height: auto; }

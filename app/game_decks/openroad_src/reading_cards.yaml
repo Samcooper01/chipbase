@@ -1,0 +1,184 @@
+
+  # ---------------------------------------------------------------- Reading real output
+
+  - id: ord-congestion
+    section: reading
+    question: "What does this global routing report say about congestion?"
+    excerpt: |2-
+      [INFO GRT-0096] Final congestion report:
+      Layer         Resource        Demand        Usage (%)    Max H / Max V / Total Congestion
+      ---------------------------------------------------------------------------------------
+      metal1               0             0            0.00%             0 /  0 /  0
+      metal2             957           522           54.55%             0 /  0 /  0
+      metal3            1394           616           44.19%             0 /  0 /  0
+      metal4             957           112           11.70%             0 /  0 /  0
+      metal5             997            41            4.11%             0 /  0 /  0
+      metal6            1013             0            0.00%             0 /  0 /  0
+      metal7             302             0            0.00%             0 /  0 /  0
+      metal8             352             0            0.00%             0 /  0 /  0
+      metal9             143             0            0.00%             0 /  0 /  0
+      metal10            143             0            0.00%             0 /  0 /  0
+      ---------------------------------------------------------------------------------------
+      Total             6258          1291           20.63%             0 /  0 /  0
+
+      [INFO GRT-0018] Total wirelength: 6218 um
+      [INFO GRT-0014] Routed nets: 628
+    hint: "Compare Demand with Resource on each layer, and read the last column."
+    answer: "Nothing is congested: every layer is well under its capacity."
+    wrong:
+      - "metal2 is congested, since it is more than half used."
+      - "The design is 20.63% routed, and the rest has failed."
+      - "6258 tracks are needed but only 1291 of them exist."
+    explain: "Resource is the tracks available and Demand the tracks the router wants; the last columns count the tiles where demand exceeds capacity, and they are all zero. metal2 and metal3 carry the routing because the upper layers are reserved for the power grid and longer nets."
+    source: grt
+
+  - id: ord-gpl-overflow
+    section: reading
+    question: "What is the placer doing over these iterations?"
+    excerpt: |2-
+      Iteration | Overflow |     HPWL (um) |  HPWL(%) |   Penalty | Group
+      ---------------------------------------------------------------
+              0 |   0.8751 |  1.457625e+03 |   +0.00% |  3.54e-14 |      
+             10 |   0.7488 |  1.788887e+03 |  +22.73% |  5.76e-14 |      
+             20 |   0.7303 |  1.810900e+03 |   +1.23% |  9.38e-14 |      
+             30 |   0.7305 |  1.810921e+03 |   +0.00% |  1.53e-13 |      
+             40 |   0.7342 |  1.806647e+03 |   -0.24% |  2.49e-13 |      
+             50 |   0.7323 |  1.812428e+03 |   +0.32% |  4.05e-13 |      
+             60 |   0.7316 |  1.813855e+03 |   +0.08% |  6.60e-13 |      
+             70 |   0.7324 |  1.810754e+03 |   -0.17% |  1.08e-12 |      
+             80 |   0.7318 |  1.809896e+03 |   -0.05% |  1.75e-12 |      
+             90 |   0.7310 |  1.810464e+03 |   +0.03% |  2.85e-12 |      
+    hint: "Overflow measures how much density exceeds the target. Watch it, and watch wirelength."
+    answer: "Spreading cells apart: overflow is still high and wirelength has grown."
+    wrong:
+      - "Shortening wires: wirelength has come down since iteration 0."
+      - "Finishing: the numbers have stopped changing, so it has converged."
+      - "Routing the congested areas, which is why the penalty keeps rising."
+    explain: "Overflow is the density excess over the target; placement ends when it reaches the target, not when wirelength stops moving. Wirelength rose from 1457 to about 1810 because the cells started piled together and are being pushed apart. The penalty grows each iteration to force that spreading."
+    source: gpl
+
+  - id: ord-drt-iterations
+    section: reading
+    question: "What happened in the router's last iterations?"
+    excerpt: |2-
+          Completing 80% with 9 violations.
+          elapsed time = 00:00:00, memory = 1037.00 (MB).
+          Completing 90% with 9 violations.
+          elapsed time = 00:00:01, memory = 1037.01 (MB).
+          Completing 100% with 0 violations.
+          elapsed time = 00:00:01, memory = 1037.01 (MB).
+      [INFO DRT-0199]   Number of violations = 0.
+    hint: "Each line is one pass over the design. Read the last two."
+    answer: "The last pass cleared the nine violations that remained before it."
+    wrong:
+      - "Nine violations are left in the finished routing."
+      - "The router stopped at 100% complete without checking rules."
+      - "Nine nets out of a hundred could not be routed at all."
+    explain: "Detailed routing repeats over the design, ripping up and rerouting what violates the rules. A run is only finished when the violation count reaches zero, which is what the last line confirms."
+    source: drt
+
+  - id: ord-drt-layers
+    section: reading
+    question: "Why is the wire length on metal1 zero?"
+    excerpt: |2-
+      Total wire length = 3605 um.
+      Total wire length on LAYER metal1 = 0 um.
+      Total wire length on LAYER metal2 = 1561 um.
+      Total wire length on LAYER metal3 = 1748 um.
+      Total wire length on LAYER metal4 = 236 um.
+      Total wire length on LAYER metal5 = 41 um.
+      Total wire length on LAYER metal6 = 17 um.
+      Total wire length on LAYER metal7 = 0 um.
+      Total wire length on LAYER metal8 = 0 um.
+      Total wire length on LAYER metal9 = 0 um.
+      Total wire length on LAYER metal10 = 0 um.
+    hint: "One layer has no wire at all. Ask what else that layer is needed for."
+    answer: "Routing was restricted to metal2 and above, leaving metal1 alone."
+    wrong:
+      - "This technology has no routing tracks defined on metal1."
+      - "The router failed on metal1 and moved the wires up a layer."
+      - "metal1 wiring is counted under vias rather than wire length."
+    explain: "The platform sets the routing layers, and metal1 is left out because the standard cells' own pins and power rails already occupy it. The wire length concentrates on metal2 and metal3, the lowest layers the router may use."
+    source: drt
+
+  - id: ord-antenna
+    section: reading
+    question: "What do these lines say together?"
+    excerpt: |2-
+      [WARNING GRT-0246] No diode with LEF class CORE ANTENNACELL found.
+      [INFO ANT-0002] Found 0 net violations.
+      [INFO ANT-0001] Found 0 pin violations.
+      [INFO ANT-0002] Found 0 net violations.
+      [INFO ANT-0001] Found 0 pin violations.
+    hint: "Three different messages here: read the warning together with the counts."
+    answer: "No antenna violations were found, and no diode cell exists to fix any."
+    wrong:
+      - "Violations were found and then fixed by inserting diode cells."
+      - "The check could not run, because no diode cell was available."
+      - "The first check found violations and the second one found none."
+    explain: "The warning says the library has no cell of the antenna-diode class, so repair would have nothing to insert. Here it does not matter: the checks report zero net and zero pin violations. The check runs twice because the flow checks before and after attempting repair."
+    source: ant
+
+  - id: ord-tapcell
+    section: reading
+    question: "The flow ran tapcell with -distance 120 on a core of 1162 square microns. Why no tap cells?"
+    excerpt: |2-
+      [INFO TAP-0004] Inserted 48 endcaps.
+      [INFO TAP-0005] Inserted 0 tapcells.
+      Design area 676 um^2 58% utilization.
+    hint: "Compare the tap spacing the flow asked for with the size of this core."
+    answer: "The core is far smaller than 120 microns across, so no tap fits the spacing."
+    wrong:
+      - "The library has no well-tap cell, so only endcaps could be placed."
+      - "Tap cells are only inserted around macros, and this design has none."
+      - "The endcap cells already contain the well taps that the rows need."
+    explain: "A core of 1162 square microns is about 34 microns square, and taps are placed on a checkerboard every 120 microns, so none land inside. The 48 endcaps are a separate insertion that terminates the rows. On a larger die the same command would insert many taps."
+    source: tap
+
+  - id: ord-area-growth
+    section: reading
+    question: "Why did the design area grow between these two stages?"
+    excerpt: |2-
+      Design area 676 um^2 58% utilization.
+
+      Design area 716 um^2 62% utilization.
+    hint: "The first line is after tap insertion, the second after routing. Ask what ran in between."
+    answer: "Cells were added in between: buffers, resized gates, a clock tree."
+    wrong:
+      - "Routing added wires, and wire area counts towards the design area."
+      - "Filler cells were inserted, which count towards the design area."
+      - "The core area shrank, so the same cells now use a larger share."
+    explain: "Design area counts the instances, not the wires, and the stages in between all add or enlarge cells. Between the two lines came placement, repair, clock tree synthesis, and timing repair, all of which add or enlarge cells. Fillers are added after routing, later than the second line."
+    source: rsz
+
+  - id: ord-cts-tree
+    section: reading
+    question: "What did clock tree synthesis build here?"
+    excerpt: |2-
+      [INFO CTS-0007] Net "clk" found for clock "core_clock".
+      [INFO CTS-0010]  Clock net "clk" has 35 sinks.
+      [INFO CTS-0008] TritonCTS found 1 clock nets.
+         ...
+      [INFO CTS-0027] Generating H-Tree topology for net clk.
+      [INFO CTS-0028]  Total number of sinks: 35.
+         ...
+       Level 1
+          Direction: Vertical
+          Sinks per sub-region: 18
+          Sub-region size: 4.1257 X 2.2000
+      [INFO CTS-0034]     Segment length (rounded): 1.
+       Level 2
+          Direction: Horizontal
+          Sinks per sub-region: 9
+          Sub-region size: 2.0629 X 2.2000
+      [INFO CTS-0034]     Segment length (rounded): 1.
+      [INFO CTS-0032]  Stop criterion found. Max number of sinks is 15.
+      [INFO CTS-0035]  Number of sinks covered: 35.
+    hint: "Read the levels: each one splits the sinks and says which way it cuts."
+    answer: "One H-tree over 35 sinks, split twice, from a single buffer type."
+    wrong:
+      - "One tree per sink, 35 in all, each with its own buffer."
+      - "A clock mesh covering 35 sinks, stopping at 15 buffers."
+      - "Two clock trees, one per level, sharing the same 35 sinks."
+    explain: "An H-tree splits the sink region in half at each level, alternating vertical and horizontal, so the path to every leaf is about the same length. Here two levels take 35 sinks down to sub-regions small enough for the stopping rule, which allows at most 15 sinks."
+    source: cts

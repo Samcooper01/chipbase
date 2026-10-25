@@ -1,0 +1,42 @@
+id: sdc-clock-io
+title: "Constrain a 500 MHz block: clock + input/output delays"
+topic: Timing Constraints
+difficulty: easy
+points: 100
+engine: sim
+kind: files
+order: 1
+editable:
+  - path: constraints.sdc
+    language: tcl
+checks:
+  - id: period
+    label: "Clock period matches 500 MHz (2.0 ns)"
+    metric: clock_period_ns
+    op: "~="
+    value: 2.0
+    tolerance: 0.005
+  - id: clkport
+    label: "Clock is created on the clk port and named clk"
+    metric: clock_port_ok
+    op: "~="
+    value: 1
+    tolerance: 0.1
+  - id: indelay
+    label: "Input delay of 0.6 ns applied relative to clk"
+    metric: input_delay_ns
+    op: "~="
+    value: 0.6
+    tolerance: 0.005
+  - id: outdelay
+    label: "Output delay of 0.7 ns applied relative to clk"
+    metric: output_delay_ns
+    op: "~="
+    value: 0.7
+    tolerance: 0.005
+  - id: noclkdata
+    label: "The clk port itself is NOT constrained as a data input"
+    metric: input_excludes_clock
+    op: "~="
+    value: 1
+    tolerance: 0.1

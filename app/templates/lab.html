@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% block title %}{{ lab.title }} - Chipbase{% endblock %}
+{% block content %}
+<article class="lab-detail">
+  <div class="crumb">
+    <a href="/problems">Problems</a> /
+    {% if lab.topic_slug %}<a href="/education/{{ lab.topic_slug }}">{{ lab.topic }}</a> /{% else %}{{ lab.topic }} /{% endif %}
+    {{ lab.title }}
+  </div>
+  <h1 class="lab-title">{{ lab.title }}</h1>
+  <div class="chip-row">
+    <span class="chip topic-chip">{{ lab.topic }}</span>
+    {% if lab.difficulty %}<span class="chip diff-{{ lab.difficulty }}">{{ lab.difficulty }}</span>{% endif %}
+    <span class="chip eng-sim" title="graded instantly in your browser, no tools required">interactive · in-browser</span>
+  </div>
+
+  <div class="desc-body lab-prompt">
+    {{ prompt_html | safe }}
+  </div>
+
+  <div id="mp-root" class="mp-root"></div>
+</article>
+{% endblock %}
+{% block scripts %}
+{% if lab.engine == "macroplace" %}
+<script src="/static/labs/macroplace.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    MacroPlace.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "pdnsize" %}
+<script src="/static/labs/pdnsize.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    PDN.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "pdnregions" %}
+<script src="/static/labs/pdnregions.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    PDNRegions.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "pdncover" %}
+<script src="/static/labs/pdncover.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    PDNCover.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "pdnparam" %}
+<script src="/static/labs/pdnparam.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    PDNParam.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "pdnstack" %}
+<script src="/static/labs/pdnstack.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    PDNStack.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "blocksize" %}
+<script src="/static/labs/blocksize.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    BlockSize.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "partition" %}
+<script src="/static/labs/partition.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Partition.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "vdomain" %}
+<script src="/static/labs/vdomain.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    VDomain.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "orient" %}
+<script src="/static/labs/orient.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Orient.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "thermal" %}
+<script src="/static/labs/thermal.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Thermal.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "place" %}
+<script src="/static/labs/place.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Place.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "legalize" %}
+<script src="/static/labs/legalize.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Legalize.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "swap" %}
+<script src="/static/labs/swap.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Swap.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "gatesize" %}
+<script src="/static/labs/gatesize.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    GateSize.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "flip" %}
+<script src="/static/labs/flip.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Flip.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "pad" %}
+<script src="/static/labs/pad.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Pad.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "filler" %}
+<script src="/static/labs/filler.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () {
+    var spec = JSON.parse(document.getElementById("lab-spec").textContent);
+    Filler.mount(document.getElementById("mp-root"), spec);
+  })();
+</script>
+{% elif lab.engine == "clkbalance" %}
+<script src="/static/labs/clkbalance.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkBalance.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "htree" %}
+<script src="/static/labs/htree.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); HTree.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkbuf" %}
+<script src="/static/labs/clkbuf.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkBuf.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkskew" %}
+<script src="/static/labs/clkskew.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkSkew.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkgate" %}
+<script src="/static/labs/clkgate.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkGate.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "banking" %}
+<script src="/static/labs/banking.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); Banking.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "useskew" %}
+<script src="/static/labs/useskew.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); UseSkew.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkndr" %}
+<script src="/static/labs/clkndr.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkNDR.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clktree" %}
+<script src="/static/labs/clktree.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkTree.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkmesh" %}
+<script src="/static/labs/clkmesh.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkMesh.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkspine" %}
+<script src="/static/labs/clkspine.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkSpine.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "clkdepth" %}
+<script src="/static/labs/clkdepth.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>
+  (function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ClkDepth.mount(document.getElementById("mp-root"), spec); })();
+</script>
+{% elif lab.engine == "maze" %}
+<script src="/static/labs/maze.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); Maze.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "groute" %}
+<script src="/static/labs/groute.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); GRoute.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "layerassign" %}
+<script src="/static/labs/layerassign.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); LayerAssign.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "trackassign" %}
+<script src="/static/labs/trackassign.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); TrackAssign.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "drcroute" %}
+<script src="/static/labs/drcroute.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); DRCRoute.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "viamin" %}
+<script src="/static/labs/viamin.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); ViaMin.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "antenna" %}
+<script src="/static/labs/antenna.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); Antenna.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "lengthmatch" %}
+<script src="/static/labs/lengthmatch.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); LengthMatch.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "xtalkroute" %}
+<script src="/static/labs/xtalkroute.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); XtalkRoute.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "steiner" %}
+<script src="/static/labs/steiner.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); Steiner.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pinaccess" %}
+<script src="/static/labs/pinaccess.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PinAccess.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "staslack" %}
+<script src="/static/labs/staslack.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaSlack.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "stasetuphold" %}
+<script src="/static/labs/stasetuphold.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaSetupHold.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "stacritical" %}
+<script src="/static/labs/stacritical.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaCritical.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "staexceptions" %}
+<script src="/static/labs/staexceptions.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaExceptions.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "stacorners" %}
+<script src="/static/labs/stacorners.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaCorners.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "staocv" %}
+<script src="/static/labs/staocv.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaOcv.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "staxtalk" %}
+<script src="/static/labs/staxtalk.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaXtalk.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "stareport" %}
+<script src="/static/labs/stareport.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaReport.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "iotiming" %}
+<script src="/static/labs/iotiming.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaIo.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "timeborrow" %}
+<script src="/static/labs/timeborrow.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); StaBorrow.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvwidth" %}
+<script src="/static/labs/pvwidth.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvWidth.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvenclosure" %}
+<script src="/static/labs/pvenclosure.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvEnclosure.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvspacing" %}
+<script src="/static/labs/pvspacing.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvSpacing.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvdensity" %}
+<script src="/static/labs/pvdensity.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvDensity.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvlvs" %}
+<script src="/static/labs/pvlvs.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvLvs.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvdevice" %}
+<script src="/static/labs/pvdevice.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvDevice.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pverc" %}
+<script src="/static/labs/pverc.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvErc.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvsignoff" %}
+<script src="/static/labs/pvsignoff.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvSignoff.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvantenna" %}
+<script src="/static/labs/pvantenna.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvAntenna.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "pvdfm" %}
+<script src="/static/labs/pvdfm.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); PvDfm.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecobuffer" %}
+<script src="/static/labs/ecobuffer.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoBuffer.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecovtswap" %}
+<script src="/static/labs/ecovtswap.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoVtSwap.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecopinswap" %}
+<script src="/static/labs/ecopinswap.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoPinSwap.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecoclone" %}
+<script src="/static/labs/ecoclone.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoClone.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecohold" %}
+<script src="/static/labs/ecohold.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoHold.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecoskew" %}
+<script src="/static/labs/ecoskew.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoSkew.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecometal" %}
+<script src="/static/labs/ecometal.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoMetal.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecorespin" %}
+<script src="/static/labs/ecorespin.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoRespin.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecodrv" %}
+<script src="/static/labs/ecodrv.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoDrv.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecorestruct" %}
+<script src="/static/labs/ecorestruct.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoRestruct.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "ecolegal" %}
+<script src="/static/labs/ecolegal.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); EcoLegal.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthtwolevel" %}
+<script src="/static/labs/synthtwolevel.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthTwoLevel.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthconstprop" %}
+<script src="/static/labs/synthconstprop.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthConstProp.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthfactor" %}
+<script src="/static/labs/synthfactor.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthFactor.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthmaparea" %}
+<script src="/static/labs/synthmaparea.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthMapArea.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthmapdelay" %}
+<script src="/static/labs/synthmapdelay.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthMapDelay.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthretime" %}
+<script src="/static/labs/synthretime.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthRetime.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthfsm" %}
+<script src="/static/labs/synthfsm.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthFsm.mount(document.getElementById("mp-root"), spec); })();</script>
+{% elif lab.engine == "synthdatapath" %}
+<script src="/static/labs/synthdatapath.js?v={{ asset_v }}"></script>
+<script id="lab-spec" type="application/json">{{ spec_json | safe }}</script>
+<script>(function () { var spec = JSON.parse(document.getElementById("lab-spec").textContent); SynthDatapath.mount(document.getElementById("mp-root"), spec); })();</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ section.title }} - {{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="fc-page">
+  <div class="crumb"><a href="/games">Games</a> / <a href="/games/over-under">{{ game.title }}</a> / {{ section.title }}</div>
+  <h1 class="lab-title">{{ section.title }}</h1>
+  <p class="fc-intro">
+    Each summary describes a real run. Say whether the metric lands over or
+    under the number asked, and the measured value is revealed against it.
+    Keys <b>o</b> and <b>u</b> answer, <b>h</b> shows a hint, and <b>Enter</b>
+    moves on. Guessing gets half right, so the score only means something above
+    that. Progress is stored in this browser.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}
+    Reference: <a href="{{ data.reference }}" target="_blank" rel="noopener">{{ data.basis.doc_title }}</a>
+    (<a href="{{ data.basis.tool_url }}" target="_blank" rel="noopener">{{ data.basis.tool }} on GitHub</a>).</span></div>
+  <div id="ou-root"></div>
+  <div id="fg-root"></div>
+
+  <details class="fc-deck">
+    <summary>All {{ play["items"] | length }} summaries {% if mixed %}in this drill{% else %}in this family{% endif %}, with their numbers</summary>
+    <ul class="fc-list">
+      {% for i in play["items"] %}
+      <li>
+        <div class="fc-list-cmd">{{ i.design.name }} on {{ i.design.platform }}: {{ i.question }}</div>
+        <div class="fc-list-ans">{{ i.value }} {{ i.unit }}, so {{ i.answer }}</div>
+        <p class="fc-list-exp">{{ i.explain_html | safe }}</p>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+</article>
+{% endblock %}
+{% block scripts %}
+<script src="/static/games/flag.js?v={{ asset_v }}"></script>
+<script src="/static/games/overunder.js?v={{ asset_v }}"></script>
+<script id="ou-data" type="application/json">{{ data_json | safe }}</script>
+<script>
+  (function () {
+    var data = JSON.parse(document.getElementById("ou-data").textContent);
+    OverUnder.mount(document.getElementById("ou-root"), data, {
+      keyTarget: document, confirm: function (m) { return window.confirm(m); }
+    });
+  })();
+</script>
+<script>Flag.mount(document.getElementById("fg-root"), "over-under");</script>
+{% endblock %}

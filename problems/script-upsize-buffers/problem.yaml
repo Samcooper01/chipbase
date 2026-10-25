@@ -1,0 +1,30 @@
+id: script-upsize-buffers
+title: "Write a script: batch-upsize the weak buffers"
+topic: Scripting
+difficulty: medium
+points: 150
+engine: script
+kind: files
+order: 2
+editable:
+  - path: script.tcl
+    language: tcl
+checks:
+  - id: swept
+    label: "No BUF_X1 instances remain"
+    metric: bufx1_remaining
+    op: "~="
+    value: 0
+    tolerance: 0.1
+  - id: became
+    label: "All five became BUF_X2 (plus the two originals = 7)"
+    metric: bufx2_count
+    op: "~="
+    value: 7
+    tolerance: 0.1
+  - id: collateral
+    label: "No other cell was touched"
+    metric: others_untouched
+    op: "~="
+    value: 1
+    tolerance: 0.1

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ game.title }} - Chipbase{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/games/games.css?v={{ asset_v }}">{% endblock %}
+{% block content %}
+<article class="gm-wide">
+  <div class="crumb"><a href="/games">Games</a> / {{ game.title }}</div>
+  <h1 class="lab-title">{{ game.title }} <span class="gm-basis-tag">{{ data.basis.tag }}</span></h1>
+  <p class="gm-intro">
+    A summary of a real run is shown, then a question about one of its numbers:
+    over or under. The true value is revealed on a scale afterwards, so a wrong
+    call still shows how far off it was. Choose a family of metrics, or take
+    them all mixed together.
+  </p>
+  <div class="gm-basis"><span class="gm-basis-label">Source</span><span>{{ data.basis.note }}
+    Reference: <a href="{{ data.reference }}" target="_blank" rel="noopener">{{ data.basis.doc_title }}</a>
+    (<a href="{{ data.basis.tool_url }}" target="_blank" rel="noopener">{{ data.basis.tool }} on GitHub</a>).</span></div>
+  <div class="gm-grid gm-grid-auto">
+    <a class="gm-tile is-mixed" href="/games/over-under/all"><div class="gm-tile-body">
+      <h2 class="gm-title">Every metric</h2>
+      <p class="gm-blurb">A mixed round drawn from every family, which is how the numbers arrive in real life.</p>
+      <div class="gm-mixed-num">{{ total }}<small>summaries across {{ data.sections | length }} families</small></div>
+      <div class="gm-tile-foot">
+        <span class="gm-count">mixed round</span>
+        <span class="chip diff-easy">play</span>
+      </div>
+    </div></a>
+    {% for s in data.sections %}
+    {% if s.count %}<a class="gm-tile" href="/games/over-under/{{ s.id }}">{% else %}<div class="gm-tile is-off">{% endif %}<div class="gm-tile-body">
+      <h2 class="gm-title">{{ s.title }}</h2>
+      <p class="gm-blurb">{{ s.blurb }}</p>
+      <div class="gm-cmds">{% for k in s.kinds %}<code>{{ k }}</code>{% endfor %}</div>
+      <div class="gm-tile-foot">
+        <span class="gm-count">{{ s.count }} summar{% if s.count == 1 %}y{% else %}ies{% endif %}</span>
+        {% if s.count %}<span class="chip diff-easy">play</span>{% else %}<span class="chip chip-soon">none yet</span>{% endif %}
+      </div>
+    </div>{% if s.count %}</a>{% else %}</div>{% endif %}
+    {% endfor %}
+  </div>
+</article>
+{% endblock %}
