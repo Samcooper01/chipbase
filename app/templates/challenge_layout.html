@@ -186,10 +186,6 @@
   .puzzle-head .pz-soon b { color: var(--text); }
   .btn.btn-off { display: inline-block; opacity: 0.55; cursor: default; }
   .btn.btn-off:hover { background: var(--panel); }
-  /* the warmup: a pointer to the smaller challenge, in the same quiet box as the rules in brief */
-  .pz-warm { border: 1px solid #e6e3da; border-left: 3px solid var(--green); border-radius: 8px; background: #faf9f5; padding: 12px 16px; }
-  .pz-warm p { margin: 0 0 8px; font-size: 15px; line-height: 1.6; }
-  .pz-warm a { font-weight: 700; font-size: 14.5px; }
 </style>
 {% endblock %}
 {% block content %}
@@ -310,10 +306,7 @@
   {# a smaller challenge to start on, with its own page, harness and leaderboard #}
   <section class="puzzle-sec" id="warmup">
     <h2>{{ warmup.callout_title }}</h2>
-    <div class="pz-warm">
-      <p>{{ warmup.callout }}</p>
-      <a href="/challenges/{{ warmup.slug }}">{{ warmup.callout_link }} &rarr;</a>
-    </div>
+    <p>{{ warmup.callout }} <a href="/challenges/{{ warmup.slug }}">{{ warmup.callout_link }} &rarr;</a></p>
   </section>
   {% endif %}
 
