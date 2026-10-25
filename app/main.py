@@ -43,6 +43,8 @@ for _p in list((_HERE / "static").rglob("*")) + list(config.PROBLEMS_DIR.glob("*
 templates.env.globals["asset_v"] = _asset_v
 # where flags and drill suggestions go (GitHub issues on the site's repository)
 templates.env.globals["issues_url"] = config.ISSUES_URL
+# link previews need an absolute address, so the tags cannot use a root-relative path
+templates.env.globals["public_url"] = config.PUBLIC_URL
 
 # navigation dropdown data: stage catalogs that actually have content,
 # in flow order; computed once at startup (content changes restart the app)

@@ -1,4 +1,6 @@
-// Renders the README banner, docs/banner/banner.html, to docs/banner.png at twice its size.
+// Renders the two cuts of the card at twice their size: docs/banner/banner.html to
+// docs/banner.png (the README strip) and linkedin.html to app/static/preview.png (the
+// 1200x627 the site's og:image points at, which is what link previews show).
 //
 // The screenshot in it is the macro placement lab, taken from the site itself: the live site
 // by default, or the address given as the first argument (a local server, for example
@@ -40,15 +42,21 @@ try {
     LOGO: dataUri(file("app", "static", "favicon.svg"), "image/svg+xml"),
     SHOT: dataUri(shot, "image/png"),
   };
-  let html = readFileSync(join(HERE, "banner.html"), "utf8");
-  for (const [key, value] of Object.entries(slots)) html = html.replaceAll(`{{${key}}}`, value);
-
-  const banner = await browser.newPage({ viewport: { width: 1200, height: 420 }, deviceScaleFactor: 2 });
-  await banner.setContent(html, { waitUntil: "load" });
-  await banner.evaluate(() => document.fonts.ready);
-  const out = join(HERE, "..", "banner.png");
-  await banner.screenshot({ path: out });
-  console.log(out);
+  // two cuts of the same card: the README strip, and the 1200x627 the link
+  // previews read from og:image
+  // the preview renders at 1x, so the file is exactly the 1200x627 its og:image tags claim
+  for (const [source, size, scale, out] of [
+    ["banner.html", { width: 1200, height: 420 }, 2, join(HERE, "..", "banner.png")],
+    ["linkedin.html", { width: 1200, height: 627 }, 1, join(ROOT, "app", "static", "preview.png")],
+  ]) {
+    let page = readFileSync(join(HERE, source), "utf8");
+    for (const [key, value] of Object.entries(slots)) page = page.replaceAll(`{{${key}}}`, value);
+    const cut = await browser.newPage({ viewport: size, deviceScaleFactor: scale });
+    await cut.setContent(page, { waitUntil: "load" });
+    await cut.evaluate(() => document.fonts.ready);
+    await cut.screenshot({ path: out });
+    console.log(out);
+  }
 } finally {
   await browser.close();
 }

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<!-- The link-preview cut, 1200 by 627: the size LinkedIn, Slack and the rest read from
+     og:image. Same headline and screenshot as banner.html, laid out taller. render.mjs
+     fills the {{...}} slots and renders it to app/static/preview.png, which the site's
+     og:image points at. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Inter"; font-weight: 100 900; src: url({{INTER}}) format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 100 800; src: url({{MONO}}) format("woff2"); }
+  :root {
+    --bg: #f4f3ee;
+    --panel: #ffffff;
+    --border: #e2e1d9;
+    --text: #16241b;
+    --muted: #5f6470;
+    --green: #16a34a;
+    --mark: rgba(22, 163, 74, 0.28);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 627px; overflow: hidden; }
+  body {
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(90deg, rgba(22,36,27,0.05) 1px, transparent 1px),
+      linear-gradient(rgba(22,36,27,0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    font-family: "Inter", sans-serif;
+    color: var(--text);
+    position: relative;
+  }
+  .left { position: absolute; left: 64px; top: 68px; width: 600px; }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .brand img { width: 48px; height: 48px; }
+  .brand .name { font-size: 25px; font-weight: 700; line-height: 1.1; }
+  .brand .line { font-size: 15px; color: var(--muted); margin-top: 1px; }
+  h1 { margin-top: 44px; font-size: 58px; font-weight: 800; line-height: 1.06; letter-spacing: -0.025em; }
+  h1 .mark { background: linear-gradient(transparent 62%, var(--mark) 62%, var(--mark) 92%, transparent 92%); }
+  .tagline { margin-top: 24px; font-size: 21px; line-height: 1.5; color: var(--muted); width: 560px; }
+  .cta { position: absolute; left: 64px; bottom: 64px; display: flex; align-items: center; gap: 18px; }
+  .cta .button {
+    background: var(--green); color: #ffffff; font-size: 20px; font-weight: 700;
+    padding: 13px 24px; border-radius: 8px; box-shadow: 4px 4px 0 rgba(22,36,27,0.9);
+  }
+  .cta .url { font-family: "JetBrains Mono", monospace; font-size: 16px; color: var(--muted); }
+  /* the screenshot runs off the right edge, so the card reads as a window onto the site */
+  .window {
+    position: absolute; right: -40px; top: 96px; width: 520px;
+    background: var(--panel); border: 2px solid var(--text); border-radius: 10px; overflow: hidden;
+    box-shadow: 8px 8px 0 rgba(22,36,27,0.9);
+  }
+  .bar { height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 12px;
+         border-bottom: 1.5px solid var(--border); background: #fbfaf7; }
+  .bar i { width: 10px; height: 10px; border-radius: 50%; background: #d8d6cc; }
+  .bar span { margin-left: 10px; font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted); }
+  .window img { display: block; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="brand">
+      <img src="{{LOGO}}" alt="">
+      <div>
+        <div class="name">Chipbase</div>
+        <div class="line">Learn physical design for free</div>
+      </div>
+    </div>
+    <h1>Learn chip physical<br>design <span class="mark">by doing</span></h1>
+    <p class="tagline">Reading pages, algorithms, labs, drills and graded problems, built on the open-source chip flow.</p>
+  </div>
+  <div class="cta">
+    <span class="button">Visit the site &rarr;</span>
+    <span class="url">samcooper01.github.io/chipbase</span>
+  </div>
+  <div class="window">
+    <div class="bar"><i></i><i></i><i></i><span>samcooper01.github.io/chipbase</span></div>
+    <img src="{{SHOT}}" alt="">
+  </div>
+</body>
+</html>
