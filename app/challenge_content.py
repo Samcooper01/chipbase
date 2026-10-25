@@ -296,6 +296,12 @@ CHALLENGES = [
             "can try several ideas in an evening."
         ),
         "callout_link": "Go to the Ibex warmup",
+        # the flow's own final image from an earlier full Ibex run on the
+        # development machine (run cal993_45dac80e), not the reference run,
+        # which is not done yet
+        "callout_img": "ibex_layout.webp",
+        "callout_img_alt": "The Ibex core laid out in ASAP7: standard cells and their wiring on every metal layer, with the power grid's straps across it",
+        "callout_img_caption": "Ibex, laid out in ASAP7",
         "design": {
             "name": "Ibex, from lowRISC",
             "summary": (

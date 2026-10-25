@@ -186,6 +186,14 @@
   .puzzle-head .pz-soon b { color: var(--text); }
   .btn.btn-off { display: inline-block; opacity: 0.55; cursor: default; }
   .btn.btn-off:hover { background: var(--panel); }
+  /* the warmup: its layout picture beside the paragraph, above it on a phone */
+  .pz-warm { display: flex; gap: 22px; align-items: flex-start; }
+  .pz-warm p { margin: 0; }
+  .pz-warm-fig { flex: none; width: 170px; text-decoration: none; }
+  .pz-warm-fig img { display: block; width: 100%; height: auto; border-radius: 10px; background: #000; }
+  .pz-warm-fig span { display: block; margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--muted); text-align: center; }
+  .pz-warm-fig:hover { text-decoration: none; }
+  @media (max-width: 560px) { .pz-warm { flex-direction: column; } .pz-warm-fig { width: 220px; margin: 0 auto; } }
 </style>
 {% endblock %}
 {% block content %}
@@ -306,7 +314,12 @@
   {# a smaller challenge to start on, with its own page, harness and leaderboard #}
   <section class="puzzle-sec" id="warmup">
     <h2>{{ warmup.callout_title }}</h2>
-    <p>{{ warmup.callout }} <a href="/challenges/{{ warmup.slug }}">{{ warmup.callout_link }} &rarr;</a></p>
+    <div class="pz-warm">
+      {% if warmup.callout_img %}<a class="pz-warm-fig" href="/challenges/{{ warmup.slug }}">
+        <img src="/static/img/{{ warmup.callout_img }}?v={{ asset_v }}" alt="{{ warmup.callout_img_alt }}" loading="lazy">
+        <span>{{ warmup.callout_img_caption }}</span></a>{% endif %}
+      <p>{{ warmup.callout }} <a href="/challenges/{{ warmup.slug }}">{{ warmup.callout_link }} &rarr;</a></p>
+    </div>
   </section>
   {% endif %}
 
