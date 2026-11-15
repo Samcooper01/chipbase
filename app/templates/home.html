@@ -42,6 +42,22 @@
   .hc-lb-row.is-open .hc-lb-name { color: rgba(255, 255, 255, 0.55); font-style: italic; }
   .hc-lb-row.is-base { border-top: 1px dashed rgba(255, 255, 255, 0.3); color: rgba(255, 255, 255, 0.75); font-size: 12.5px; }
   .hc-ch-btn { display: inline-block; margin-top: 18px; }
+  /* how long a run takes, so Competition 01 reads as the long design */
+  .hc-ch-budget { display: inline-flex; align-items: center; gap: 8px; margin: 2px 0 12px; padding: 5px 12px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 700; color: #a7f3d0; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.45); }
+  .hc-ch-budget svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+  /* the warmup strip under it, in the warmup's amber */
+  .hc-warm { display: flex; align-items: center; gap: 18px; margin-top: 26px; padding: 14px 18px 14px 14px; border-radius: 12px;
+    text-decoration: none; color: #fff; background: linear-gradient(100deg, rgba(251, 191, 36, 0.16), rgba(248, 113, 113, 0.10));
+    border: 1.5px solid rgba(251, 191, 36, 0.55); box-shadow: 5px 5px 0 rgba(251, 191, 36, 0.25); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .hc-warm:hover { text-decoration: none; transform: translateY(-1px); box-shadow: 6px 7px 0 rgba(251, 191, 36, 0.4); }
+  .hc-warm-img { flex: none; width: 76px; height: 76px; border-radius: 8px; object-fit: cover; background: #000; }
+  .hc-warm-text { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .hc-warm-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.1px; text-transform: uppercase; color: #fbbf24; }
+  .hc-warm-title { font-size: 18px; font-weight: 800; background: linear-gradient(90deg, #fbbf24, #f87171); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hc-warm-line { font-size: 14px; line-height: 1.5; color: rgba(255, 255, 255, 0.78); }
+  .hc-warm-go { flex: none; padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 800; color: #1c1408; background: linear-gradient(90deg, #fbbf24, #fb923c); }
+  @media (max-width: 720px) { .hc-warm { flex-wrap: wrap; } .hc-warm-go { margin-left: 90px; } }
   /* hero artwork: placed cell rows with a few routed nets, faint, on the right,
      fading out before the text; generated once from a fixed seed, and static */
   .hc-hero-band { position: relative; overflow: hidden; }
@@ -319,6 +335,7 @@
     <div class="hc-ch-text">
       <div class="eyebrow eyebrow-light"><span class="hc-ch-word">Challenge</span> <span class="hc-ch-status">{{ catalog.challenge.status }}</span></div>
       <h2 class="hc-ch-title">{{ catalog.challenge.title }}</h2>
+      {% if catalog.challenge.budget %}<div class="hc-ch-budget"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.2V8l2.6 1.6"/></svg>{{ catalog.challenge.budget }}</div>{% endif %}
       <p class="hc-ch-blurb">{{ catalog.challenge.blurb }}</p>
       <a class="cc-btn cc-btn-light hc-ch-btn" href="{{ catalog.challenge.href }}">See the challenge</a>
     </div>
@@ -337,6 +354,21 @@
       </div>
     </div>
   </div>
+  {% set w = catalog.challenge.warmup %}
+  {% if w %}
+  <!-- the warmup: the quick way to start, under the long challenge -->
+  <div class="band-inner">
+    <a class="hc-warm" href="{{ w.href }}">
+      {% if w.img %}<img class="hc-warm-img" src="/static/img/{{ w.img }}?v={{ asset_v }}" alt="{{ w.img_alt }}" loading="lazy">{% endif %}
+      <span class="hc-warm-text">
+        <span class="hc-warm-eyebrow">New to the open flow? Start with the warmup</span>
+        <span class="hc-warm-title">{{ w.title }}</span>
+        <span class="hc-warm-line">{{ w.line }}</span>
+      </span>
+      <span class="hc-warm-go">Start the warmup &rarr;</span>
+    </a>
+  </div>
+  {% endif %}
 </section>
 {% endif %}
 

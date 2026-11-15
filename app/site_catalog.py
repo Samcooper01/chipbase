@@ -19,6 +19,16 @@ BANNER_TEXT = {
                 "with open tools. Entries are scored on clock speed, area and power.",
 }
 
+# how long a run takes, so the banner shows Competition 01 is a long design
+BANNER_BUDGET = {
+    "cva6-ppa": "12-hour compute budget: the reference flow takes about 6 hours",
+}
+# the warmup under it, as the quick way to start
+BANNER_WARMUP = {
+    "ibex": "A 1-hour budget, and the reference builds in 15 minutes. Same flow, same scoring, "
+            "with a leaderboard of its own.",
+}
+
 # the open-source tools and process kits the site is built on, for the
 # front page's logo row; a kit with no logo is shown as a text mark
 BUILT_ON = [
@@ -119,7 +129,8 @@ def catalog() -> dict:
     challenges = {
         "title": "Challenges", "href": "/challenges", "count": len(chs), "unit": "open" if len(chs) == 1 else "challenges",
         "blurb": "Open design competitions: one design, one score, leaders reproduced from their containers.",
-        "items": [{"title": _name(c["title"]), "href": "/challenges", "note": c.get("status", "")} for c in chs],
+        "items": [{"title": _name(c["title"]), "href": "/challenges" if i == 0 else f"/challenges/{c['slug']}",
+                   "note": c.get("status", "")} for i, c in enumerate(chs)],
     }
 
     # ---- help and records
@@ -165,5 +176,10 @@ def _banner(chs):
     entries = c.get("entries") or []
     podium = sorted(entries, key=lambda e: -e["fom"])[:3]
     podium += [None] * (3 - len(podium))
+    # the challenge's warmup, shown under it on the banner as the easier way in
+    w = challenge_content.get(c.get("warmup") or "")
+    warmup = w and {"title": _name(w["title"]), "href": f"/challenges/{w['slug']}", "img": w.get("callout_img"),
+                    "img_alt": w.get("callout_img_alt", ""), "line": BANNER_WARMUP.get(w["slug"], "")}
     return {"title": _name(c["title"]), "blurb": first, "status": c.get("status", ""), "href": "/challenges",
+            "budget": BANNER_BUDGET.get(c.get("slug"), ""), "warmup": warmup,
             "more": len(chs) - 1, "podium": podium, "baseline_fom": "1.000"}
