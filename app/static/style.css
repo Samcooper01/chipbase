@@ -168,6 +168,32 @@ a:hover { text-decoration: underline; }
 .nav-links a.nav-challenge { color: var(--green-deep); font-weight: 800; font-size: 16.5px; padding-top: 5.7px; padding-bottom: 5.7px; }
 .nav-links a.nav-challenge:hover { color: var(--green-deep); background: rgba(22, 163, 74, 0.10); }
 .nav-links a.nav-challenge.active { background: rgba(22, 163, 74, 0.14); }
+/* the Challenges menu: each challenge is a card over its own layout, in its own colors
+   (Competition 01 purple to blue, the warmup amber to red) */
+.nav-dd-panel:has(.nav-ch-link) { width: 380px; padding: 8px; }
+.nav-dd-panel a.nav-ch-link {
+  position: relative; display: block; overflow: hidden; padding: 14px 16px; min-height: 112px;
+  border-radius: 10px; color: #fff; background-color: #111;
+  background-image: linear-gradient(100deg, var(--shade) 0%, var(--shade) 42%, rgba(10, 10, 14, 0.15) 100%), var(--layout);
+  background-size: cover; background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.nav-dd-panel a.nav-ch-link + a.nav-ch-link { margin-top: 8px; }
+.nav-dd-panel a.nav-ch-link::after {   /* a colored rule along the bottom */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, var(--c1), var(--c2));
+}
+.nav-dd-panel a.nav-ch-link:hover {
+  background-color: #111; transform: translateY(-1px);
+  box-shadow: inset 0 0 0 2px var(--c1), 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+.nav-ch-main { --c1: #c4b5fd; --c2: #7dd3fc; --shade: rgba(30, 16, 64, 0.90); --layout: url("/static/img/nav_ch_gemmini.webp"); }
+.nav-ch-warm { --c1: #fbbf24; --c2: #f87171; --shade: rgba(64, 24, 8, 0.90); --layout: url("/static/img/nav_ch_ibex.webp"); }
+.nav-ch-body { position: relative; display: flex; flex-direction: column; max-width: 250px; }
+.nav-ch-badge { align-self: flex-start; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #16241b; background: linear-gradient(90deg, var(--c1), var(--c2)); padding: 2px 8px; border-radius: 999px; }
+.nav-ch-title { margin-top: 6px; font-size: 15.5px; font-weight: 800; line-height: 1.25; background: linear-gradient(90deg, var(--c1), var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.nav-ch-sub { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 500; line-height: 1.4; color: rgba(255, 255, 255, 0.86); white-space: normal; }
 
 /* ---------- page shells ---------- */
 

@@ -267,9 +267,9 @@ CHALLENGES = [
     },
     {
         # the warmup: a small flat core, the same kind of harness and score as
-        # Competition 01, and a 1 hour budget. Its harness is not built yet, so
-        # status is "soon": the page says so, the harness buttons are inactive,
-        # and every number the reference run sets is left to be published with it
+        # Competition 01, and a 1 hour budget. Its numbers are the evaluator's,
+        # measured on the reference run in the pinned container; keep them in
+        # step with the harness's README.md and scoring.yaml
         "slug": "ibex",
         "title": "Chipbase Warmup: Ibex RISC-V Core",
         "template": "challenge_ibex.html",
@@ -280,12 +280,7 @@ CHALLENGES = [
             "Competition 01: a full run fits in one hour, and entries are scored on "
             "clock speed, area and power."
         ),
-        "status": "soon",
-        "status_note": (
-            "The harness, the reference layout and its numbers are published when "
-            "the reference run is finished. Until then, the rules and scoring below "
-            "are a draft and may change."
-        ),
+        "status": "open",
         # how Competition 01's page introduces it
         "callout_title": "Warm up on Ibex",
         "callout": (
@@ -349,13 +344,22 @@ CHALLENGES = [
         ],
         "howitworks": [
             "Clone the harness, start the pinned container, and run `./setup.sh` inside it:",
-            "Optional: `./run_baseline.sh` reproduces the reference, then `./evaluate.sh baseline/` should score 1.000, confirming your machine matches it.",
-            "Make the flow your own: edit or replace the reference flow in `flow/`. `run_baseline.sh` runs it, both here and in the official run, where `reproduce/run.sh` copies its result to `/result`.",
+            "Optional: `./run_baseline.sh` reproduces the reference in about 15 minutes, then `./evaluate.sh baseline/` should score 1.000, confirming your machine matches it.",
+            "Make the flow your own: edit or replace the reference flow in `flow/`. `run_baseline.sh` runs it, both here and in the official run, where `reproduce/run.sh` copies its result to `/result`. Here are some places to start:",
             "Build and score your flow inside the container:",
             "Once you are ready to submit, push your source, without build outputs, and open an issue on the harness repository with your repository, the commit, and your `eval_work/mine/evaluation.json`.",
         ],
-        # files to start from are linked once the harness is published
-        "start_points": [],
+        # linked under step 3: files in the harness repository to build an entry from
+        "start_points": [
+            {"label": "The reference flow", "kind": "blob", "path": "flow/ibex/config.mk",
+             "note": "every setting the reference uses, and the ones to change first"},
+            {"label": "The constraints", "kind": "blob", "path": "flow/ibex/constraint.sdc",
+             "note": "the clock period is the one value you choose"},
+            {"label": "The reference as an entry", "kind": "tree", "path": "reproduce",
+             "note": "a Dockerfile and run script; point them at your flow"},
+            {"label": "The submission spec", "kind": "blob", "path": "submission/README.md",
+             "note": "what `run.sh` must write"},
+        ],
         # speed leads here: there are no blocks or memories to pack, so the die
         # is the cells synthesis fixes, and the clock period is where physical
         # design shows most on a processor pipeline; keep in step with the
@@ -390,9 +394,9 @@ CHALLENGES = [
             {"title": "Timing, legality, routing, area", "gate": True,
              "body": "Reads your layout, extracts its parasitics with the pinned rules, and times it with OpenSTA at your declared period with propagated clocks: setup at the slow corner (0.63 V, 100 °C), hold at the fast corner. Checks that no cell overlaps another, that everything is on the placement grid, and that no net is unrouted. The die area comes from the layout's outline."},
             {"title": "Power", "gate": False,
-             "body": "Total power at the typical corner with a fixed 1,000 ps reference clock, from the pinned switching activity: a short program run on the golden RTL, published with the harness. Activity is applied per flip-flop by register name and propagated through the rest. A slower clock does not lower your power score."},
+             "body": "Total power at the typical corner with a fixed 1,000 ps reference clock, from the pinned switching activity: a short program (a CRC-32, a matrix multiply, a sort, and divides, 42,302 cycles) simulated on the pinned synthesis of the golden RTL, the gate netlist every entry is proven equivalent to. Activity is applied per flip-flop by register name (every flip-flop of the reference is covered) and propagated through the rest. A slower clock does not lower your power score."},
             {"title": "Power integrity", "gate": True,
-             "body": "Static IR drop analysis of your power grid with OpenROAD, using that power; the worst drop must be at most 110 mV."},
+             "body": "Static IR drop analysis of your power grid with OpenROAD, using that power; the worst drop must be at most 110 mV. The reference's is 30.4 mV."},
             {"title": "Design rules", "gate": True,
              "body": "The layout is checked with the detailed router's own rule checker against the technology's routing and via rules. Any short, or any via spacing, enclosure, or off-grid violation, fails the entry. The checker's other findings (end-of-line keep-out and spacing, corner and metal spacing, minimum width) are reported as counts but do not fail the entry, as in Competition 01. The open ASAP7 KLayout deck is available for information, but it is not a gate."},
             {"title": "Logic equivalence", "gate": True,
@@ -400,11 +404,12 @@ CHALLENGES = [
             {"title": "Layout matches netlist", "gate": True,
              "body": "The pin-level connectivity of the layout is compared with that of the netlist that passed equivalence, net by net. ASAP7 has no open transistor-level LVS (Layout Versus Schematic) deck, so this compares the connectivity the layout declares; opens and shorts in the metal are caught by routing and the design-rule check."},
             {"title": "Score", "gate": False,
-             "body": "The figure of merit from your clock period, die area, and power against the reference values, which are published with the harness. The report lists every gate's result and details, every metric, and the score, and evaluation.json holds the same as JSON (JavaScript Object Notation) for the leaderboard."},
+             "body": "The figure of merit from your clock period, die area, and power against the reference values (2,126 ps, 6,501.4 µm², 18.70 mW). The report lists every gate's result and details, every metric, and the score, and evaluation.json holds the same as JSON (JavaScript Object Notation) for the leaderboard."},
         ],
         "eval_note": (
             "The evaluator is deterministic: the same result always gets the "
-            "same numbers. Its own runtime does not count toward your budget."
+            "same numbers. Its own runtime does not count toward your budget; "
+            "on the reference it takes about 2 minutes."
         ),
         "eval_open_runtime": "",
         "submission": (
@@ -423,8 +428,8 @@ CHALLENGES = [
         ],
         "requirements": [
             "A Linux machine on x86-64.",
-            "8 threads and 16 GB of memory: the same limits the official run builds under.",
-            "Free disk for the container image and a few runs; the exact figure is published with the harness.",
+            "8 threads and 16 GB of memory: the same limits the official run builds under. The reference peaks at 4.7 GB while building and 9.3 GB while it is scored.",
+            "About 10 GB of free disk, counting Docker's own storage: the container image is 6.5 GB, and a run and its evaluation take about 1.5 GB.",
             "Docker, or any OCI (Open Container Initiative) container runtime.",
             "Git and Python 3 on your machine itself, outside the container, and a repository for your entry.",
         ],
@@ -459,8 +464,7 @@ CHALLENGES = [
              "ref": "flow/platforms/asap7",
              "url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/bde10c79a2389ffe9c5d73445f177f81262059f9/flow/platforms/asap7"},
         ],
-        # not published yet: the page shows the harness buttons as inactive
-        "repo_url": None,
+        "repo_url": "https://github.com/Samcooper01/ibex-warmup-harness",
         "quickstart_code": (
             "git clone https://github.com/Samcooper01/ibex-warmup-harness\n"
             "cd ibex-warmup-harness\n"
@@ -476,14 +480,15 @@ CHALLENGES = [
         ),
         "iterate_code": (
             "./run_baseline.sh          # runs your flow, as reproduce/run.sh does,\n"
-            "                           # into baseline/\n"
-            "./evaluate.sh baseline/    # checks every gate and scores it"
+            "                           # into baseline/ (about 15 minutes for the reference)\n"
+            "./evaluate.sh baseline/    # checks every gate and scores it (about 2 minutes)"
         ),
         "presubmit_text": "Before you submit, test it once the way the official run will: commit, then run the official runner in a terminal on your own machine, outside the container (for an entry that is not a fork of the harness, add its path and commit):",
         "selftest_code": (
             "git add -A && git commit -m \"my entry\"\n"
             "# builds your commit's container and runs it with no network under the\n"
-            "# 1 hour budget, then scores it, writing eval_work/mine/evaluation.json\n"
+            "# 1 hour budget, then scores it (about 17 minutes for the reference),\n"
+            "# writing eval_work/mine/evaluation.json\n"
             "judge/run_entry.sh"
         ),
         "submit_how": (
@@ -494,6 +499,8 @@ CHALLENGES = [
             "against its run."
         ),
         "links": [
+            {"label": "Challenge harness", "url": "https://github.com/Samcooper01/ibex-warmup-harness",
+             "note": "the pinned inputs, the reference flow, the evaluator, and the submission spec, in one repository to clone"},
             {"label": "OpenROAD-flow-scripts @ bde10c7", "url": "https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts/tree/bde10c79a2389ffe9c5d73445f177f81262059f9",
              "note": "the exact flow and PDK the harness pins"},
             {"label": "ASAP7 PDK", "url": "https://github.com/The-OpenROAD-Project/asap7",

@@ -80,7 +80,27 @@
       {% set in_sandboxes = path in sandbox_paths or path.startswith('/explore/examples/') or path.startswith('/explore/designs/') %}
       {% set in_reference = path.startswith('/glossary') or path.startswith('/explore/processes') or path.startswith('/data') %}
       {% set in_learn = not in_sandboxes and not in_reference and (path.startswith('/education') or path.startswith('/explore')) %}
-      <a href="/challenges" class="nav-challenge{% if path.startswith('/challenges') %} active{% endif %}">Challenge</a>
+      <div class="nav-item">
+        <a href="/challenges" class="nav-challenge{% if path.startswith('/challenges') %} active{% endif %}">Challenges <span class="nav-caret">▾</span></a>
+        <div class="nav-dropdown">
+          <div class="nav-dd-panel">
+            <a class="nav-ch-link nav-ch-main" href="/challenges">
+              <span class="nav-ch-body">
+                <span class="nav-ch-badge">Competition 01</span>
+                <span class="nav-ch-title">Systolic Array AI Accelerator</span>
+                <span class="nav-ch-sub">The main event: lay out a whole AI accelerator and race for the top score</span>
+              </span>
+            </a>
+            <a class="nav-ch-link nav-ch-warm" href="/challenges/ibex">
+              <span class="nav-ch-body">
+                <span class="nav-ch-badge">Warmup</span>
+                <span class="nav-ch-title">Ibex RISC-V Core</span>
+                <span class="nav-ch-sub">Start here: a real processor, start to finish in under an hour</span>
+              </span>
+            </a>
+          </div>
+        </div>
+      </div>
       <div class="nav-item">
         <a href="/education" class="{% if in_learn %}active{% endif %}">Learn <span class="nav-caret">▾</span></a>
         <div class="nav-dropdown">

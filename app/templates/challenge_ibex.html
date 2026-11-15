@@ -1,7 +1,6 @@
 {% extends "challenge_layout.html" %}
 {# the Ibex warmup: the parts of the page only it has; everything else is
-   challenge_layout.html. It has no reference layout section until the
-   reference run is published, so that section and its menu entry are left out #}
+   challenge_layout.html #}
 {% block og_description %}Take Ibex, a small open-source RISC-V processor core, from RTL to a complete layout in the ASAP7 predictive process with open-source tools, within a 1 hour budget. The warmup for Chipbase Competition 01.{% endblock %}
 {% block spec_strip %}
     <dl class="spec-strip">
@@ -11,119 +10,222 @@
     </dl>
 {% endblock %}
 {% block design %}
-    {% set t_iport = "The core's port to instruction memory: it sends an address and gets back 32 bits of instructions. The memory itself sits outside the core and is not part of this challenge." %}
-    {% set t_dport = "The core's port to data memory, for loads and stores, 32 bits wide. The memory itself sits outside the core and is not part of this challenge." %}
-    {% set t_pref = "Prefetch buffer: fetches instructions ahead of time and holds them in a small first-in, first-out queue, so the pipeline does not wait on every fetch." %}
+    {% set t_imem = "Instruction memory: outside the core and outside this challenge. The core sends it an address and gets back 32 bits of instructions." %}
+    {% set t_dmem = "Data memory: outside the core and outside this challenge. Loads and stores reach it through the load-store unit." %}
+    {% set t_pcmux = "Next-PC multiplexer: picks where fetching goes next. Normally the prefetch buffer just counts up; on a taken branch or a jump the address comes from the arithmetic logic unit, and on reset, an exception or a return from one it comes from the boot address, the exception vector or the saved return address." %}
+    {% set t_pref = "Prefetch buffer: holds the fetch address and fetches instructions ahead of time into a small first-in, first-out queue, so the pipeline does not wait on every fetch." %}
     {% set t_cdec = "Compressed decoder: expands 16-bit compressed instructions into their 32-bit equivalents, so the rest of the core sees only full-size instructions." %}
-    {% set t_preg = "Pipeline register: holds the fetched instruction for one clock between the two stages." %}
-    {% set t_clk = "One clock: a single clock, on the clk_i port, drives every flip-flop in the core, including the register file." %}
-    {% set t_dec = "Decoder: works out what each instruction does, which registers it reads and writes, and which unit runs it." %}
-    {% set t_ctl = "Controller: the core's control state machine. It handles branches and jumps, stalls, exceptions, interrupts and debug requests." %}
+    {% set t_preg = "Pipeline register: holds the fetched instruction and its address for one clock, between the fetch stage and the stage that decodes and executes it." %}
+    {% set t_dec = "Decoder: splits the instruction into its fields: which registers it reads (rs1, rs2) and writes (rd), the immediate value built into it, and the select lines for every multiplexer." %}
     {% set t_rf = "Register file: the 32 general-purpose registers, 32 bits each, built from flip-flops; register zero always reads as zero. Two reads and one write every clock." %}
-    {% set t_csr = "Control and status registers: the core's settings and counters, such as the cycle counter and the state of interrupts and exceptions." %}
-    {% set t_alu = "Arithmetic logic unit: adds, subtracts, compares, shifts and does bitwise logic, and decides whether a branch is taken." %}
-    {% set t_md = "Multiplier and divider: run the multiply and divide instructions, each taking more than one clock." %}
-    {% set t_lsu = "Load-store unit: sends load and store requests to the data memory and lines up the data that comes back." %}
+    {% set t_opa = "Operand A multiplexer: register rs1 for most instructions, or the instruction's own address (PC) for branches, jumps and AUIPC." %}
+    {% set t_opb = "Operand B multiplexer: register rs2, or the immediate value from the instruction." %}
+    {% set t_alu = "Arithmetic logic unit: adds, subtracts, compares, shifts and does bitwise logic. Its adder also computes every load and store address and every branch and jump target, and its comparison decides whether a branch is taken." %}
+    {% set t_md = "Multiplier and divider: run the multiply and divide instructions on rs1 and rs2, each taking more than one clock." %}
+    {% set t_exmux = "Result multiplexer: the arithmetic logic unit's result, or the multiplier and divider's." %}
+    {% set t_lsu = "Load-store unit: sends the address and, for a store, the data in rs2 to the data memory, and lines up the data that comes back for a load." %}
+    {% set t_csr = "Control and status registers: the core's settings and counters, such as the cycle counter and the state of interrupts and exceptions. CSR instructions read them into a register." %}
+    {% set t_wbmux = "Write-back multiplexer: picks the value written to register rd: load data, the execute result, or a control and status register. The wire runs back to the register file." %}
+    {% set t_ctl = "Controller: the core's control state machine. It sees whether a branch is taken and redirects fetching, and it handles stalls, exceptions, interrupts and debug requests." %}
     <p><b>{{ ch.design.name }}.</b> {{ ch.design.summary }}</p>
     <div class="block-diagram">
-      <svg viewBox="0 0 720 412" role="img" aria-label="Ibex processor core block diagram: a fetch stage and a decode and execute stage, between the instruction and data memory ports" style="font-family:'Inter',system-ui,sans-serif">
+      <svg viewBox="0 0 820 520" role="img" aria-label="Ibex datapath: a next-PC multiplexer feeds the prefetch buffer, which fetches from instruction memory; the compressed decoder and a pipeline register pass the instruction to the decoder and register file; operand multiplexers feed the arithmetic logic unit, whose adder also gives the load-store address and the branch target; a write-back multiplexer returns load data, the execute result or a control register value to the register file" style="font-family:'Inter',system-ui,sans-serif">
         <defs>
           <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="#5f6470"/>
           </marker>
+          <marker id="ahc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#9aa0a8"/>
+          </marker>
         </defs>
 
-        <!-- the two memory ports, outside the core -->
-        <rect class="bd-tip" data-tip="{{ t_iport }}" tabindex="0" x="40" y="10" width="270" height="26" rx="6" fill="#16241b"/>
-        <text class="bd-tip" data-tip="{{ t_iport }}" x="175" y="27" text-anchor="middle" fill="#f4f3ee" font-size="12" font-family="ui-monospace,monospace">Instruction memory port  (32 b)</text>
-        <rect class="bd-tip" data-tip="{{ t_dport }}" tabindex="0" x="410" y="10" width="270" height="26" rx="6" fill="#16241b"/>
-        <text class="bd-tip" data-tip="{{ t_dport }}" x="545" y="27" text-anchor="middle" fill="#f4f3ee" font-size="12" font-family="ui-monospace,monospace">Data memory port  (32 b)</text>
+        <!-- the memories, outside the core -->
+        <rect class="bd-tip" data-tip="{{ t_imem }}" tabindex="0" x="120" y="10" width="180" height="26" rx="6" fill="#16241b"/>
+        <text class="bd-tip" data-tip="{{ t_imem }}" x="210" y="27" text-anchor="middle" fill="#f4f3ee" font-size="12" font-family="ui-monospace,monospace">Instruction memory</text>
+        <rect class="bd-tip" data-tip="{{ t_dmem }}" tabindex="0" x="600" y="10" width="190" height="26" rx="6" fill="#16241b"/>
+        <text class="bd-tip" data-tip="{{ t_dmem }}" x="695" y="27" text-anchor="middle" fill="#f4f3ee" font-size="12" font-family="ui-monospace,monospace">Data memory</text>
 
-        <!-- stage 1: fetch -->
-        <rect x="30" y="56" width="290" height="290" rx="8" fill="#f7f6f2" stroke="#cdd0c8" stroke-dasharray="5 3"/>
-        <text x="42" y="72" fill="#5f6470" font-size="9.5" font-weight="700" letter-spacing="0.06em">STAGE 1  &#183;  FETCH</text>
-        <line x1="175" y1="36" x2="175" y2="86" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
-        <rect class="bd-tip" data-tip="{{ t_pref }}" tabindex="0" x="50" y="88" width="250" height="50" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
-        <text class="bd-tip" data-tip="{{ t_pref }}" x="175" y="109" text-anchor="middle" fill="#16241b" font-size="12" font-weight="700">Prefetch buffer</text>
-        <text x="175" y="126" text-anchor="middle" fill="#5f6470" font-size="10.5">fetches ahead into a small queue</text>
-        <line x1="175" y1="138" x2="175" y2="156" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
-        <rect class="bd-tip" data-tip="{{ t_cdec }}" tabindex="0" x="50" y="158" width="250" height="50" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
-        <text class="bd-tip" data-tip="{{ t_cdec }}" x="175" y="179" text-anchor="middle" fill="#16241b" font-size="12" font-weight="700">Compressed decoder</text>
-        <text x="175" y="196" text-anchor="middle" fill="#5f6470" font-size="10.5">16-bit instructions &#8594; 32-bit</text>
-        <line x1="175" y1="208" x2="175" y2="226" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
-        <rect class="bd-tip" data-tip="{{ t_preg }}" tabindex="0" x="50" y="228" width="250" height="30" rx="5" fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3"/>
-        <text class="bd-tip" data-tip="{{ t_preg }}" x="175" y="247" text-anchor="middle" fill="#b45309" font-size="11.5" font-weight="700">Pipeline register</text>
+        <!-- the two stages, and the pipeline register between them -->
+        <rect x="10" y="50" width="252" height="410" rx="8" fill="#f7f6f2" stroke="#cdd0c8" stroke-dasharray="5 3"/>
+        <text x="22" y="64" fill="#5f6470" font-size="9.5" font-weight="700" letter-spacing="0.06em">STAGE 1  &#183;  FETCH</text>
+        <rect x="300" y="50" width="510" height="410" rx="8" fill="#f7f6f2" stroke="#cdd0c8" stroke-dasharray="5 3"/>
+        <text x="312" y="64" fill="#5f6470" font-size="9.5" font-weight="700" letter-spacing="0.06em">STAGE 2  &#183;  DECODE, EXECUTE, WRITE BACK</text>
+        <rect class="bd-tip" data-tip="{{ t_preg }}" tabindex="0" x="270" y="90" width="22" height="250" rx="3" fill="#d97706" fill-opacity="0.18" stroke="#d97706" stroke-width="1.3"/>
+        <polyline points="275,340 281,331 287,340" fill="none" stroke="#b45309" stroke-width="1.2"/>
+        <text class="bd-tip" data-tip="{{ t_preg }}" x="281" y="215" text-anchor="middle" fill="#b45309" font-size="10.5" font-weight="700" transform="rotate(-90 281 215)">pipeline register</text>
 
-        <!-- the clock -->
-        <rect class="bd-tip" data-tip="{{ t_clk }}" tabindex="0" x="50" y="276" width="250" height="54" rx="6" fill="#ffffff" stroke="#16241b" stroke-dasharray="4 3"/>
-        <circle cx="68" cy="294" r="7" fill="none" stroke="#16241b" stroke-width="1.2"/>
-        <line x1="68" y1="294" x2="68" y2="289" stroke="#16241b" stroke-width="1.2"/>
-        <line x1="68" y1="294" x2="72" y2="296" stroke="#16241b" stroke-width="1.2"/>
-        <text class="bd-tip" data-tip="{{ t_clk }}" x="84" y="298" fill="#16241b" font-size="12" font-weight="700">One clock</text>
-        <text x="62" y="318" fill="#16241b" font-size="11">drives every flip-flop in the core</text>
+        <!-- stage 1: next PC, prefetch, compressed decoder -->
+        <polygon class="bd-tip" data-tip="{{ t_pcmux }}" tabindex="0" points="118,150 138,166 138,254 118,270" fill="#eef0ec" stroke="#5f6470" stroke-width="1.2"/>
+        <text x="128" y="142" text-anchor="middle" fill="#16241b" font-size="10" font-weight="700">next PC</text>
+        <g font-size="9.5" fill="#5f6470" text-anchor="end">
+          <text x="100" y="176">branch target</text>
+          <text x="102" y="199">boot address</text>
+          <text x="102" y="223">exception vector</text>
+          <text x="102" y="247">return address</text>
+        </g>
+        <g stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)">
+          <line x1="106" y1="196" x2="116" y2="196"/><line x1="106" y1="220" x2="116" y2="220"/><line x1="106" y1="244" x2="116" y2="244"/>
+          <line x1="138" y1="210" x2="148" y2="210"/>
+        </g>
+        <rect class="bd-tip" data-tip="{{ t_pref }}" tabindex="0" x="150" y="176" width="100" height="68" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
+        <text class="bd-tip" data-tip="{{ t_pref }}" x="200" y="205" text-anchor="middle" fill="#16241b" font-size="11.5" font-weight="700">Prefetch buffer</text>
+        <text x="200" y="221" text-anchor="middle" fill="#5f6470" font-size="9.5">fetch address</text>
+        <text x="200" y="234" text-anchor="middle" fill="#5f6470" font-size="9.5">and a small queue</text>
+        <line x1="165" y1="174" x2="165" y2="38" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="161" y="96" text-anchor="end" fill="#5f6470" font-size="9.5">address</text>
+        <line x1="200" y1="38" x2="200" y2="174" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="204" y="132" fill="#5f6470" font-size="9.5">instruction</text>
+        <line x1="200" y1="244" x2="200" y2="270" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <rect class="bd-tip" data-tip="{{ t_cdec }}" tabindex="0" x="150" y="272" width="100" height="56" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
+        <text class="bd-tip" data-tip="{{ t_cdec }}" x="200" y="292" text-anchor="middle" fill="#16241b" font-size="11.5" font-weight="700">Compressed</text>
+        <text class="bd-tip" data-tip="{{ t_cdec }}" x="200" y="306" text-anchor="middle" fill="#16241b" font-size="11.5" font-weight="700">decoder</text>
+        <text x="200" y="320" text-anchor="middle" fill="#5f6470" font-size="9.5">16 &#8594; 32 bits</text>
+        <g stroke="#5f6470" stroke-width="1.2" fill="none" marker-end="url(#ah)">
+          <line x1="250" y1="300" x2="268" y2="300"/>
+          <polyline points="250,190 258,190 258,110 268,110"/>
+        </g>
 
-        <!-- the fetched instruction into stage 2 -->
-        <polyline points="300,243 330,243 330,111 354,111" fill="none" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <!-- stage 2: decode and read registers -->
+        <polyline points="292,110 430,110 430,196 438,196" fill="none" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="300" y="104" fill="#5f6470" font-size="9.5">PC (the instruction's address)</text>
+        <line x1="292" y1="300" x2="314" y2="300" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <rect class="bd-tip" data-tip="{{ t_dec }}" tabindex="0" x="316" y="272" width="94" height="56" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
+        <text class="bd-tip" data-tip="{{ t_dec }}" x="363" y="296" text-anchor="middle" fill="#16241b" font-size="11.5" font-weight="700">Decoder</text>
+        <text x="363" y="311" text-anchor="middle" fill="#5f6470" font-size="9.5">fields, immediate</text>
+        <line x1="363" y1="272" x2="363" y2="244" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="368" y="261" fill="#5f6470" font-size="9.5">rs1, rs2, rd</text>
+        <rect class="bd-tip" data-tip="{{ t_rf }}" tabindex="0" x="316" y="130" width="94" height="112" rx="5" fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3"/>
+        <text class="bd-tip" data-tip="{{ t_rf }}" x="363" y="178" text-anchor="middle" fill="#b45309" font-size="11.5" font-weight="700">Register file</text>
+        <text x="363" y="194" text-anchor="middle" fill="#5f6470" font-size="9.5">32 &#215; 32 bits,</text>
+        <text x="363" y="207" text-anchor="middle" fill="#5f6470" font-size="9.5">flip-flops</text>
+        <g font-size="8.5" fill="#b45309">
+          <text x="320" y="150">write</text>
+          <text x="406" y="164" text-anchor="end">rs1</text>
+          <text x="406" y="220" text-anchor="end">rs2</text>
+        </g>
 
-        <!-- stage 2: decode and execute -->
-        <rect x="340" y="56" width="362" height="290" rx="8" fill="#f7f6f2" stroke="#cdd0c8" stroke-dasharray="5 3"/>
-        <text x="352" y="72" fill="#5f6470" font-size="9.5" font-weight="700" letter-spacing="0.06em">STAGE 2  &#183;  DECODE AND EXECUTE</text>
-        <g fill="#ffffff" stroke="#cdd0c8">
-          <rect class="bd-tip" data-tip="{{ t_dec }}" tabindex="0" x="356" y="88" width="160" height="46" rx="5"/>
-          <rect class="bd-tip" data-tip="{{ t_ctl }}" tabindex="0" x="528" y="88" width="160" height="46" rx="5"/>
-          <rect class="bd-tip" data-tip="{{ t_csr }}" tabindex="0" x="528" y="150" width="160" height="70" rx="5"/>
+        <!-- operand multiplexers -->
+        <polygon class="bd-tip" data-tip="{{ t_opa }}" tabindex="0" points="440,148 458,160 458,212 440,224" fill="#eef0ec" stroke="#5f6470" stroke-width="1.2"/>
+        <polygon class="bd-tip" data-tip="{{ t_opb }}" tabindex="0" points="440,226 458,238 458,290 440,302" fill="#eef0ec" stroke="#5f6470" stroke-width="1.2"/>
+        <g stroke="#5f6470" stroke-width="1.2" fill="none" marker-end="url(#ah)">
+          <line x1="410" y1="160" x2="438" y2="160"/>
+          <polyline points="410,216 420,216 420,244 438,244"/>
+          <polyline points="410,306 432,306 432,280 438,280"/>
+          <line x1="458" y1="186" x2="474" y2="186"/>
+          <line x1="458" y1="264" x2="474" y2="264"/>
         </g>
-        <g fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3">
-          <rect class="bd-tip" data-tip="{{ t_rf }}" tabindex="0" x="356" y="150" width="160" height="70" rx="5"/>
-          <rect class="bd-tip" data-tip="{{ t_alu }}" tabindex="0" x="356" y="240" width="100" height="52" rx="5"/>
-          <rect class="bd-tip" data-tip="{{ t_md }}" tabindex="0" x="466" y="240" width="110" height="52" rx="5"/>
-          <rect class="bd-tip" data-tip="{{ t_lsu }}" tabindex="0" x="586" y="240" width="102" height="52" rx="5"/>
+        <text x="414" y="319" fill="#5f6470" font-size="9.5">immediate</text>
+
+        <!-- arithmetic logic unit -->
+        <polygon class="bd-tip" data-tip="{{ t_alu }}" tabindex="0" points="476,146 540,176 540,276 476,306 476,240 490,226 476,212" fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3"/>
+        <g class="bd-tip" data-tip="{{ t_alu }}" font-size="9.5" fill="#b45309" font-weight="700" text-anchor="middle">
+          <text x="515" y="204">arithmetic</text><text x="515" y="218">logic</text><text x="515" y="232">unit</text>
         </g>
-        <g font-size="12" font-weight="700" text-anchor="middle">
-          <text class="bd-tip" data-tip="{{ t_dec }}" x="436" y="108" fill="#16241b">Decoder</text>
-          <text class="bd-tip" data-tip="{{ t_ctl }}" x="608" y="108" fill="#16241b">Controller</text>
-          <text class="bd-tip" data-tip="{{ t_csr }}" x="608" y="172" fill="#16241b">Control and status</text>
-          <text class="bd-tip" data-tip="{{ t_csr }}" x="608" y="187" fill="#16241b">registers</text>
-          <text class="bd-tip" data-tip="{{ t_rf }}" x="436" y="172" fill="#b45309">Register file</text>
-          <text class="bd-tip" data-tip="{{ t_alu }}" x="406" y="262" fill="#b45309">Arithmetic</text>
-          <text class="bd-tip" data-tip="{{ t_alu }}" x="406" y="277" fill="#b45309">logic unit</text>
-          <text class="bd-tip" data-tip="{{ t_md }}" x="521" y="262" fill="#b45309">Multiplier</text>
-          <text class="bd-tip" data-tip="{{ t_md }}" x="521" y="277" fill="#b45309">and divider</text>
-          <text class="bd-tip" data-tip="{{ t_lsu }}" x="637" y="262" fill="#b45309">Load-store</text>
-          <text class="bd-tip" data-tip="{{ t_lsu }}" x="637" y="277" fill="#b45309">unit</text>
+        <text x="512" y="256" text-anchor="middle" fill="#b45309" font-size="9">+ &#8722; &lt; &#8810; &amp;</text>
+        <!-- its adder: the load and store address, and the branch and jump target -->
+        <polyline points="503,159 503,84 104,84 104,170 116,170" fill="none" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <line x1="503" y1="96" x2="618" y2="96" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <circle cx="503" cy="96" r="2.6" fill="#5f6470"/>
+        <text x="508" y="118" fill="#5f6470" font-size="9.5">adder result</text>
+        <text x="560" y="91" text-anchor="middle" fill="#5f6470" font-size="9.5">address</text>
+        <text x="312" y="80" fill="#5f6470" font-size="9.5">branch or jump target, back to fetch</text>
+
+        <!-- multiplier and divider -->
+        <rect class="bd-tip" data-tip="{{ t_md }}" tabindex="0" x="476" y="338" width="54" height="44" rx="5" fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3"/>
+        <text class="bd-tip" data-tip="{{ t_md }}" x="503" y="357" text-anchor="middle" fill="#b45309" font-size="9.5" font-weight="700">multiply</text>
+        <text class="bd-tip" data-tip="{{ t_md }}" x="503" y="370" text-anchor="middle" fill="#b45309" font-size="9.5" font-weight="700">divide</text>
+        <line x1="446" y1="360" x2="474" y2="360" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="442" y="363" text-anchor="end" fill="#5f6470" font-size="9.5">rs1, rs2</text>
+
+        <!-- result multiplexer -->
+        <polygon class="bd-tip" data-tip="{{ t_exmux }}" tabindex="0" points="548,200 564,212 564,372 548,384" fill="#eef0ec" stroke="#5f6470" stroke-width="1.2"/>
+        <g stroke="#5f6470" stroke-width="1.2" fill="none" marker-end="url(#ah)">
+          <line x1="540" y1="226" x2="546" y2="226"/>
+          <line x1="530" y1="360" x2="546" y2="360"/>
+          <line x1="564" y1="281" x2="738" y2="281"/>
         </g>
-        <g font-size="10.5" fill="#5f6470" text-anchor="middle">
-          <text x="436" y="124">reads the instruction</text>
-          <text x="608" y="124">branches, stalls, exceptions</text>
-          <text x="608" y="205">settings and counters</text>
-          <text x="436" y="189">32 registers &#215; 32 bits</text>
-          <text x="436" y="205">in flip-flops</text>
-        </g>
-        <!-- decode reads the registers; the registers feed the execute units; the controller owns the status registers -->
-        <line x1="436" y1="134" x2="436" y2="148" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
-        <line x1="406" y1="220" x2="406" y2="238" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
-        <line x1="490" y1="220" x2="490" y2="238" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
-        <line x1="608" y1="134" x2="608" y2="148" stroke="#5f6470" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ah)"/>
-        <!-- loads and stores, out to the data memory port and back -->
-        <polyline points="690,266 710,266 710,23 683,23" fill="none" stroke="#5f6470" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+        <text x="600" y="276" fill="#5f6470" font-size="9.5">execute result</text>
+
+        <!-- load-store unit and data memory -->
+        <rect class="bd-tip" data-tip="{{ t_lsu }}" tabindex="0" x="620" y="80" width="100" height="70" rx="5" fill="#d97706" fill-opacity="0.14" stroke="#d97706" stroke-width="1.3"/>
+        <text class="bd-tip" data-tip="{{ t_lsu }}" x="670" y="112" text-anchor="middle" fill="#b45309" font-size="11.5" font-weight="700">Load-store</text>
+        <text class="bd-tip" data-tip="{{ t_lsu }}" x="670" y="126" text-anchor="middle" fill="#b45309" font-size="11.5" font-weight="700">unit</text>
+        <line x1="596" y1="132" x2="618" y2="132" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="592" y="135" text-anchor="end" fill="#5f6470" font-size="9.5">store data (rs2)</text>
+        <line x1="650" y1="78" x2="650" y2="38" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="646" y="60" text-anchor="end" fill="#5f6470" font-size="9.5">address, store data</text>
+        <line x1="700" y1="38" x2="700" y2="78" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+        <text x="704" y="60" fill="#5f6470" font-size="9.5">load data</text>
+        <polyline points="700,150 700,214 738,214" fill="none" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+
+        <!-- control and status registers -->
+        <rect class="bd-tip" data-tip="{{ t_csr }}" tabindex="0" x="600" y="330" width="104" height="48" rx="5" fill="#ffffff" stroke="#cdd0c8"/>
+        <text class="bd-tip" data-tip="{{ t_csr }}" x="652" y="351" text-anchor="middle" fill="#16241b" font-size="10.5" font-weight="700">Control and</text>
+        <text class="bd-tip" data-tip="{{ t_csr }}" x="652" y="365" text-anchor="middle" fill="#16241b" font-size="10.5" font-weight="700">status registers</text>
+        <polyline points="704,354 724,354 724,318 738,318" fill="none" stroke="#5f6470" stroke-width="1.2" marker-end="url(#ah)"/>
+
+        <!-- write back -->
+        <polygon class="bd-tip" data-tip="{{ t_wbmux }}" tabindex="0" points="740,190 756,202 756,330 740,342" fill="#eef0ec" stroke="#5f6470" stroke-width="1.2"/>
+        <text x="748" y="182" text-anchor="middle" fill="#16241b" font-size="10" font-weight="700">write back</text>
+        <polyline points="756,266 790,266 790,440 306,440 306,146 314,146" fill="none" stroke="#5f6470" stroke-width="1.4" marker-end="url(#ah)"/>
+        <text x="560" y="435" text-anchor="middle" fill="#5f6470" font-size="9.5">the result, written back to register rd</text>
+
+        <!-- control -->
+        <rect class="bd-tip" data-tip="{{ t_ctl }}" tabindex="0" x="330" y="372" width="96" height="44" rx="5" fill="#ffffff" stroke="#9aa0a8" stroke-dasharray="4 3"/>
+        <text class="bd-tip" data-tip="{{ t_ctl }}" x="378" y="391" text-anchor="middle" fill="#16241b" font-size="10.5" font-weight="700">Controller</text>
+        <text x="378" y="405" text-anchor="middle" fill="#5f6470" font-size="9">branches, stalls, traps</text>
+        <polyline points="500,295 500,326 452,326 452,394 428,394" fill="none" stroke="#9aa0a8" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ahc)"/>
+        <text x="504" y="313" fill="#9aa0a8" font-size="9">branch</text><text x="504" y="323" fill="#9aa0a8" font-size="9">taken?</text>
+        <polyline points="330,394 128,394 128,264" fill="none" stroke="#9aa0a8" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#ahc)"/>
+        <text x="200" y="389" text-anchor="middle" fill="#9aa0a8" font-size="9">redirect fetch</text>
 
         <!-- legend -->
-        <rect x="120" y="364" width="12" height="12" rx="2" fill="#d97706" fill-opacity="0.14" stroke="#d97706"/>
-        <text x="138" y="374" fill="#5f6470" font-size="11.5">datapath: registers and arithmetic</text>
-        <rect x="400" y="364" width="12" height="12" rx="2" fill="#ffffff" stroke="#cdd0c8"/>
-        <text x="418" y="374" fill="#5f6470" font-size="11.5">fetch, decode and control</text>
-        <text x="360" y="400" text-anchor="middle" fill="#5f6470" font-size="11.5">Every block is standard cells: the core has no memory macros.</text>
+        <rect x="70" y="482" width="12" height="12" rx="2" fill="#d97706" fill-opacity="0.14" stroke="#d97706"/>
+        <text x="88" y="492" fill="#5f6470" font-size="11">datapath: holds or computes data</text>
+        <polygon points="300,480 312,485 312,493 300,498" fill="#eef0ec" stroke="#5f6470"/>
+        <text x="318" y="492" fill="#5f6470" font-size="11">multiplexer: passes one input</text>
+        <line x1="512" y1="488" x2="536" y2="488" stroke="#9aa0a8" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <text x="542" y="492" fill="#5f6470" font-size="11">control</text>
+        <text x="610" y="492" fill="#5f6470" font-size="11">every data wire is 32 bits</text>
       </svg>
     </div>
-    <p class="bd-hint">Hover over or tap any block to see what it does.</p>
+    <p class="bd-hint">Hover over or tap any part to see what it does.</p>
+{% endblock %}
+{% block reference_layout %}
+  <section class="puzzle-sec" id="reference-layout">
+    <h2>The reference layout, stage by stage</h2>
+    {# one stage at a time, large, opening on the finished die: the buttons (or the arrow keys) switch it;
+       the flow's own images, which are square #}
+    <div class="stage-viewer" id="stage-viewer">
+      <div class="sv-tabs" role="tablist" aria-label="Stages of the reference flow">
+        <button type="button" role="tab" data-sv="0" aria-selected="false"><span>1</span>Placement</button>
+        <button type="button" role="tab" data-sv="1" aria-selected="false"><span>2</span>Clock tree</button>
+        <button type="button" role="tab" data-sv="2" aria-selected="false"><span>3</span>Routing</button>
+        <button type="button" role="tab" data-sv="3" aria-selected="true"><span>4</span>Finish</button>
+      </div>
+      {% set stages = [
+        ("ibex_ref_1_placement", "Placement", "About 20,700 standard cells on an 81 by 81 &micro;m die, sized for 40 percent utilization (43 percent once buffers are added). The bare region at the top right is spare room that target leaves."),
+        ("ibex_ref_2_clock_tree", "Clock tree", "One clock tree from the clock pin to the core's 1,938 flip-flops and the clock gate's latch."),
+        ("ibex_ref_3_routing", "Routing", "Every signal routed on metal layers M2 to M7, with no shorts or via violations. The pins on the edges are the core's ports."),
+        ("ibex_ref_4_finish", "Finish", "The finished die, every layer at once: the layout the evaluator checks. 80.631 by 80.631 &micro;m, 2,126 ps declared (470 MHz) at the slow corner, 18.70 mW at the fixed 1,000 ps power clock, worst IR (current times resistance) drop 30.4 mV, hold met, zero shorts or via violations: the numbers an entry is scored against."),
+      ] %}
+      {% for img, name, cap in stages %}
+      <figure class="sv-pane" data-sv="{{ loop.index0 }}"{% if not loop.last %} hidden{% endif %}>
+        <a class="sv-img" href="/static/img/{{ img }}.webp?v={{ asset_v }}" target="_blank" rel="noopener" title="Open full size">
+          <img src="/static/img/{{ img }}.webp?v={{ asset_v }}" alt="The Ibex reference layout after {{ name | lower }}" style="aspect-ratio: 1 / 1"></a>
+        <figcaption><b>{{ name }}</b> {{ cap | safe }} <a class="sv-full" href="/static/img/{{ img }}.webp?v={{ asset_v }}" target="_blank" rel="noopener">Open the full-size image &#8599;</a></figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </section>
 {% endblock %}
 {% block fom_why %}
     <p class="fom-why">Speed weighs most because on a processor core the clock period is where placement,
       sizing and the clock tree show. <a href="#weights">How the weights were chosen</a>.</p>
 {% endblock %}
 {% block fom_note %}
-        <p class="fom-note">Slide each value against the reference and watch your score. The reference numbers
-          are published with the harness.</p>
+        <p class="fom-note">Slide each value against the reference and watch your score. The reference is 2,126 ps,
+          6,501 &micro;m&sup2; and 18.70 mW.</p>
 {% endblock %}
 {% block steps_need %}
     <p class="steps-need"><b>Basic requirements:</b> a Linux machine with Docker, 8 threads and 16 GB of
